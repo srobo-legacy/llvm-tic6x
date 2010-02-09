@@ -277,6 +277,7 @@ AC_CACHE_CHECK([target architecture],[llvm_cv_target_arch],
   msp430-*)               llvm_cv_target_arch="MSP430" ;;
   s390x-*)                llvm_cv_target_arch="SystemZ" ;;
   bfin-*)                 llvm_cv_target_arch="Blackfin" ;;
+  tic64x-*)               llvm_cv_target_arch="TMS320C64X" ;;
   *)                      llvm_cv_target_arch="Unknown" ;;
 esac])
 
@@ -463,7 +464,7 @@ AC_ARG_ENABLE([targets],AS_HELP_STRING([--enable-targets],
     [Build specific host targets: all,host-only,{target-name} (default=all)]),,
     enableval=all)
 case "$enableval" in
-  all) TARGETS_TO_BUILD="X86 Sparc PowerPC Alpha ARM Mips CellSPU PIC16 XCore MSP430 SystemZ Blackfin CBackend MSIL CppBackend" ;;
+  all) TARGETS_TO_BUILD="X86 Sparc PowerPC Alpha ARM Mips CellSPU PIC16 XCore MSP430 SystemZ Blackfin TMS320C64X CBackend MSIL CppBackend" ;;
   host-only)
     case "$llvm_cv_target_arch" in
       x86)         TARGETS_TO_BUILD="X86" ;;
@@ -479,6 +480,7 @@ case "$enableval" in
       MSP430)      TARGETS_TO_BUILD="MSP430" ;;
       SystemZ)     TARGETS_TO_BUILD="SystemZ" ;;
       Blackfin)    TARGETS_TO_BUILD="Blackfin" ;;
+      TMS320C64X)  TARGETS_TO_BUILD="TMS320C64X" ;;
       *)       AC_MSG_ERROR([Can not set target to build]) ;;
     esac
     ;;
@@ -500,6 +502,7 @@ case "$enableval" in
         cbe)      TARGETS_TO_BUILD="CBackend $TARGETS_TO_BUILD" ;;
         msil)     TARGETS_TO_BUILD="MSIL $TARGETS_TO_BUILD" ;;
         cpp)      TARGETS_TO_BUILD="CppBackend $TARGETS_TO_BUILD" ;;
+        tms320c64x) TARGETS_TO_BUILD="TMS320C64X $TARGETS_TO_BUILD" ;;
         *) AC_MSG_ERROR([Unrecognized target $a_target]) ;;
       esac
   done
