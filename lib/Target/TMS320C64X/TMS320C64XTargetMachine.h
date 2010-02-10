@@ -11,6 +11,7 @@
 #ifndef LLVM_TARGET_TMS320C64X_TARGETMACHINE_H
 #define LLVM_TARGET_TMS320C64X_TARGETMACHINE_H
 
+#include "TMS320C64XSubtarget.h"
 #include "llvm/Target/TargetData.h"
 #include "llvm/Target/TargetFrameInfo.h"
 #include "llvm/Target/TargetMachine.h"
