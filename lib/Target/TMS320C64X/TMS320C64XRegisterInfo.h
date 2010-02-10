@@ -19,7 +19,8 @@ namespace llvm {
 class TargetInstrInfo;
 class TMS320C64XTargetMachine;
 
-struct TMS320C64XRegisterInfo : public TMS320C64XGenRegisterInfo {
+// FIXME: make register info extend table definition
+struct TMS320C64XRegisterInfo : TargetRegisterInfo /*: public TMS320C64XGenRegisterInfo*/ {
 private:
 	TMS320C64XTargetMachine &TM;
 	const TargetInstrInfo &TII;
@@ -28,7 +29,21 @@ public:
 	TMS320C64XRegisterInfo(TMS320C64XTargetMachine &tm,
 				const TargetInstrInfo &tii);
 
-	/* Yet again, avoid implementing anything machdep until it's needed */
+	const unsigned int *getCalleeSavedRegs(const MachineFunction *) const;
+	const TargetRegisterClass* const*
+		getCalleeSavedRegClasses(const MachineFunction *) const;
+	BitVector getReservedRegs(const MachineFunction &MF) const;
+	unsigned int getSubReg(unsigned int, unsigned int) const;
+	bool hasFP(const MachineFunction &MF);
+	void eliminateFrameIndex(MachineBasicBlock::iterator I, int SPAdj
+					RegScavenger *r) const;
+	void emitPrologue(MachineFunction &MF) const;
+	void emitEpilogue(MachineFunction &MF, MachineBasicBlok &MBB) const;
+
+	/* Debug stuff, apparently */
+	unsigned int getRARegister() const;
+	unsigned int getFrameRegister(MachineFunction &MF) const;
+	int getDwarfRegNum(unsigned RegNum, bool isEH) const;
 };
 
 } // llvm namespace
