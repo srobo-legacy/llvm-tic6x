@@ -25,7 +25,8 @@ class TMS320C64XTargetMachine : public LLVMTargetMachine {
 	const TargetData		DataLayout;
 	TMS320C64XInstrInfo		InstrInfo;
 	TMS320C64XTargetLowering	TLInfo;
-	TMS320C64XTargetFrameInfo	FrameInfo;
+	/* Can't see another backend that subclasses this */
+	TargetFrameInfo	FrameInfo;
 
 public:
 	TMS320C64XTargetMachine(const Target &T, const std::string &TT,
