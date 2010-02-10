@@ -34,11 +34,11 @@ public:
 		getCalleeSavedRegClasses(const MachineFunction *) const;
 	BitVector getReservedRegs(const MachineFunction &MF) const;
 	unsigned int getSubReg(unsigned int, unsigned int) const;
-	bool hasFP(const MachineFunction &MF);
-	void eliminateFrameIndex(MachineBasicBlock::iterator I, int SPAdj
+	bool hasFP(const MachineFunction &MF) const;
+	void eliminateFrameIndex(MachineBasicBlock::iterator I, int SPAdj,
 					RegScavenger *r) const;
 	void emitPrologue(MachineFunction &MF) const;
-	void emitEpilogue(MachineFunction &MF, MachineBasicBlok &MBB) const;
+	void emitEpilogue(MachineFunction &MF, MachineBasicBlock &MBB) const;
 
 	/* Debug stuff, apparently */
 	unsigned int getRARegister() const;
