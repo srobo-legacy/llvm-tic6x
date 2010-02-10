@@ -11,13 +11,14 @@
 #ifndef LLVM_TARGET_TMS320C64X_INSTRINFO_H
 #define LLVM_TARGET_TMS320C64X_INSTRINFO_H
 
+#include "TMS320C64XRegisterInfo.h"
 #include "llvm/Target/TargetInstrInfo.h"
 
 namespace llvm {
 
 class TMS320C64XTargetMachine;
 
-class TMX320C64XInstrInfo : public TargetInstrInfoImpl {
+class TMS320C64XInstrInfo : public TargetInstrInfoImpl {
 	const TMS320C64XRegisterInfo RI;
 	TMS320C64XTargetMachine &TM;
 public:
