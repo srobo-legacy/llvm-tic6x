@@ -1,4 +1,4 @@
-//===- MSP430InstrInfo.cpp - MSP430 Instruction Information ---------------===//
+//===- TMS320C64XInstrInfo.cpp - TMS320C64X Instruction Information -------===//
 //
 //                     The LLVM Compiler Infrastructure
 //

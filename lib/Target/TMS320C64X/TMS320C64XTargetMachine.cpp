@@ -6,7 +6,6 @@
 // what student robotics decides to do with this code
 // Derived from MSP430 implementation, see LLVM's LICENSE.TXT
 //
-//
 //===----------------------------------------------------------------------===//
 
 #include "TMS320C64XTargetMachine.h"
