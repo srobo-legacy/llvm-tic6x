@@ -4,6 +4,8 @@
 //
 // This file Copyright Jeremy Morse (jmorse+llvm@studentrobotics.org), pending
 // what student robotics decides to do with this code
+// Derived from MSP430 implementation, see LLVM's LICENSE.TXT
+//
 //
 //===----------------------------------------------------------------------===//
 
