@@ -44,6 +44,15 @@ def PostDecImm	: AddrMode<11>;
 def PlainReg	: AddrMode<12>;
 def PlainImm	: AddrMode<13>;
 
+class InstUnit<int u> {
+	int unit = u;
+}
+
+def UnitL	: InstUnit<0>;
+def UnitS	: InstUnit<1>;
+def UnitD	: InstUnit<2>;
+def UnitM	: InstUnit<3>;
+
 class MemAccessOperand<MainReg b, AddrMode m, MemIndex idx> : Operand<i32> {
 	MainReg base = b;
 	AddrMode mode = m;
