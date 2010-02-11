@@ -22,7 +22,8 @@ include "TMS320C64XRegisterInfo.td"
 // Instruction formats, instructions
 //===----------------------------------------------------------------------===//
 
-//None right now
+include "TMS320C64XInstrFormats.td"
+include "TMS320C64XInstrInfo.td"
 
 //===----------------------------------------------------------------------===//
 // Subtarget features:
