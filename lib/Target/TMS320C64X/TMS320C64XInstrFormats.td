@@ -52,5 +52,10 @@ class MemAccessOperand<MainReg b, AddrMode m, MemIndex idx> : Operand<i32> {
 
 // ~
 
-// Dummy base class
-class TMSIns : Instruction { }
+class TMSInst<dag outs, dag ins, string mnemonic, list<dag> pattern>
+							: Instruction {
+	let OutOperandList = outs;
+	let InOperandList = ins;
+	let AsmString = mnemonic;
+	let Pattern = pattern;
+}
