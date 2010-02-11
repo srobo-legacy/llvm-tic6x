@@ -61,10 +61,12 @@ class MemAccessOperand<MainReg b, AddrMode m, MemIndex idx> : Operand<i32> {
 
 // ~
 
-class TMSInst<dag outs, dag ins, string mnemonic, list<dag> pattern>
+class TMSInst<dag outs, dag ins, string mnemonic, list<dag> pattern, InstUnit u>
 							: Instruction {
 	let OutOperandList = outs;
 	let InOperandList = ins;
 	let AsmString = mnemonic;
 	let Pattern = pattern;
+	InstUnit unit = u;
 }
+multiclass MemoryInst<string 
