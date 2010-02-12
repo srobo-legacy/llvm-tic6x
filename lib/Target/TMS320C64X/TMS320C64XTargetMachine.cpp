@@ -25,7 +25,7 @@ TMS320C64XTargetMachine::TMS320C64XTargetMachine(const Target &T,
 						const std::string &TT,
 						const std::string &FS) :
 	LLVMTargetMachine(T, TT),
-	Subtarget(TT, FS),
+	Subtarget(),
 	DataLayout("e-p:32:32:32-i8:8:8-i16:16:16-i32:32:32-n32"),
 	/* No float types - could define n40, in that the DSP supports 40 bit
 	 * arithmatic, however it doesn't support it for all logic operations,
@@ -38,7 +38,6 @@ TMS320C64XTargetMachine::TMS320C64XTargetMachine(const Target &T,
 
 bool TMS320C64XTargetMachine::addInstSelector(PassManagerBase &PM,
 						CodeGenOpt::Level OptLevel) {
-	PM.add(createTMS320C64XISelDag(*this, OptLevel));
 	return false;
 }
 
