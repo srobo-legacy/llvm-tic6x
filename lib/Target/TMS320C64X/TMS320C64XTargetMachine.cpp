@@ -8,7 +8,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "TMS320C64X.h"
 #include "TMS320C64XTargetMachine.h"
+#include "TMS320C64XTargetAsmInfo.h"
 #include "llvm/PassManager.h"
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/Target/TargetAsmInfo.h"

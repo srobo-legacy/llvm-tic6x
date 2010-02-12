@@ -1,0 +1,25 @@
+//=====-- TMS320C64XTargetAsmInfo.h - TI asm properties -*- C++ -*--====//
+//
+//                     The LLVM Compiler Infrastructure
+//
+// This file Copyright Jeremy Morse (jmorse+llvm@studentrobotics.org), pending
+// what student robotics decides to do with this code
+// Derived from Sparc implementation, see LLVM's LICENSE.TXT
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef LLVM_TARGET_TMS320C64X_TARGETASMINFO_H
+#define LLVM_TARGET_TMS320C64X_TARGETASMINFO_H
+
+#include "llvm/Target/TargetAsmInfo.h"
+
+namespace llvm {
+  class Target;
+  class StringRef;
+  struct TMS320C64XTargetAsmInfo : public TargetAsmInfo {
+    explicit TMS320C64XTargetAsmInfo(const Target &T, const StringRef &TT);
+  };
+
+} // namespace llvm
+
+#endif
