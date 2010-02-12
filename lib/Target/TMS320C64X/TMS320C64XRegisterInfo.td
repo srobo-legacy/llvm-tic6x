@@ -11,6 +11,7 @@
 class MainReg<bits<6> num, bit side, string n> : Register<n> {
 	field bits<6> Num = num;
 	bit side = side;
+	let Namespace = "TMS320C64X";
 }
 
 def A0	:	MainReg<0, 0, "A0">, DwarfRegNum<[0]>;
@@ -98,13 +99,13 @@ let MethodProtos = [{
 	iterator allocation_order_end(const MachineFunction &MF) const;
 }];
 let MethodBodies = [{
-	GPRegs::iterator
-	GPRegs::allocation_order_begin(const MachineFunction &MF)
+	GPRegsClass::iterator
+	GPRegsClass::allocation_order_begin(const MachineFunction &MF)
 									const {
 		 return begin();
 	}
-	GPRegs::iterator
-	GPRegs::allocation_order_end(const MachineFunction &MF)
+	GPRegsClass::iterator
+	GPRegsClass::allocation_order_end(const MachineFunction &MF)
 									const {
 		// No allocation of B30 or B31
 		return end()-2;
@@ -133,13 +134,13 @@ let MethodProtos = [{
 	iterator allocation_order_end(const MachineFunction &MF) const;
 }];
 let MethodBodies = [{
-	GPRegs::iterator
-	GPRegs::allocation_order_begin(const MachineFunction &MF)
+	VectorRegsClass::iterator
+	VectorRegsClass::allocation_order_begin(const MachineFunction &MF)
 									const {
 		 return begin();
 	}
-	GPRegs::iterator
-	GPRegs::allocation_order_end(const MachineFunction &MF)
+	VectorRegsClass::iterator
+	VectorRegsClass::allocation_order_end(const MachineFunction &MF)
 									const {
 		// No allocation of B30 or B31
 		return end()-2;
