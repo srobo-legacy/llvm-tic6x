@@ -12,3 +12,12 @@
 // with a) alignment limitation, b) offset limitation, c) sign extension
 def ldb : TMSInst<(outs GPRegs:$dst), (ins i8mem:$ptr), "ldb",
 	[(set GPRegs:$dst, (sextloadi8 (load node:$ptr)))], UnitD>;
+
+def ldbu : TMSInst<(outs GPRegs:$dst), (ins i8mem:$ptr), "ldbu",
+	[(set GPRegs:$dst, (zextloadi8 (load node:$ptr)))], UnitD>;
+
+def ldh : TMSInst<(outs GPRegs:$dst), (ins i16mem:$ptr), "ldh",
+	[(set GPRegs:$dst, (sextloadi16 (load node:$ptr)))], UnitD>;
+
+def ldhu : TMSInst<(outs GPRegs:$dst), (ins i16mem:$ptr), "ldhu",
+	[(set GPRegs:$dst, (zextloadi16 (load node:$ptr)))], UnitD>;
