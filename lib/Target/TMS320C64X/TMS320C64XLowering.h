@@ -23,6 +23,7 @@ public:
 	explicit TMS320C64XLowering(TMS320C64XTargetMachine &TM);
 
 	unsigned getFunctionAlignment(const Function *F) const;
+	const TMS320C64XTargetMachine &TM;
 };
 } // namespace llvm
 

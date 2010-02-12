@@ -9,6 +9,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TMS320C64XLowering.h"
+#include "TMS320C64XTargetMachine.h"
 #include "llvm/DerivedTypes.h"
 #include "llvm/Function.h"
 #include "llvm/Intrinsics.h"
@@ -27,8 +28,7 @@
 using namespace llvm;
 
 TMS320C64XLowering::TMS320C64XLowering(TMS320C64XTargetMachine &tm) :
-	TargetLowering(tm, new TargetLoweringObjectFileCOFF()),
-	Subtarget(*tm.getSubtargetImpl()), TM(tm)
+	TargetLowering(tm, new TargetLoweringObjectFileCOFF()), TM(tm)
 {
 
 	/* Again; implement later */
