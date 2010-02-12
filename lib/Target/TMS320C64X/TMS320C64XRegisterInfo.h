@@ -11,16 +11,17 @@
 #ifndef LLVM_TARGET_TMS320C64X_REGISTERINFO_H
 #define LLVM_TARGET_TMS320C64X_REGISTERINFO_H
 
+#include "TMS320C64XGenRegisterInfo.h.inc"
+#include "TMS320C64XGenRegisterNames.inc"
+
 #include "llvm/Target/TargetRegisterInfo.h"
-// Include here: register definition table
 
 namespace llvm {
 
 class TargetInstrInfo;
 class TMS320C64XTargetMachine;
 
-// FIXME: make register info extend table definition
-struct TMS320C64XRegisterInfo : TargetRegisterInfo /*: public TMS320C64XGenRegisterInfo*/ {
+struct TMS320C64XRegisterInfo : TMS320C64XGenRegisterInfo {
 private:
 	TMS320C64XTargetMachine &TM;
 	const TargetInstrInfo &TII;
