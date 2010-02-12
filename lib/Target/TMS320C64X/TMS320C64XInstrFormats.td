@@ -53,7 +53,7 @@ def UnitS	: InstUnit<1>;
 def UnitD	: InstUnit<2>;
 def UnitM	: InstUnit<3>;
 
-class MemAcc<ValueType sz, string printMethod> : Operand<sz> {
+class MemAcc<ValueType sz, string printMethod> : Operand<i32> {
 	let PrintMethod = printMethod;
 	let MIOperandInfo = (ops ptr_rc, i1, i8, GPRegs);
 }
