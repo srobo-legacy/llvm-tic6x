@@ -67,6 +67,7 @@ def i64mem	: MemAcc<i64, "printi64mem">;
 
 class TMSInst<dag outs, dag ins, string mnemonic, list<dag> pattern, InstUnit u>
 							: Instruction {
+	let Namespace = "TMS320C64X";
 	let OutOperandList = outs;
 	let InOperandList = ins;
 	let AsmString = mnemonic;
