@@ -53,11 +53,15 @@ def UnitS	: InstUnit<1>;
 def UnitD	: InstUnit<2>;
 def UnitM	: InstUnit<3>;
 
-class MemAccessOperand<MainReg b, AddrMode m, MemIndex idx> : Operand<i32> {
-	MainReg base = b;
-	AddrMode mode = m;
-	MemIndex index = idx;
+class MemAcc<ValueType sz, string printMethod> : Operand<sz> {
+	let PrintMethod = printMethod;
+	let MIOperandInfo = (ops ptr_rc, i1, i8, GeneralRegs);
 }
+
+def i8mem	: MemAcc<i8, "printi8mem">;
+def i16mem	: MemAcc<i16, "printi16mem">;
+def i32mem	: MemAcc<i32, "printi32mem">;
+def i64mem	: MemAcc<i64, "printi64mem">;
 
 // ~
 
@@ -69,4 +73,3 @@ class TMSInst<dag outs, dag ins, string mnemonic, list<dag> pattern, InstUnit u>
 	let Pattern = pattern;
 	InstUnit unit = u;
 }
-multiclass MemoryInst<string 
