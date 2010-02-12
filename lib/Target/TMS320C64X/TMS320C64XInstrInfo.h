@@ -12,6 +12,11 @@
 #define LLVM_TARGET_TMS320C64X_INSTRINFO_H
 
 #include "TMS320C64XRegisterInfo.h"
+#include "TMS320C64XGenRegisterInfo.h.inc"
+#include "TMS320C64XGenRegisterNames.inc"
+#include "TMS320C64XGenInstrNames.inc"
+#include "TMS320C64XGenRegisterInfo.inc"
+#include "TMS320C64XGenInstrInfo.inc"
 #include "llvm/Target/TargetInstrInfo.h"
 
 namespace llvm {
