@@ -78,7 +78,7 @@ def B29	:	MainReg<61, 1, "B29">, DwarfRegNum<[61]>;
 def B30	:	MainReg<62, 1, "B30">, DwarfRegNum<[62]>;
 def B31	:	MainReg<63, 1, "B31">, DwarfRegNum<[63]>;
 
-def GeneralRegs : RegisterClass<"TMS320C64X", [i32], 32,
+def GPRegs : RegisterClass<"TMS320C64X", [i32], 32,
 	[
 		/* Following most other arches, make one half of registers
 		 * volatile (and allocate first), the other half nonvolatile.
@@ -98,13 +98,13 @@ let MethodProtos = [{
 	iterator allocation_order_end(const MachineFunction &MF) const;
 }];
 let MethodBodies = [{
-	GeneralRegs::iterator
-	GeneralRegs::allocation_order_begin(const MachineFunction &MF)
+	GPRegs::iterator
+	GPRegs::allocation_order_begin(const MachineFunction &MF)
 									const {
 		 return begin();
 	}
-	GeneralRegs::iterator
-	GeneralRegs::allocation_order_end(const MachineFunction &MF)
+	GPRegs::iterator
+	GPRegs::allocation_order_end(const MachineFunction &MF)
 									const {
 		// No allocation of B30 or B31
 		return end()-2;
@@ -133,13 +133,13 @@ let MethodProtos = [{
 	iterator allocation_order_end(const MachineFunction &MF) const;
 }];
 let MethodBodies = [{
-	GeneralRegs::iterator
-	GeneralRegs::allocation_order_begin(const MachineFunction &MF)
+	GPRegs::iterator
+	GPRegs::allocation_order_begin(const MachineFunction &MF)
 									const {
 		 return begin();
 	}
-	GeneralRegs::iterator
-	GeneralRegs::allocation_order_end(const MachineFunction &MF)
+	GPRegs::iterator
+	GPRegs::allocation_order_end(const MachineFunction &MF)
 									const {
 		// No allocation of B30 or B31
 		return end()-2;

@@ -55,7 +55,7 @@ def UnitM	: InstUnit<3>;
 
 class MemAcc<ValueType sz, string printMethod> : Operand<sz> {
 	let PrintMethod = printMethod;
-	let MIOperandInfo = (ops ptr_rc, i1, i8, GeneralRegs);
+	let MIOperandInfo = (ops ptr_rc, i1, i8, GPRegs);
 }
 
 def i8mem	: MemAcc<i8, "printi8mem">;

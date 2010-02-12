@@ -10,5 +10,5 @@
 
 // Loads: we can handle all post/pre inc/dec modes, and all indexing situations,
 // with a) alignment limitation, b) offset limitation, c) sign extension
-def ldb : TMSInst<(outs GeneralRegs:$dst), (ins i8mem:$ptr), "ldb",
-	[(set GeneralRegs:$dst, (extloadi8 (load node:$ptr)))], UnitD>;
+def ldb : TMSInst<(outs GPRegs:$dst), (ins i8mem:$ptr), "ldb",
+	[(set GPRegs:$dst, (extloadi8 (load node:$ptr)))], UnitD>;
