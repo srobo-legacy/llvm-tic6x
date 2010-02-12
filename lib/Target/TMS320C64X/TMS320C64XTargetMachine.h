@@ -24,7 +24,7 @@ class TMS320C64XTargetMachine : public LLVMTargetMachine {
 	TMS320C64XSubtarget		Subtarget;
 	const TargetData		DataLayout;
 	TMS320C64XInstrInfo		InstrInfo;
-	TMS320C64XTargetLowering	TLInfo;
+	TMS320C64XLowering		TLInfo;
 	/* Can't see another backend that subclasses this */
 	TargetFrameInfo	FrameInfo;
 
@@ -42,8 +42,8 @@ public:
 			const { return &Subtarget; }
 	virtual const TargetRegisterInfo *getRegisterInfo()
 			const { return &InstrInfo.getRegisterInfo(); }
-	virtual TMS320C64XTargetLowering *getTargetLowering()
-		const { return const_cast<TMS320C64XTargetLowering*>(&TLInfo); }
+	virtual TMS320C64XLowering *getTargetLowering()
+		const { return const_cast<TMS320C64XLowering*>(&TLInfo); }
 	virtual bool addInstSelector(PassManagerBase &PM,
 					CodeGenOpt::Level OptLevel);
 };

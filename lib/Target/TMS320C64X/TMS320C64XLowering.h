@@ -18,9 +18,9 @@ namespace llvm {
 class TMS320C64XSubtarget;
 class TMS320C64XTargetMachine;
 
-class TMS320C64XTargetLowering : public TargetLowering {
+class TMS320C64XLowering : public TargetLowering {
 public:
-	explicit TMS320C64XTargetLowering(TMS320C64XTargetMachine &TM);
+	explicit TMS320C64XLowering(TMS320C64XTargetMachine &TM);
 
 	unsigned getFunctionAlignment(const Function *F) const;
 };
