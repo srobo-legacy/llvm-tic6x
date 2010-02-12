@@ -14,6 +14,8 @@
 
 #include "TMS320C64XSubtarget.h"
 #include "TMS320C64XLowering.h"
+#include "TMS320C64XInstrInfo.h"
+
 #include "llvm/Target/TargetData.h"
 #include "llvm/Target/TargetFrameInfo.h"
 #include "llvm/Target/TargetMachine.h"
