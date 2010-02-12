@@ -26,7 +26,7 @@
 #include "llvm/Target/TargetLoweringObjectFile.h"
 using namespace llvm;
 
-TMS320C64XLowering::TMS320C64xLowering(TMS320C64XTargetMachine &tm) :
+TMS320C64XLowering::TMS320C64XLowering(TMS320C64XTargetMachine &tm) :
 	TargetLowering(tm, new TargetLoweringObjectFileCOFF()),
 	Subtarget(*tm.getSubtargetImpl()), TM(tm)
 {
