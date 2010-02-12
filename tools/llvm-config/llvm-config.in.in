@@ -381,7 +381,8 @@ sub expand_names (@) {
     my @names = @_;
     my @result;
     foreach my $name (@names) {
-        if (defined $LIB_TO_SET_MAP{$name}) {
+	if (!defined $name) {
+	} elsif (defined $LIB_TO_SET_MAP{$name}) {
             # We've hit bottom: An actual library name.
             push @result, $name;
         } elsif (defined $NAME_MAP{$name}) {
