@@ -63,6 +63,8 @@ def i16mem	: MemAcc<i16, "printi16mem">;
 def i32mem	: MemAcc<i32, "printi32mem">;
 def i64mem	: MemAcc<i64, "printi64mem">;
 
+def AddrType : ComplexPattern<i32, 4, "AddrBees", [], []>;
+
 // ~
 
 class TMSInst<dag outs, dag ins, string mnemonic, list<dag> pattern, InstUnit u>
