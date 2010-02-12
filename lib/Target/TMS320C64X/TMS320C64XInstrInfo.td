@@ -25,3 +25,12 @@ def ldhu : TMSInst<(outs GPRegs:$dst), (ins i16mem:$ptr), "ldhu",
 
 def ldw : TMSInst<(outs GPRegs:$dst), (ins i32mem:$ptr), "ldw",
 	[(set GPRegs:$dst, (sextloadi32 (load node:$ptr)))], UnitD>;
+
+def stb : TMSInst<(outs), (ins i8mem:$ptr, GPRegs:$reg), "stb",
+	[(truncstorei8 GPRegs:$reg, i8mem:$ptr)], UnitD>;
+
+def sth : TMSInst<(outs), (ins i16mem:$ptr, GPRegs:$reg), "sth",
+	[(truncstorei16 GPRegs:$reg, i16mem:$ptr)], UnitD>;
+
+def stw : TMSInst<(outs), (ins i32mem:$ptr, GPRegs:$reg), "stw",
+	[(truncstorei32 GPRegs:$reg, i32mem:$ptr)], UnitD>;
