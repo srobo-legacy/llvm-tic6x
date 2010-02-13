@@ -21,7 +21,7 @@ BUILT_SOURCES =	TMS320C64XGenRegisterInfo.h.inc \
 		TMS320C64XInstrInfo.cpp TMS320C64XRegisterInfo.cpp \
 		TMS320C64XLowering.cpp
 
-DIRS =
+DIRS = TargetInfo
 
 include $(LEVEL)/Makefile.common
 
