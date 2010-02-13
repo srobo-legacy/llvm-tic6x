@@ -4,4 +4,4 @@ add_llvm_library(LLVMTMS320C64XInfo
 	TMS320C64XTargetInfo.cpp
 )
 
-add_dependencies(LLVMTMS320C64XInfo TMS320C64XCodeGenTable_gen)
+add_dependencies(LLVMTMS320C64XInfo TMS320C64X)

@@ -7,7 +7,7 @@ tablegen(TMS320C64XGenInstrNames.inc -gen-instr-enums)
 tablegen(TMS320C64XGenInstrInfo.inc -gen-instr-desc)
 //tablegen(TMS320C64XGenAsmWriter.inc -gen-asm-writer)
 
-add_llvm_target(TMS320C64XCodeGen
+add_llvm_target(TMS320C64X
   TMS320C64XInstrInfo.cpp
   TMS320C64XLowering.cpp
   TMS320C64XRegisterInfo.cpp
@@ -16,4 +16,4 @@ add_llvm_target(TMS320C64XCodeGen
   TMS320C64XTargetMachine.cpp
   )
 
-target_link_libraries (LLVMTMS320C64XCodeGen LLVMSelectionDAG)
+target_link_libraries (LLVMTMS320C64X LLVMSelectionDAG)
