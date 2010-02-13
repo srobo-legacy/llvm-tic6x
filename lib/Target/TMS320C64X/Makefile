@@ -8,7 +8,7 @@
 # 
 ##===----------------------------------------------------------------------===##
 LEVEL = ../../..
-LIBRARYNAME = LLVMTMS320C64XCodeGen
+LIBRARYNAME = LLVMTMS320C64X
 TARGET = TMS320C64X
 
 # Make sure that tblgen is run, first thing.
