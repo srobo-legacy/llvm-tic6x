@@ -21,6 +21,7 @@ class TMS320C64XTargetMachine;
 class TMS320C64XLowering : public TargetLowering {
 public:
 	explicit TMS320C64XLowering(TMS320C64XTargetMachine &TM);
+	~TMS320C64XLowering();
 
 	unsigned getFunctionAlignment(const Function *F) const;
 	const TMS320C64XTargetMachine &TM;

@@ -34,3 +34,10 @@ TMS320C64XLowering::TMS320C64XLowering(TMS320C64XTargetMachine &tm) :
 	/* Again; implement later */
 	return;
 }
+
+TMS320C64XLowering::~TMS320C64XLowering()
+{
+
+	/* _nothing_ */
+	return;
+}
