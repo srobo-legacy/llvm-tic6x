@@ -39,6 +39,7 @@ const char *Triple::getArchTypeName(ArchType Kind) {
   case x86:     return "i386";
   case x86_64:  return "x86_64";
   case xcore:   return "xcore";
+  case tms320c64x: return "tms320c64x";
   }
 
   return "<invalid>";
