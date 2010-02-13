@@ -29,6 +29,7 @@ private:
 public:
 	TMS320C64XRegisterInfo(TMS320C64XTargetMachine &tm,
 				const TargetInstrInfo &tii);
+	~TMS320C64XRegisterInfo();
 
 	const unsigned int *getCalleeSavedRegs(const MachineFunction *) const;
 	const TargetRegisterClass* const*

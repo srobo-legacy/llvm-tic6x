@@ -26,3 +26,10 @@ TMS320C64XRegisterInfo::TMS320C64XRegisterInfo(TMS320C64XTargetMachine &tm,
 
 	return;
 }
+
+TMS320C64XRegisterInfo::~TMS320C64XRegisterInfo()
+{
+
+	/* as ever, nothing */
+	return;
+}
