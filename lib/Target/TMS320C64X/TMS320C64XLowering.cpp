@@ -46,5 +46,5 @@ unsigned
 TMS320C64XLowering::getFunctionAlignment(Function const*) const
 {
 
-	llvm_unreachable_internal("Unimplemented function getFunctionAlignment ;_;\n");
+	return 5; /* 32 bytes; instruction packet */
 }
