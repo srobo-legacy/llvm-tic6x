@@ -19,7 +19,8 @@ BUILT_SOURCES =	TMS320C64XGenRegisterInfo.h.inc \
 		TMS320C64XGenInstrInfo.inc \
 		TMS320C64XTargetMachine.cpp TMS320C64XSubtarget.cpp \
 		TMS320C64XInstrInfo.cpp TMS320C64XRegisterInfo.cpp \
-		TMS320C64XLowering.cpp TMS320C64XTargetAsmInfo.cpp
+		TMS320C64XLowering.cpp TMS320C64XTargetAsmInfo.cpp \
+		TMS320C64XSelector.cpp
 
 DIRS = TargetInfo
 
