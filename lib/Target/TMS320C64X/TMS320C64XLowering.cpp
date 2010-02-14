@@ -41,3 +41,10 @@ TMS320C64XLowering::~TMS320C64XLowering()
 	/* _nothing_ */
 	return;
 }
+
+unsigned
+TMS320C64XLowering::getFunctionAlignment(Function const*) const
+{
+
+	llvm_unreachable_internal("Unimplemented function getFunctionAlignment ;_;\n");
+}
