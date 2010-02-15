@@ -16,6 +16,8 @@ public:
 	explicit TMS320C64XInstSelectorPass(TMS320C64XTargetMachine &TM);
 
 	void InstructionSelect();
-	/* As ever, add more as required */
+	const char *getPassName() const {
+		return "TMS320C64X Instruction Selection";
+	}
 };
 }
