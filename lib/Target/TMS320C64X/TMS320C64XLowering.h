@@ -13,6 +13,9 @@
 
 #include "llvm/CodeGen/SelectionDAG.h"
 #include "llvm/Target/TargetLowering.h"
+#include "llvm/CodeGen/SelectionDAGISel.h"
+#include "llvm/CodeGen/ValueTypes.h"
+#include "llvm/Target/TargetLoweringObjectFile.h"
 
 namespace llvm {
 class TMS320C64XSubtarget;
@@ -24,6 +27,12 @@ public:
 	~TMS320C64XLowering();
 
 	unsigned getFunctionAlignment(const Function *F) const;
+	SDValue LowerFormalArguments(SDValue Chain,
+				unsigned CallConv, bool isVarArg,
+				const SmallVectorImpl<ISD::InputArg> &Ins,
+				DebugLoc dl, SelectionDAG &DAG,
+				SmallVectorImpl<SDValue> &InVals);
+
 	const TMS320C64XTargetMachine &TM;
 };
 } // namespace llvm

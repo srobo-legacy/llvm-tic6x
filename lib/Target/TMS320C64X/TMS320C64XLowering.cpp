@@ -22,6 +22,7 @@
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/PseudoSourceValue.h"
+#include "llvm/CodeGen/SelectionDAG.h"
 #include "llvm/CodeGen/SelectionDAGISel.h"
 #include "llvm/CodeGen/ValueTypes.h"
 #include "llvm/Target/TargetLoweringObjectFile.h"
@@ -47,4 +48,15 @@ TMS320C64XLowering::getFunctionAlignment(Function const*) const
 {
 
 	return 5; /* 32 bytes; instruction packet */
+}
+
+SDValue
+TMS320C64XLowering::LowerFormalArguments(SDValue Chain,
+				unsigned CallConv, bool isVarArg,
+				const SmallVectorImpl<ISD::InputArg> &Ins,
+				DebugLoc dl, SelectionDAG &DAG,
+				SmallVectorImpl<SDValue> &InVals)
+{
+
+	llvm_unreachable_internal("ponies");
 }
