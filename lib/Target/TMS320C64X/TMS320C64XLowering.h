@@ -18,6 +18,12 @@
 #include "llvm/Target/TargetLoweringObjectFile.h"
 
 namespace llvm {
+namespace TMSISD {
+	enum {
+		FIRST_NUMBER = ISD::BUILTIN_OP_END,
+		RET_FLAG
+	};
+}
 class TMS320C64XSubtarget;
 class TMS320C64XTargetMachine;
 
@@ -32,6 +38,9 @@ public:
 				const SmallVectorImpl<ISD::InputArg> &Ins,
 				DebugLoc dl, SelectionDAG &DAG,
 				SmallVectorImpl<SDValue> &InVals);
+	SDValue LowerReturn(SDValue Chain, unsigned CallConv, bool isVarArg,
+				const SmallVectorImpl<ISD::OutputArg> &Outs,
+				DebugLoc dl, SelectionDAG &DAG);
 
 	const TMS320C64XTargetMachine &TM;
 };
