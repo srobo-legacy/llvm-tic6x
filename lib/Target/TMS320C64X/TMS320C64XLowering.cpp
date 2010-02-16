@@ -9,7 +9,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "TMS320C64XLowering.h"
+
 #include "TMS320C64XTargetMachine.h"
+#include "TMS320C64XRegisterInfo.h"
 #include "llvm/DerivedTypes.h"
 #include "llvm/Function.h"
 #include "llvm/Intrinsics.h"
@@ -27,6 +29,10 @@
 #include "llvm/CodeGen/ValueTypes.h"
 #include "llvm/Target/TargetLoweringObjectFile.h"
 using namespace llvm;
+
+namespace llvm {
+#include "TMS320C64XGenCallingConv.inc"
+}
 
 TMS320C64XLowering::TMS320C64XLowering(TMS320C64XTargetMachine &tm) :
 	TargetLowering(tm, new TargetLoweringObjectFileCOFF()), TM(tm)
@@ -57,6 +63,15 @@ TMS320C64XLowering::LowerFormalArguments(SDValue Chain,
 				DebugLoc dl, SelectionDAG &DAG,
 				SmallVectorImpl<SDValue> &InVals)
 {
+#if 0
+	MachineFunction &MF = DAG.getMachineFunction();
+	MachineFrameInfo *MFI = MF.getFrameInfo();
+	MachineRegisterInfo &RegInfo = MF.getRegInfo();
+#endif
 
-	llvm_unreachable_internal("ponies");
+	SmallVector<CCValAssign, 16> ArgLocs;
+	CCState CCInfo(CallConv, isVarArg, getTargetMachine(), ArgLocs,
+			*DAG.getContext());
+	CCInfo.AnalyzeFormalArguments(Ins, CC_TMS320C64X);
+
 }
