@@ -12,7 +12,6 @@
 #include "TMS320C64XTargetMachine.h"
 
 // Actual register information
-#include "TMS320C64XGenRegisterNames.inc"
 #include "TMS320C64XGenRegisterInfo.inc"
 
 #include "llvm/CodeGen/MachineFrameInfo.h"

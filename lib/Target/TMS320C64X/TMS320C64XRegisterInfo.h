@@ -12,6 +12,7 @@
 #define LLVM_TARGET_TMS320C64X_REGISTERINFO_H
 
 #include "TMS320C64XGenRegisterInfo.h.inc"
+#include "TMS320C64XGenRegisterNames.inc"
 
 #include "llvm/Target/TargetRegisterInfo.h"
 
