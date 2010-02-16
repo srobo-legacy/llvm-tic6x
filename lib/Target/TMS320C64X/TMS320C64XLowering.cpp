@@ -103,15 +103,80 @@ TMS320C64XLowering::LowerFormalArguments(SDValue Chain,
 				DebugLoc dl, SelectionDAG &DAG,
 				SmallVectorImpl<SDValue> &InVals)
 {
-#if 0
-	MachineFunction &MF = DAG.getMachineFunction();
-	MachineFrameInfo *MFI = MF.getFrameInfo();
-	MachineRegisterInfo &RegInfo = MF.getRegInfo();
-#endif
-
+	static const unsigned arg_regs[] =
+	{ TMS320C64X::A12, TMS320C64X::A13, TMS320C64X::A14, TMS320C64X::A15,
+	TMS320C64X::B12, TMS320C64X::B13, TMS320C64X::B14, TMS320C64X::B15 };
 	SmallVector<CCValAssign, 16> ArgLocs;
+	unsigned int i, cur_arg, arg_offset;
+
+	MachineFunction &MF = DAG.getMachineFunction();
+	MachineRegisterInfo &RegInfo = MF.getRegInfo();
+	arg_offset = 8;
+
 	CCState CCInfo(CallConv, isVarArg, getTargetMachine(), ArgLocs,
 			*DAG.getContext());
 	CCInfo.AnalyzeFormalArguments(Ins, CC_TMS320C64X);
 
+	for (i = 0; i < ArgLocs.size(); ++i) {
+		CCValAssign &VA = ArgLocs[i];
+		EVT ObjectVT = VA.getValVT();
+		switch (ObjectVT.getSimpleVT().SimpleTy) {
+		default: llvm_unreachable("Unhandled argument type!");
+		case MVT::i1:
+		case MVT::i8:
+		case MVT::i16:
+		case MVT::i32:
+			if (Ins[i].Used) {
+				if (cur_arg < 8)
+					cur_arg++;
+				InVals.push_back(DAG.getUNDEF(ObjectVT));
+			} else if (cur_arg < 8) {
+				unsigned VReg = RegInfo.createVirtualRegister(
+					&TMS320C64X::GPRegsRegClass);
+				MF.getRegInfo().addLiveIn(arg_regs[cur_arg++],
+									VReg);
+				SDValue Arg = DAG.getCopyFromReg(Chain, dl,
+								VReg, MVT::i32);
+				if (ObjectVT != MVT::i32) {
+					/* Looks like AssertSext gets put in
+					 * here topoint out the caller will
+					 * have sign extended the incoming
+					 * value */
+					Arg = DAG.getNode(ISD::AssertSext, dl,
+						MVT::i32, Arg,
+						DAG.getValueType(ObjectVT));
+					Arg = DAG.getNode(ISD::TRUNCATE, dl,
+							ObjectVT, Arg);
+				}
+				InVals.push_back(Arg);
+			} else {
+				/* It's going on the stack */
+				int FrameIdx = MF.getFrameInfo()->
+					CreateFixedObject(4, arg_offset);
+				SDValue FIPtr = DAG.getFrameIndex(FrameIdx,
+								MVT::i32);
+				SDValue Load;
+				if (ObjectVT == MVT::i32) {
+					Load = DAG.getLoad(MVT::i32, dl, Chain,
+								FIPtr, NULL, 0);
+				} else {
+					Load = DAG.getExtLoad(ISD::SEXTLOAD, dl,
+							MVT::i32, Chain, FIPtr,
+							NULL, 0, ObjectVT);
+					Load = DAG.getNode(ISD::TRUNCATE, dl,
+								ObjectVT, Load);
+				}
+
+				InVals.push_back(Load);
+				arg_offset += 4;
+			}
+		}
+	}
+
+	/* And we have to munge varargs onto the stack */
+	if (isVarArg) {
+		llvm_unreachable_internal("No varargs yet, pls");
+	}
+
+	return Chain;
 }
