@@ -7,6 +7,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+def RetCC_TMS320C64X : CallingConv<[
+	// Return values -> A12
+	CCIfType<[i32], CCAssignToReg<[A12]>>
+]>;
+
 def CC_TMS320C64X : CallingConv<[
 	// I'm not aware of any existing CC for TIs DSPs, but there probably
 	// is one. Until I find it, instead pass arguments in set of middle
