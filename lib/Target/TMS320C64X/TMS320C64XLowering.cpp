@@ -25,6 +25,8 @@
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/PseudoSourceValue.h"
 #include "llvm/CodeGen/SelectionDAG.h"
+#include "llvm/CodeGen/SelectionDAGNodes.h"
+#include "llvm/Target/TargetLoweringObjectFile.h"
 #include "llvm/CodeGen/SelectionDAGISel.h"
 #include "llvm/CodeGen/ValueTypes.h"
 #include "llvm/Target/TargetLoweringObjectFile.h"
@@ -38,7 +40,45 @@ TMS320C64XLowering::TMS320C64XLowering(TMS320C64XTargetMachine &tm) :
 	TargetLowering(tm, new TargetLoweringObjectFileCOFF()), TM(tm)
 {
 
-	/* Again; implement later */
+	/* Ugh */
+	addRegisterClass(MVT::i32, TMS320C64X::GPRegsRegisterClass);
+
+	setLoadExtAction(ISD::SEXTLOAD, MVT::i1, Promote);
+	/* All other loads have sx and zx support */
+
+	/* No 32 bit load insn */
+	setOperationAction(ISD::GlobalAddress, MVT::i32, Custom);
+
+	/* No in-reg sx */
+	setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i16, Expand);
+	setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i8, Expand);
+	setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i1, Expand);
+
+	/* No divide anything */
+	setOperationAction(ISD::UDIV, MVT::i32, Expand);
+	setOperationAction(ISD::SDIV, MVT::i32, Expand);
+	setOperationAction(ISD::UREM, MVT::i32, Expand);
+	setOperationAction(ISD::SREM, MVT::i32, Expand);
+	setOperationAction(ISD::UDIVREM, MVT::i32, Expand);
+	setOperationAction(ISD::SDIVREM, MVT::i32, Expand);
+
+	/* Curious that llvm has a select; tms320c64x doesn't though, expanding
+	 * apparently leads to SELECT_CC insns */
+	setOperationAction(ISD::SELECT, MVT::i32, Expand);
+	/* No setcc either, although we can emulate it */
+	setOperationAction(ISD::SETCC, MVT::i32, Expand);
+	/* No branchcc, but we have brcond */
+	setOperationAction(ISD::BR_CC, MVT::i32, Expand);
+
+	/* Probably is a membarrier, but I'm not aware of it right now */
+	setOperationAction(ISD::MEMBARRIER, MVT::Other, Expand);
+
+	/* Should also inject other invalid operations here */
+
+
+	setStackPointerRegisterToSaveRestore(TMS320C64X::B30);
+
+	computeRegisterProperties();
 	return;
 }
 
