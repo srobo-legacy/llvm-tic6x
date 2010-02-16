@@ -35,8 +35,7 @@ include "TMS320C64XInstrInfo.td"
 // Calling convention:
 //===----------------------------------------------------------------------===//
 
-//include "TMS320C64XCallingConv.td"
-//ENOTYET
+include "TMS320C64XGenCallingConv.td"
 
 // Target:
 
