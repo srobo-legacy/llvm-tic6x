@@ -7,7 +7,31 @@
 //
 //===----------------------------------------------------------------------===//
 
+//#include "TMS320C64X.h"
+#include "TMS320C64XTargetMachine.h"
+#include "llvm/Target/TargetLowering.h"
+#include "llvm/Intrinsics.h"
+#include "llvm/CodeGen/SelectionDAG.h"
+#include "llvm/CodeGen/SelectionDAGISel.h"
+#include "llvm/Support/raw_ostream.h"
 using namespace llvm;
+
+namespace {
+class TMS320C64XInstSelectorPass : public SelectionDAGISel {
+public:
+	explicit TMS320C64XInstSelectorPass(TargetMachine &TM);
+
+	virtual void InstructionSelect();
+	SDNode *Select(SDValue op);
+	bool select_addr(SDValue op, SDValue N, SDValue &R1, SDValue &R2,
+				SDValue &R3, SDValue &R4);
+	const char *getPassName() const {
+		return "TMS320C64X Instruction Selection";
+	}
+
+#include "TMS320C64XGenDAGISel.inc"
+};
+}
 
 extern "C" TMS320C64XInstSelectorPass*
 TMS320C64XCreateInstSelector(TargetMachine &TM)
@@ -16,8 +40,7 @@ TMS320C64XCreateInstSelector(TargetMachine &TM)
 	return new TMS320C64XInstSelectorPass(TM);
 }
 
-TMS320C64XInstSelectorPass::TMS320C64XInstSelectorPass(
-						TMS320C64XTargetMachine &TM)
+TMS320C64XInstSelectorPass::TMS320C64XInstSelectorPass(TargetMachine &TM)
 	: SelectionDAGISel(TM)
 {
 }
@@ -26,5 +49,14 @@ void
 TMS320C64XInstSelectorPass::InstructionSelect()
 {
 
-	llvm_unreachable_internal("Unimplemented function InstructionSelect()");
+	SelectRoot(*CurDAG);
+	CurDAG->RemoveDeadNodes();
+}
+
+bool
+TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &R1,
+					SDValue &R2, SDValue &R3, SDValue &R4)
+{
+
+	llvm_unreachable_internal("select_addr not implemented");
 }
