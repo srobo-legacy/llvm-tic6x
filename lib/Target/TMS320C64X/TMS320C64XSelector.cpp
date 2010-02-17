@@ -7,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-//#include "TMS320C64X.h"
+#include "TMS320C64X.h"
 #include "TMS320C64XTargetMachine.h"
 #include "llvm/Target/TargetLowering.h"
 #include "llvm/Intrinsics.h"
@@ -33,8 +33,8 @@ public:
 };
 }
 
-extern "C" TMS320C64XInstSelectorPass*
-TMS320C64XCreateInstSelector(TargetMachine &TM)
+FunctionPass*
+llvm::TMS320C64XCreateInstSelector(TargetMachine &TM)
 {
 
 	return new TMS320C64XInstSelectorPass(TM);
