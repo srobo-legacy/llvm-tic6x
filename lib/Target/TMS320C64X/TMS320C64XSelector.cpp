@@ -60,3 +60,11 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &R1,
 
 	llvm_unreachable_internal("select_addr not implemented");
 }
+
+
+SDNode *
+TMS320C64XInstSelectorPass::Select(SDValue op)
+{
+
+	llvm_unreachable_internal("Select not implemented");
+}
