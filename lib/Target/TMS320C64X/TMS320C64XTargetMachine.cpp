@@ -11,7 +11,6 @@
 #include "TMS320C64X.h"
 #include "TMS320C64XTargetMachine.h"
 #include "TMS320C64XTargetAsmInfo.h"
-#include "TMS320C64XSelector.h"
 #include "llvm/PassManager.h"
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/Target/TargetAsmInfo.h"
@@ -41,7 +40,7 @@ TMS320C64XTargetMachine::TMS320C64XTargetMachine(const Target &T,
 
 bool TMS320C64XTargetMachine::addInstSelector(PassManagerBase &PM,
 						CodeGenOpt::Level OptLevel) {
-	PM.add(new TMS320C64XInstSelectorPass(*this));
+	PM.add(TMS320C64XCreateInstSelector(*this));
 	return false;
 }
 
