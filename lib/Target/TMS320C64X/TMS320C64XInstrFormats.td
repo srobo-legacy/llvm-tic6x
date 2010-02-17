@@ -64,6 +64,19 @@ def i32mem	: MemAcc<i32, "printi32mem">;
 def i64mem	: MemAcc<i64, "printi64mem">;
 
 def AddrType : ComplexPattern<i32, 4, "AddrBees", [], []>;
+def i8index : PatLeaf<(imm), [{
+	return ((int)N->getSExtValue() >= 0 && (int)N->getSExtValue() < 32);
+}]>;
+
+def i16index : PatLeaf<(imm), [{
+	return ((int)N->getSExtValue() >= 0 && (int)N->getSExtValue() < 64 &&
+			((int)N->getSExtValue() & 1) == 0);
+}]>;
+
+def i32index : PatLeaf<(imm), [{
+	return ((int)N->getSExtValue() >= 0 && (int)N->getSExtValue() < 32 &&
+			((int)N->getSExtValue() & 3) == 0);
+}]>;
 
 // ~
 
