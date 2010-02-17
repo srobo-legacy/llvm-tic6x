@@ -13,14 +13,12 @@
 // So, uh, yeah, not certain precisely what to put in here...
 
 #include "llvm/Target/TargetMachine.h"
-#include "llvm/CodeGen/SelectionDAG.h"
-#include "llvm/CodeGen/SelectionDAGISel.h"
 
 namespace llvm {
 	extern Target TheTMS320C64XTarget;
+	class FunctionPass;
+	FunctionPass *TMS320C64XCreateInstSelector(TargetMachine &TM);
 }
 
-extern "C" SelectionDAGISel
-TMS320C64XCreateInstSelector(TMS320C64XTargetMachine &TM);
 
 #endif //LLVM_TARGET_TMS320C64X_TMS320C64X_H
