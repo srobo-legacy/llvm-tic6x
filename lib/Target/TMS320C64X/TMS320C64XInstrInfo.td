@@ -33,4 +33,7 @@ def sth : TMSInst<(outs), (ins i16mem:$ptr, GPRegs:$reg), "sth",
 	[(truncstorei16 GPRegs:$reg, addr:$ptr)], UnitD>;
 
 def stw : TMSInst<(outs), (ins i32mem:$ptr, GPRegs:$reg), "stw",
-	[(truncstorei32 GPRegs:$reg, addr:$ptr)], UnitD>;
+	[(store GPRegs:$reg, addr:$ptr)], UnitD>;
+
+def stw_idx : TMSInst<(outs), (ins i32mem:$ptr, GPRegs:$reg), "stw",
+			[(store GPRegs:$reg, idxaddr:$ptr)], UnitD>;

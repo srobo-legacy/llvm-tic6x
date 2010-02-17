@@ -77,7 +77,8 @@ def i32index : PatLeaf<(imm), [{
 			((int)N->getSExtValue() & 3) == 0);
 }]>;
 
-def addr : ComplexPattern<i32, 4, "select_addr", [], []>;
+def addr : ComplexPattern<i32, 2, "select_addr", [], []>;
+def idxaddr : ComplexPattern<i32, 2, "select_idxaddr", [frameindex], []>;
 
 // ~
 

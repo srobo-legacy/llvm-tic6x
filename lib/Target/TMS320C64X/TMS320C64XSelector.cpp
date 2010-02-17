@@ -23,8 +23,8 @@ public:
 
 	virtual void InstructionSelect();
 	SDNode *Select(SDValue op);
-	bool select_addr(SDValue op, SDValue N, SDValue &R1, SDValue &R2,
-				SDValue &R3, SDValue &R4);
+	bool select_addr(SDValue op, SDValue N, SDValue &R1, SDValue &R2);
+	bool select_idxaddr(SDValue op, SDValue N, SDValue &R1, SDValue &R2);
 	const char *getPassName() const {
 		return "TMS320C64X Instruction Selection";
 	}
@@ -55,12 +55,40 @@ TMS320C64XInstSelectorPass::InstructionSelect()
 
 bool
 TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &R1,
-					SDValue &R2, SDValue &R3, SDValue &R4)
+					SDValue &R2)
 {
 
 	llvm_unreachable_internal("select_addr not implemented");
 }
 
+bool
+TMS320C64XInstSelectorPass::select_idxaddr(SDValue op, SDValue addr,
+					SDValue &base, SDValue &offs)
+{
+	FrameIndexSDNode *FIN;
+
+	FIN = dyn_cast<FrameIndexSDNode>(addr);
+	if (FIN) {
+		base = CurDAG->getTargetFrameIndex(FIN->getIndex(), MVT::i32);
+		offs = CurDAG->getTargetConstant(0, MVT::i32);
+		return true;
+	}
+
+	if (addr.getOpcode() == ISD::TargetExternalSymbol ||
+				addr.getOpcode() == ISD::TargetGlobalAddress)
+		return false;
+
+	if (addr.getOpcode() == ISD::ADD) {
+		// We could match against the proper indexed load things here,
+		// and emit a single instruction for loading, but that can be
+		// implemented at some other point in time
+		// XXX - death
+	}
+
+	base = addr;
+	offs = CurDAG->getTargetConstant(0, MVT::i32);
+	return true;
+}
 
 SDNode *
 TMS320C64XInstSelectorPass::Select(SDValue op)
