@@ -66,5 +66,5 @@ SDNode *
 TMS320C64XInstSelectorPass::Select(SDValue op)
 {
 
-	llvm_unreachable_internal("Select not implemented");
+	return SelectCode(op);
 }
