@@ -37,3 +37,11 @@ def stw : TMSInst<(outs), (ins i32mem:$ptr, GPRegs:$reg), "stw",
 
 def stw_idx : TMSInst<(outs), (ins i32mem:$ptr, GPRegs:$reg), "stw",
 			[(store GPRegs:$reg, idxaddr:$ptr)], UnitD>;
+
+
+
+// ????
+
+def retflag : SDNode<"TMSISD::RET_FLAG", SDTNone, [SDNPHasChain, SDNPOptInFlag]>;
+// FIXME: how the hell do we manage spilling of link register?
+def ret : TMSInst<(outs), (ins), "br B29", [(retflag)], UnitS>;
