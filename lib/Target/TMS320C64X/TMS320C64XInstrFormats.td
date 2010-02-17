@@ -53,15 +53,15 @@ def UnitS	: InstUnit<1>;
 def UnitD	: InstUnit<2>;
 def UnitM	: InstUnit<3>;
 
-class MemAcc<ValueType sz, string printMethod> : Operand<i32> {
+class MemAcc<string printMethod> : Operand<iPTR> {
 	let PrintMethod = printMethod;
 	let MIOperandInfo = (ops ptr_rc, i1, i8, GPRegs);
 }
 
-def i8mem	: MemAcc<i8, "printi8mem">;
-def i16mem	: MemAcc<i16, "printi16mem">;
-def i32mem	: MemAcc<i32, "printi32mem">;
-def i64mem	: MemAcc<i64, "printi64mem">;
+def i8mem	: MemAcc<"printi8mem">;
+def i16mem	: MemAcc<"printi16mem">;
+def i32mem	: MemAcc<"printi32mem">;
+def i64mem	: MemAcc<"printi64mem">;
 
 def AddrType : ComplexPattern<i32, 4, "AddrBees", [], []>;
 def i8index : PatLeaf<(imm), [{
