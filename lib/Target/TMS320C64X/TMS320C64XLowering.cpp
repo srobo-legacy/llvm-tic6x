@@ -155,3 +155,40 @@ TMS320C64XLowering::LowerFormalArguments(SDValue Chain,
 
 	return Chain;
 }
+
+SDValue
+TMS320C64XLowering::LowerReturn(SDValue Chain, unsigned CallConv, bool isVarArg,
+                                const SmallVectorImpl<ISD::OutputArg> &Outs,
+                                DebugLoc dl, SelectionDAG &DAG)
+{
+	SmallVector<CCValAssign, 16> RLocs;
+	SDValue Flag;
+	unsigned int i;
+
+	CCState CCInfo(CallConv, isVarArg, DAG.getTarget(), RLocs,
+						*DAG.getContext());
+	CCInfo.AnalyzeReturn(Outs, RetCC_TMS320C64X);
+
+	// Apparently we need to add this to the out list only if it's first
+	if (DAG.getMachineFunction().getRegInfo().liveout_empty()) {
+		for (i = 0; i != RLocs.size(); ++i)
+			if (RLocs[i].isRegLoc())
+				DAG.getMachineFunction().getRegInfo().addLiveOut
+							(RLocs[i].getLocReg());
+	}
+
+	for (i = 0; i != RLocs.size(); ++i) {
+		CCValAssign &VA = RLocs[i];
+		assert(VA.isRegLoc() && "Invalid return position");
+
+		Chain = DAG.getCopyToReg(Chain, dl, VA.getLocReg(), Outs[i].Val,
+									Flag);
+
+		Flag = Chain.getValue(1); // From sparc... why?
+	}
+
+	if (Flag.getNode())
+		return DAG.getNode(TMSISD::RET_FLAG, dl, MVT::Other, Chain,
+									Flag);
+	return DAG.getNode(TMSISD::RET_FLAG, dl, MVT::Other, Chain);
+}
