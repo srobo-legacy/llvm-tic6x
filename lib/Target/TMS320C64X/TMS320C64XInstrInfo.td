@@ -8,6 +8,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+//Some arithmatic and logic
+
+def add_r : TMSInst<(outs GPRegs:$reg), (ins GPRegs:$reg1, GPRegs:$reg2),
+		"add", [(set GPRegs:$reg, (add GPRegs:$reg1, GPRegs:$reg2))],
+		 UnitL>;
+
+def add_i5 : TMSInst<(outs GPRegs:$reg),
+		(ins GPRegs:$reg1, int_operand:$immarg),
+		"add", [(set GPRegs:$reg, (add GPRegs:$reg1, sconst5:$immarg))],
+		UnitL>;
+
 // Loading consts: almost always as halfwords
 def mvkl : TMSInst<(outs GPRegs:$reg), (ins int_operand:$val), "mvkl",
 		[(set GPRegs:$reg, set_lo:$val)], UnitS>;

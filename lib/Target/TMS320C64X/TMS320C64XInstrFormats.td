@@ -77,6 +77,14 @@ def idxaddr : ComplexPattern<i32, 2, "select_idxaddr", [frameindex], []>;
 
 def int_operand : Operand<iAny>;
 
+def sconst5_xform : SDNodeXForm<imm, [{
+	return CurDAG->getTargetConstant((int)N->getSExtValue(), MVT::i32);
+}]>;
+def sconst5 : PatLeaf<(imm), [{
+	int val = (int)N->getSExtValue();
+	return (val <= 15 && val >= -16);
+}], sconst5_xform>;
+
 // ~
 
 def set_lo : PatLeaf<(imm), [{
