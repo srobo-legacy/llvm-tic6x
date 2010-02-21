@@ -8,6 +8,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+// Loading consts: almost always as halfwords
+def mvkl : TMSInst<(outs GPRegs:$reg), (ins int_operand:$val), "mvkl",
+		[(set GPRegs:$reg, set_lo:$val)], UnitS>;
+def mvkh : TMSInst<(outs GPRegs:$reg), (ins int_operand:$val), "mvkh",
+		[(set GPRegs:$reg, set_hi:$val)], UnitS>;
+
+def mvkall: TMSInst<(outs GPRegs:$reg), (ins i32imm:$val), "mvkall",
+		[(set GPRegs:$reg, imm:$val)], UnitS>;
+
 // Loads: we can handle all post/pre inc/dec modes, and all indexing situations,
 // with a) alignment limitation, b) offset limitation, c) sign extension
 def ldb : TMSInst<(outs GPRegs:$dst), (ins mem_operand:$ptr), "ldb",
