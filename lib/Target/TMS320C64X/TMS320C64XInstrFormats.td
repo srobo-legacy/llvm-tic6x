@@ -53,15 +53,10 @@ def UnitS	: InstUnit<1>;
 def UnitD	: InstUnit<2>;
 def UnitM	: InstUnit<3>;
 
-class MemAcc<string printMethod> : Operand<iPTR> {
-	let PrintMethod = printMethod;
-	let MIOperandInfo = (ops ptr_rc, i1, i8, GPRegs);
+def mem_operand	: Operand<i32> {
+	let PrintMethod = "printMemOperand";
+	let MIOperandInfo = (ops GPRegs, GPRegs);
 }
-
-def i8mem	: MemAcc<"printi8mem">;
-def i16mem	: MemAcc<"printi16mem">;
-def i32mem	: MemAcc<"printi32mem">;
-def i64mem	: MemAcc<"printi64mem">;
 
 def i8index : PatLeaf<(imm), [{
 	return ((int)N->getSExtValue() >= 0 && (int)N->getSExtValue() < 32);
