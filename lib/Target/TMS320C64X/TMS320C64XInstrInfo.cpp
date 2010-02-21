@@ -26,3 +26,19 @@ TMS320C64XInstrInfo::TMS320C64XInstrInfo(TMS320C64XTargetMachine &tm)
 
 	return;
 }
+
+bool
+TMS320C64XInstrInfo::copyRegToReg(MachineBasicBlock &MBB, 
+				MachineBasicBlock::iterator I,
+				unsigned dst_reg, unsigned src_reg,
+				const TargetRegisterClass *dst_class,
+				const TargetRegisterClass *src_class) const
+{
+
+	if (dst_class != src_class)
+		llvm_unreachable("copyRegToReg sees nonexistant registerclass");
+
+	DebugLoc DL = DebugLoc::getUnknownLoc();
+	BuildMI(MBB, I, DL, get(TMS320C64X::add_i5), dst_reg).addReg(src_reg).addImm(0);
+	return true;
+}

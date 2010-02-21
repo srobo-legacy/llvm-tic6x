@@ -28,9 +28,11 @@ public:
 
 	virtual const TargetRegisterInfo &getRegisterInfo() const { return RI; }
 
-	/* MSP430 code that this is based on has a large amount of fudge here
-	 * to implement branches, stack slot spills and the like; for the moment
-	 * leave unimplemented and fix it when something explodes */
+	virtual bool copyRegToReg(MachineBasicBlock &MBB,
+				MachineBasicBlock::iterator I,
+				unsigned desg_reg, unsigned src_reg,
+				const TargetRegisterClass *dst_rc,
+				const TargetRegisterClass *src_rc) const;
 };
 
 } // llvm
