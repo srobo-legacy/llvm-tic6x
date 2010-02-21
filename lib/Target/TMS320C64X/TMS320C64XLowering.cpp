@@ -148,7 +148,8 @@ TMS320C64XLowering::LowerFormalArguments(SDValue Chain,
 		}
 	}
 
-	/* And we have to munge varargs onto the stack */
+	// XXX - varargs have to go on stack, and to match TI calling
+	// convention the previous argument has to go on stack too.
 	if (isVarArg) {
 		llvm_unreachable_internal("No varargs yet, pls");
 	}
