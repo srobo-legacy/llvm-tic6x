@@ -38,25 +38,45 @@ TMS320C64XRegisterInfo::~TMS320C64XRegisterInfo()
 	return;
 }
 
-const unsigned int*
-TMS320C64XRegisterInfo::getCalleeSavedRegs(MachineFunction const*) const
+BitVector
+TMS320C64XRegisterInfo::getReservedRegs(const MachineFunction &MF) const
 {
 
-	llvm_unreachable_internal("Unimplemented function getCalleeSavedRegs\n");
+	BitVector Reserved(getNumRegs());
+	Reserved.set(TMS320C64X::B15);
+	Reserved.set(TMS320C64X::A15);
+	Reserved.set(TMS320C64X::A14);
+	return Reserved;
+}
+
+const unsigned *
+TMS320C64XRegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const
+{
+	static const unsigned nonvolatileRegs[] = {
+		TMS320C64X::A10, TMS320C64X::B10,
+		TMS320C64X::A11, TMS320C64X::B11,
+		TMS320C64X::A12, TMS320C64X::B12,
+		TMS320C64X::A13, TMS320C64X::B13,
+		TMS320C64X::A14, TMS320C64X::B14,
+		TMS320C64X::A15, TMS320C64X::B15
+	};
+
+	return nonvolatileRegs;
 }
 
 const TargetRegisterClass* const*
 TMS320C64XRegisterInfo::getCalleeSavedRegClasses(MachineFunction const*) const
 {
+	static const TargetRegisterClass *const calleeNonvolatileRegClasses[] ={
+		&TMS320C64X::GPRegsRegClass, &TMS320C64X::GPRegsRegClass,
+		&TMS320C64X::GPRegsRegClass, &TMS320C64X::GPRegsRegClass,
+		&TMS320C64X::GPRegsRegClass, &TMS320C64X::GPRegsRegClass,
+		&TMS320C64X::GPRegsRegClass, &TMS320C64X::GPRegsRegClass,
+		&TMS320C64X::GPRegsRegClass, &TMS320C64X::GPRegsRegClass,
+		&TMS320C64X::GPRegsRegClass, &TMS320C64X::GPRegsRegClass
+	};
 
-	llvm_unreachable_internal("Unimplemented function getCalleeSavedRegClasses\n");
-}
-
-BitVector
-TMS320C64XRegisterInfo::getReservedRegs(const MachineFunction &MF) const
-{
-
-	llvm_unreachable_internal("Unimplemented function getReservedRegs\n");
+	return calleeNonvolatileRegClasses;
 }
 
 unsigned int
