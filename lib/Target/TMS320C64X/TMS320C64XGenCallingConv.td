@@ -8,15 +8,13 @@
 //===----------------------------------------------------------------------===//
 
 def RetCC_TMS320C64X : CallingConv<[
-	// Return values -> A12
-	CCIfType<[i32], CCAssignToReg<[A12]>>
+	// XXX - returning structs is a black arg
+	CCIfType<[i32], CCAssignToReg<[A4]>>
 ]>;
 
 def CC_TMS320C64X : CallingConv<[
-	// I'm not aware of any existing CC for TIs DSPs, but there probably
-	// is one. Until I find it, instead pass arguments in set of middle
-	// registers (out of volatile range, condition range), spill rest
-	// to stack.
-	CCIfType<[i32], CCAssignToReg<[A12,A13,A14,A15,B12,B13,B14,B15]>>,
+	// XXX - dword arguments should go in register pairs. Nonexistant
+	// right now.
+	CCIfType<[i32], CCAssignToReg<[A4,B4,A6,B6,A8,B8,A10,B10,A12,B12]>>,
 	CCAssignToStack<4, 4>
 ]>;
