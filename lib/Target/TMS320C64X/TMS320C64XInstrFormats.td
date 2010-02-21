@@ -75,6 +75,8 @@ def i32index : PatLeaf<(imm), [{
 def addr : ComplexPattern<i32, 2, "select_addr", [], []>;
 def idxaddr : ComplexPattern<i32, 2, "select_idxaddr", [frameindex], []>;
 
+def int_operand : Operand<iAny>;
+
 // ~
 
 def set_lo : PatLeaf<(imm), [{
