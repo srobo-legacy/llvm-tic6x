@@ -81,17 +81,20 @@ def B31	:	MainReg<63, 1, "B31">, DwarfRegNum<[63]>;
 
 def GPRegs : RegisterClass<"TMS320C64X", [i32], 32,
 	[
-		/* Following most other arches, make one half of registers
-		 * volatile (and allocate first), the other half nonvolatile.
-		 * Use B30 and B31 for frame/stack pointer, don't alloc. */
+		// A10-A15, B10-B15 are nonvolatile, B15 SP, A15 FP.
+		// B14 is a data page pointer used by TIs C compiler for
+		// the near memory model; we'll treat as reserved
 		A0, A1, A2, A3, A4, A5, A6, A7,
-		A8, A9, A10, A11, A12, A13, A14, A15,
-		B0, B1, B2, B3, B4, B5, B6, B7,
-		B8, B9, B10, B11, B12, B13, B14, B15,
-		A16, A17, A18, A19, A20, A21, A22, A23,
+		A8, A9, B0, B1, B2, B3, B4, B5, B6, B7,
+		B8, A16, A17, A18, A19, A20, A21, A22, A23,
 		A24, A25, A26, A27, A28, A29, A30, A31,
 		B16, B17, B18, B19, B20, B21, B22, B23,
-		B24, B25, B26, B27, B28, B29, B30, B31
+		B24, B25, B26, B27, B28, B29, B30, B31,
+		/* Sparc and others put volatile / reserved registers at the
+		 * end to decrease likelyhood of being allocated */
+		A10, A11, A12, A13, A14,
+		B10, B11, B12, B13,
+		A15, B14, B15
 	] >
 {
 let MethodProtos = [{
@@ -107,8 +110,8 @@ let MethodBodies = [{
 	GPRegsClass::iterator
 	GPRegsClass::allocation_order_end(const MachineFunction &MF)
 									const {
-		// No allocation of B30 or B31
-		return end()-2;
+		/* Don't allocate SP/FP/DP */
+		return end()-3;
 	}
 }];
 }
@@ -116,17 +119,16 @@ let MethodBodies = [{
 /* Copy+paste from above, but with different types */
 def VectorRegs : RegisterClass<"TMS320C64X", [v4i8,v2i16], 32,
 	[
-		/* Following most other arches, make one half of registers
-		 * volatile (and allocate first), the other half nonvolatile.
-		 * Use B30 and B31 for frame/stack pointer, don't alloc. */
+		/* See comments above */
 		A0, A1, A2, A3, A4, A5, A6, A7,
-		A8, A9, A10, A11, A12, A13, A14, A15,
-		B0, B1, B2, B3, B4, B5, B6, B7,
-		B8, B9, B10, B11, B12, B13, B14, B15,
-		A16, A17, A18, A19, A20, A21, A22, A23,
+		A8, A9, B0, B1, B2, B3, B4, B5, B6, B7,
+		B8, A16, A17, A18, A19, A20, A21, A22, A23,
 		A24, A25, A26, A27, A28, A29, A30, A31,
 		B16, B17, B18, B19, B20, B21, B22, B23,
-		B24, B25, B26, B27, B28, B29, B30, B31
+		B24, B25, B26, B27, B28, B29, B30, B31,
+		A10, A11, A12, A13, A14,
+		B10, B11, B12, B13,
+		A15, B14, B15
 	] >
 {
 let MethodProtos = [{
@@ -142,8 +144,8 @@ let MethodBodies = [{
 	VectorRegsClass::iterator
 	VectorRegsClass::allocation_order_end(const MachineFunction &MF)
 									const {
-		// No allocation of B30 or B31
-		return end()-2;
+		/* See comment above */
+		return end()-3;
 	}
 }];
 }
