@@ -77,6 +77,16 @@ def idxaddr : ComplexPattern<i32, 2, "select_idxaddr", [frameindex], []>;
 
 // ~
 
+def set_lo : PatLeaf<(imm), [{
+	unsigned int val = N->getZExtValue();
+	if ((val & 0xFFFF) == val);
+}]>;
+
+def set_hi : PatLeaf<(imm), [{
+	unsigned int val = (unsigned)N->getZExtValue();
+	return ((val & 0xFFFF0000) == val);
+}]>;
+
 class TMSInst<dag outs, dag ins, string mnemonic, list<dag> pattern, InstUnit u>
 							: Instruction {
 	let Namespace = "TMS320C64X";
