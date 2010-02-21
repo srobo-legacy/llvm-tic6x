@@ -81,7 +81,7 @@ def int_operand : Operand<iAny>;
 
 def set_lo : PatLeaf<(imm), [{
 	unsigned int val = N->getZExtValue();
-	if ((val & 0xFFFF) == val);
+	return ((val & 0xFFFF) == val);
 }]>;
 
 def set_hi : PatLeaf<(imm), [{
