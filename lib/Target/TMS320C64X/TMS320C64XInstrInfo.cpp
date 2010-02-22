@@ -42,3 +42,17 @@ TMS320C64XInstrInfo::copyRegToReg(MachineBasicBlock &MBB,
 	BuildMI(MBB, I, DL, get(TMS320C64X::add_i5), dst_reg).addReg(src_reg).addImm(0);
 	return true;
 }
+
+void
+TMS320C64XInstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
+		MachineBasicBlock::iterator I, unsigned src_reg,
+		bool is_kill, int FI, const TargetRegisterClass *rc) const
+{
+	DebugLoc DL = DebugLoc::getUnknownLoc();
+
+	if (rc != TMS320C64X::GPRegsRegisterClass)
+		llvm_unreachable("Unknown register class in spillslot");
+
+	BuildMI(MBB, I, DL, get(TMS320C64X::stw_idx)).addFrameIndex(FI)
+				.addImm(0) .addReg(TMS320C64X::A15);
+}

@@ -33,6 +33,10 @@ public:
 				unsigned desg_reg, unsigned src_reg,
 				const TargetRegisterClass *dst_rc,
 				const TargetRegisterClass *src_rc) const;
+	virtual void storeRegToStackSlot(MachineBasicBlock &MBB,
+				MachineBasicBlock::iterator I,
+				unsigned src_reg, bool is_kill, int FI,
+				const TargetRegisterClass *rc) const;
 };
 
 } // llvm
