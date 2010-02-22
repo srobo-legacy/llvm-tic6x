@@ -98,10 +98,6 @@ TMS320C64XAsmPrinter::PrintGlobalVariable(const GlobalVariable *GVar)
 void
 TMS320C64XAsmPrinter::printOperand(const MachineInstr *MI, int op_num)
 {
-	if (op_num >= MI->getNumOperands()) {
-		O << "Bees";
-		return;
-	}
 	const MachineOperand &MO = MI->getOperand(op_num);
 	const TargetRegisterInfo &RI = *TM.getRegisterInfo();
 	switch(MO.getType()) {

@@ -130,13 +130,13 @@ TMS320C64XRegisterInfo::emitPrologue(MachineFunction &MF) const
 	// Store return pointer - we could use the correct addressing mode
 	// to decrement SP for us, but I don't know the infrastructure well
 	// enough to do that yet
-	BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::stw))
-			.addReg(TMS320C64X::B3).addReg(TMS320C64X::B15);
+	BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::stw_idx))
+		.addReg(TMS320C64X::B3).addImm(0).addReg(TMS320C64X::B15);
 	BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::sub_i5), TMS320C64X::B15)
 			.addReg(TMS320C64X::B15).addImm(4);
 	// Store FP
-	BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::stw))
-			.addReg(TMS320C64X::A15).addReg(TMS320C64X::B15);
+	BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::stw_idx))
+		.addReg(TMS320C64X::A15).addImm(0).addReg(TMS320C64X::B15);
 	BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::sub_i5), TMS320C64X::B15)
 			.addReg(TMS320C64X::B15).addImm(4);
 	// Load new FP, adjust SP to account for frame info
