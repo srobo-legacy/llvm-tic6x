@@ -97,8 +97,19 @@ void
 TMS320C64XRegisterInfo::eliminateFrameIndex(
 	MachineBasicBlock::iterator I, int SPAdj, RegScavenger *r) const
 {
+	unsigned i, frame_index, offs;
 
-	llvm_unreachable_internal("Unimplemented function eliminateFrameIndex\n");
+	MachineInstr &MI = *I;
+	MachineFunction &MF = *MI.getParent()->getParent();
+	i = 0;
+
+	while (!MI.getOperand(i).isFI())
+		++i;
+
+	assert(i < MI.getNumOperands() && "No FrameIndex in eliminateFrameIdx");
+	frame_index = MI.getOperand(i).getIndex();
+	offs = MF.getFrameInfo()->getObjectOffset(frame_index);
+	MI.getOperand(i).ChangeToImmediate(offs);
 }
 
 void
