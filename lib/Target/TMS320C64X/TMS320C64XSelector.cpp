@@ -58,7 +58,8 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &R1,
 					SDValue &R2)
 {
 
-	llvm_unreachable_internal("select_addr not implemented");
+	// Bees
+	return false;
 }
 
 bool
