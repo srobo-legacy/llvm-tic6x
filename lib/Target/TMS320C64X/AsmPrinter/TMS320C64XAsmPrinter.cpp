@@ -39,17 +39,15 @@ public:
 	void printInstruction(const MachineInstr *MI);
 	bool runOnMachineFunction(MachineFunction &F);
 	void PrintGlobalVariable(const GlobalVariable *GVar);
-#if 0
-    void printOperand(const MachineInstr *MI, int opNum);
-    void printMemOperand(const MachineInstr *MI, int opNum,
-                         const char *Modifier = 0);
-    void printCCOperand(const MachineInstr *MI, int opNum);
+	void printOperand(const MachineInstr *MI, int opNum);
+	void printMemOperand(const MachineInstr *MI, int opNum,
+					const char *Modifier = 0);
+	void printCCOperand(const MachineInstr *MI, int opNum);
 
-    bool PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
-                       unsigned AsmVariant, const char *ExtraCode);
-    bool PrintAsmMemoryOperand(const MachineInstr *MI, unsigned OpNo,
-                             unsigned AsmVariant, const char *ExtraCode);
-#endif
+	bool PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
+		unsigned AsmVariant, const char *ExtraCode);
+	bool PrintAsmMemoryOperand(const MachineInstr *MI, unsigned OpNo,
+		unsigned AsmVariant, const char *ExtraCode);
 };
 }
 
@@ -95,6 +93,46 @@ TMS320C64XAsmPrinter::PrintGlobalVariable(const GlobalVariable *GVar)
 {
 
 	llvm_unreachable_internal("Unimplemented function PrintGlobalVariable");
+}
+
+void
+TMS320C64XAsmPrinter::printOperand(const MachineInstr *MI, int opNum)
+{
+
+	llvm_unreachable_internal("Unimplemented function printOperand");
+}
+
+void
+TMS320C64XAsmPrinter::printMemOperand(const MachineInstr *MI, int opNum,
+					const char *Modifier)
+{
+
+	llvm_unreachable_internal("Unimplemented function printMemOperand");
+}
+
+void
+TMS320C64XAsmPrinter::printCCOperand(const MachineInstr *MI, int opNum)
+{
+
+	llvm_unreachable_internal("Unimplemented function printCCOperand");
+}
+
+bool
+TMS320C64XAsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
+		unsigned AsmVariant, const char *ExtraCode)
+{
+
+	llvm_unreachable_internal("Unimplemented function PrintAsmOperand");
+}
+
+bool
+TMS320C64XAsmPrinter::PrintAsmMemoryOperand(const MachineInstr *MI,
+						unsigned OpNo,
+						unsigned AsmVariant,
+						const char *ExtraCode)
+{
+
+	llvm_unreachable_internal("Unimplemented func PrintAsmMemoryOperand");
 }
 
 extern "C" void LLVMInitializeTMS320C64XAsmPrinter()
