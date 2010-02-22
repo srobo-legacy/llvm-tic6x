@@ -126,11 +126,20 @@ TMS320C64XAsmPrinter::printOperand(const MachineInstr *MI, int op_num)
 }
 
 void
-TMS320C64XAsmPrinter::printMemOperand(const MachineInstr *MI, int opNum,
+TMS320C64XAsmPrinter::printMemOperand(const MachineInstr *MI, int op_num,
 					const char *Modifier)
 {
 
-	llvm_unreachable_internal("Unimplemented function printMemOperand");
+	printOperand(MI, op_num);
+
+	// Don't print zero offset
+	if (MI->getOperand(op_num+1).isImm() &&
+				MI->getOperand(op_num+1).getImm() == 0)
+		return;
+
+	O << "(";
+	printOperand(MI, op_num+1);
+	O << ")";
 }
 
 void
