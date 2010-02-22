@@ -96,10 +96,33 @@ TMS320C64XAsmPrinter::PrintGlobalVariable(const GlobalVariable *GVar)
 }
 
 void
-TMS320C64XAsmPrinter::printOperand(const MachineInstr *MI, int opNum)
+TMS320C64XAsmPrinter::printOperand(const MachineInstr *MI, int op_num)
 {
-
-	llvm_unreachable_internal("Unimplemented function printOperand");
+	const MachineOperand &MO = MI->getOperand(op_num);
+	const TargetRegisterInfo &RI = *TM.getRegisterInfo();
+	switch(MO.getType()) {
+	case MachineOperand::MO_Register:
+		if (TargetRegisterInfo::isPhysicalRegister(MO.getReg()))
+			O << RI.get(MO.getReg()).AsmName;
+		else
+			llvm_unreachable("Nonphysical register being printed");
+		break;
+	case MachineOperand::MO_Immediate:
+		O << (int)MO.getImm();
+		break;
+	case MachineOperand::MO_MachineBasicBlock:
+		printBasicBlockLabel(MO.getMBB());
+		break;
+	case MachineOperand::MO_GlobalAddress:
+		O << Mang->getMangledName(MO.getGlobal());
+		break;
+	case MachineOperand::MO_ExternalSymbol:
+		O << MO.getSymbolName();
+		break;
+	case MachineOperand::MO_ConstantPoolIndex:
+	default:
+		llvm_unreachable("Unknown operand type");
+	}
 }
 
 void
