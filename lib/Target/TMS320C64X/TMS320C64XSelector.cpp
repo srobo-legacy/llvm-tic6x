@@ -70,8 +70,8 @@ TMS320C64XInstSelectorPass::select_idxaddr(SDValue op, SDValue addr,
 
 	FIN = dyn_cast<FrameIndexSDNode>(addr);
 	if (FIN) {
-		base = CurDAG->getTargetFrameIndex(FIN->getIndex(), MVT::i32);
-		offs = CurDAG->getTargetConstant(0, MVT::i32);
+		base = CurDAG->getRegister(TMS320C64X::A15, MVT::i32);
+		offs = CurDAG->getTargetFrameIndex(FIN->getIndex(), MVT::i32);
 		return true;
 	}
 
