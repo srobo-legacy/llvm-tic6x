@@ -19,6 +19,15 @@ def add_i5 : TMSInst<(outs GPRegs:$reg),
 		"add", [(set GPRegs:$reg, (add GPRegs:$reg1, sconst5:$immarg))],
 		UnitL>;
 
+def sub_r : TMSInst<(outs GPRegs:$reg), (ins GPRegs:$reg1, GPRegs:$reg2),
+		"sub", [(set GPRegs:$reg, (sub GPRegs:$reg1, GPRegs:$reg2))],
+		UnitL>;
+
+def sub_i5 : TMSInst<(outs GPRegs:$reg),
+		(ins GPRegs:$reg1, int_operand:$immarg),
+		"sub", [(set GPRegs:$reg, (sub GPRegs:$reg1, sconst5:$immarg))],
+		UnitL>;
+
 // Loading consts: almost always as halfwords
 def mvkl : TMSInst<(outs GPRegs:$reg), (ins int_operand:$val), "mvkl",
 		[(set GPRegs:$reg, set_lo:$val)], UnitS>;
