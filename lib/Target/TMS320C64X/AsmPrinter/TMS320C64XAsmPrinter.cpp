@@ -130,6 +130,7 @@ TMS320C64XAsmPrinter::printMemOperand(const MachineInstr *MI, int op_num,
 					const char *Modifier)
 {
 
+	O << "*";
 	printOperand(MI, op_num);
 
 	// Don't print zero offset
