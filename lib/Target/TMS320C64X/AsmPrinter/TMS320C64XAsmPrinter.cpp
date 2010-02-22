@@ -63,10 +63,31 @@ TMS320C64XAsmPrinter::TMS320C64XAsmPrinter(formatted_raw_ostream &O,
 }
 
 bool
-TMS320C64XAsmPrinter::runOnMachineFunction(MachineFunction &F)
+TMS320C64XAsmPrinter::runOnMachineFunction(MachineFunction &MF)
 {
+	Function *F = MF.getFunction();
 
-	llvm_unreachable_internal("Unimplemented funciton runOnMachineFunction");
+	SetupMachineFunction(MF);
+	EmitConstantPool(MF.getConstantPool());
+	O << "\n\n";
+	EmitAlignment(F->getAlignment(), F);
+	O << "\t.globl\t" << CurrentFnName << "\n";
+	printVisibility(CurrentFnName, F->getVisibility());
+
+	for (MachineFunction::const_iterator I = MF.begin(), E = MF.end();
+								I != E; ++I) {
+		if (I != MF.begin()) {
+			printBasicBlockLabel(I, true, true);
+			O << "\n";
+		}
+
+		for (MachineBasicBlock::const_iterator II = I->begin(),
+				E = I->end(); II != E; ++II) {
+			printInstruction(II);
+		}
+	}
+
+	return false;
 }
 
 void
