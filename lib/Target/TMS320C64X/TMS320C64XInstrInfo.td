@@ -31,6 +31,10 @@ def sub_i5 : TMSInst<(outs GPRegs:$reg),
 	UnitL>;
 
 // Loading consts: almost always as halfwords
+def mvk : TMSInst<(outs GPRegs:$reg), (ins int_operand:$val),
+	"mvk $val, $reg",
+	[(set GPRegs:$reg, mvk_pred:$val)], UnitS>;
+
 def mvkl : TMSInst<(outs GPRegs:$reg), (ins int_operand:$val),
 	"mvkl $val, $reg",
 	[(set GPRegs:$reg, set_lo:$val)], UnitS>;
