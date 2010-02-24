@@ -15,7 +15,7 @@ def add_r : TMSInst<(outs GPRegs:$reg), (ins GPRegs:$reg1, GPRegs:$reg2),
 	[(set GPRegs:$reg, (add GPRegs:$reg1, GPRegs:$reg2))], UnitL>;
 
 def add_i5 : TMSInst<(outs GPRegs:$reg),
-	(ins GPRegs:$reg1, int_operand:$immarg),
+	(ins GPRegs:$reg1, i32imm:$immarg),
 	"add $reg1, $immarg, $reg",
 	[(set GPRegs:$reg, (add GPRegs:$reg1, sconst5:$immarg))],
 	UnitL>;
@@ -25,21 +25,22 @@ def sub_r : TMSInst<(outs GPRegs:$reg), (ins GPRegs:$reg1, GPRegs:$reg2),
 	[(set GPRegs:$reg, (sub GPRegs:$reg1, GPRegs:$reg2))], UnitL>;
 
 def sub_i5 : TMSInst<(outs GPRegs:$reg),
-	(ins GPRegs:$reg1, int_operand:$immarg),
+	(ins GPRegs:$reg1, i32imm:$immarg),
 	"sub $reg1, $immarg, $reg",
 	[(set GPRegs:$reg, (sub GPRegs:$reg1, sconst5:$immarg))],
 	UnitL>;
 
 // Loading consts: almost always as halfwords
-def mvk : TMSInst<(outs GPRegs:$reg), (ins int_operand:$val),
+def mvk : TMSInst<(outs GPRegs:$reg), (ins i32imm:$val),
 	"mvk $val, $reg",
 	[(set GPRegs:$reg, mvk_pred:$val)], UnitS>;
 
-def mvkl : TMSInst<(outs GPRegs:$reg), (ins int_operand:$val),
+// FIXME: make mvkl and mvkh operate on halfword regs. Which needs hword regs.
+def mvkl : TMSInst<(outs GPRegs:$reg), (ins i32imm:$val),
 	"mvkl $val, $reg",
 	[(set GPRegs:$reg, set_lo:$val)], UnitS>;
 
-def mvkh : TMSInst<(outs GPRegs:$reg), (ins int_operand:$val),
+def mvkh : TMSInst<(outs GPRegs:$reg), (ins i32imm:$val),
 	"mvkh $val, $reg",
 	[(set GPRegs:$reg, set_hi:$val)], UnitS>;
 
