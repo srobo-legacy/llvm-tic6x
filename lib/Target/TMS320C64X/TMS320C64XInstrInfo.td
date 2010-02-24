@@ -47,12 +47,8 @@ def mvkall: TMSInst<(outs GPRegs:$reg), (ins i32imm:$val),
 	"mvkall: fix badgers please",
 	[(set GPRegs:$reg, imm:$val)], UnitS>;
 
-//def : Pat<(i32 imm:$val), (mvkall imm:$val)>;
-
-// Fullsized immediate - I'd like to just use a pattern and two mvk operations,
-// however tablegen implodes if you try to do this. Instead, bounce to some
-// custom code.
-//def : Pat<(i32 imm:$val), (mvk32 (NOOP_SDNodeXForm imm:$val))>;
+def : Pat<(i32 mvk_pred:$val), (mvk imm:$val)>;
+def : Pat<(i32 mvk_all_pred:$val), (mvkall imm:$val)>;
 
 // Loads: we can handle all post/pre inc/dec modes, and all indexing situations,
 // with a) alignment limitation, b) offset limitation, c) sign extension

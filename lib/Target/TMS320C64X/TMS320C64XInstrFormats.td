@@ -101,6 +101,10 @@ def mvk_pred : PatLeaf<(imm), [{
 	return (val < 0x7FFF && val >= -0x8000);
 }], mvk_xform>;
 
+def mvk_all_pred : PatLeaf<(imm), [{
+	return true;
+}], NOOP_SDNodeXForm>;
+
 // ~
 
 def set_lo : PatLeaf<(imm), [{
