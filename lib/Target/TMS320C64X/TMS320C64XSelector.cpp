@@ -54,11 +54,46 @@ TMS320C64XInstSelectorPass::InstructionSelect()
 }
 
 bool
-TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &R1,
-					SDValue &R2)
+TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
+					SDValue &offs)
 {
+	if (N.getOpcode() == ISD::FrameIndex)
+		return false;
 
-	// Bees
+	if (N.getOpcode() == ISD::TargetExternalSymbol ||
+				N.getOpcode() == ISD::TargetGlobalAddress)
+		return false;
+
+	if (N.getOperand(0).getOpcode() == ISD::Register &&
+		N.getOperand(1).getOpcode() == ISD::Constant) {
+		if ((N.getOpcode() == ISD::ADD || N.getOpcode() == ISD::SUB)) {
+			if ((Predicate_sconst5(N.getOperand(1).getNode()) &&
+				Predicate_sconst5(N.getOperand(1).getNode())) ||
+			(Predicate_uconst15(N.getOperand(1).getNode()) &&
+				Predicate_uconst15(N.getOperand(1).getNode()))) {
+
+				base = N.getOperand(0);
+				offs = N.getOperand(1);
+				return true;
+			} else {
+				// Too big - load into register
+				base = N.getOperand(0);
+				offs = CurDAG->getTargetConstant(imm, MVT::i32);
+				return true;
+			}
+		} else {
+			return false;
+		}
+	} else if (N.getOperand(0).getOpcode() == ISD::Register &&
+		N.getOperand(1).getOpcode() == ISD::Constant) {
+		// We can use operand as index if it's add - just leave
+		// as 2nd operand
+		if (N.getOpcode() != ISD::ADD)
+			return false;
+		else
+			return true;
+	}
+
 	return false;
 }
 
