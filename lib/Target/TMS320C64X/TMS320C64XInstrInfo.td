@@ -91,7 +91,7 @@ def stw : TMSInst<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
 
 def stw_idx : TMSInst<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
 	"stw $reg, $ptr",
-			[(store GPRegs:$reg, idxaddr:$ptr)], UnitD>;
+	[(store GPRegs:$reg, idxaddr:$ptr)], UnitD>;
 
 
 
