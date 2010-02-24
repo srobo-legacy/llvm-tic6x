@@ -9,10 +9,12 @@
 
 #include "TMS320C64X.h"
 #include "TMS320C64XTargetMachine.h"
+#include "TMS320C64XRegisterInfo.h"
 #include "llvm/Target/TargetLowering.h"
 #include "llvm/Intrinsics.h"
 #include "llvm/CodeGen/SelectionDAG.h"
 #include "llvm/CodeGen/SelectionDAGISel.h"
+#include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace llvm;
 
@@ -77,8 +79,19 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 				return true;
 			} else {
 				// Too big - load into register
+				// XXX - how to do that?
 				base = N.getOperand(0);
-				offs = CurDAG->getTargetConstant(imm, MVT::i32);
+
+				DebugLoc dl = DebugLoc::getUnknownLoc();
+				MachineFunction &MF =
+						CurDAG->getMachineFunction();
+				MachineRegisterInfo &MR = MF.getRegInfo();
+				unsigned reg = MR.createVirtualRegister(
+						&TMS320C64X::GPRegsRegClass);
+				// XXX - damned if I know what chain is supposed
+				// to be in this situation
+				offs = CurDAG->getCopyToReg(N.getOperand(1),
+						dl, reg, N.getOperand(1));
 				return true;
 			}
 		} else {
