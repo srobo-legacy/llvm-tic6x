@@ -47,6 +47,11 @@ public:
 				const SmallVectorImpl<ISD::InputArg> &Ins,
 				DebugLoc dl, SelectionDAG &DAG,
 				SmallVectorImpl<SDValue> &InVals);
+	SDValue LowerCallResult(SDValue Chain, SDValue InFlag,
+				unsigned CallConv, bool isVarArg,
+				const SmallVectorImpl<ISD::InputArg> &Ins,
+				DebugLoc dl, SelectionDAG &DAG,
+				SmallVectorImpl<SDValue> &InVals);
 
 	const TMS320C64XTargetMachine &TM;
 };

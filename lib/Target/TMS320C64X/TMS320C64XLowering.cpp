@@ -300,15 +300,39 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 		ops.push_back(in_flag);
 
 	SDVTList node_types = DAG.getVTList(MVT::Other, MVT::Flag);
-	chain = DAG.getNode(TMS320C64X::callp, dl, node_types, &ops[0],
+	Chain = DAG.getNode(TMS320C64X::callp, dl, node_types, &ops[0],
 							ops.size());
-	in_flag = chain.getValue(1);
+	in_flag = Chain.getValue(1);
 
-	chain = DAG.getCALLSEQ_END(chain,
+	Chain = DAG.getCALLSEQ_END(Chain,
 			DAG.getConstant(bytes, getPointerTy(), true),
 			DAG.getConstant(0, getPointerTy(), true), in_flag);
-	in_flag = chain.getValue(1);
+	in_flag = Chain.getValue(1);
 
-	return LowerCallResult(chain, in_flag, CallConv, isVarArg, Ins, dl,
+	return LowerCallResult(Chain, in_flag, CallConv, isVarArg, Ins, dl,
 					DAG, InVals);
+}
+
+SDValue
+TMS320C64XLowering::LowerCallResult(SDValue Chain, SDValue InFlag,
+				unsigned CallConv, bool isVarArg,
+				const SmallVectorImpl<ISD::InputArg> &Ins,
+				DebugLoc dl, SelectionDAG &DAG,
+				SmallVectorImpl<SDValue> &InVals)
+{
+	unsigned int i;
+	SmallVector<CCValAssign, 16> ret_locs;
+	CCState CCInfo(CallConv, isVarArg, getTargetMachine(),
+			ret_locs, *DAG.getContext());
+	CCInfo.AnalyzeCallResult(Ins, RetCC_TMS320C64X);
+
+	for (i = 0; i < ret_locs.size(); ++i) {
+		Chain = DAG.getCopyFromReg(Chain, dl, ret_locs[i].getLocReg(),
+						ret_locs[i].getValVT(),
+						InFlag).getValue(1);
+		InFlag = Chain.getValue(2);
+		InVals.push_back(Chain.getValue(0));
+	}
+
+	return Chain;
 }
