@@ -25,11 +25,11 @@
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/PseudoSourceValue.h"
 #include "llvm/CodeGen/SelectionDAG.h"
-#include "llvm/CodeGen/SelectionDAGNodes.h"
-#include "llvm/Target/TargetLoweringObjectFile.h"
 #include "llvm/CodeGen/SelectionDAGISel.h"
+#include "llvm/CodeGen/SelectionDAGNodes.h"
 #include "llvm/CodeGen/ValueTypes.h"
 #include "llvm/Target/TargetLoweringObjectFile.h"
+#include "llvm/ADT/VectorExtras.h"
 using namespace llvm;
 
 namespace llvm {
@@ -192,4 +192,123 @@ TMS320C64XLowering::LowerReturn(SDValue Chain, unsigned CallConv, bool isVarArg,
 		return DAG.getNode(TMSISD::RET_FLAG, dl, MVT::Other, Chain,
 									Flag);
 	return DAG.getNode(TMSISD::RET_FLAG, dl, MVT::Other, Chain);
+}
+
+SDValue
+TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
+			bool isVarArg, bool isTailCall,
+			const SmallVectorImpl<ISD::OutputArg> &Outs,
+			const SmallVectorImpl<ISD::InputArg> &Ins,
+			DebugLoc dl, SelectionDAG &DAG,
+			SmallVectorImpl<SDValue> &InVals)
+{
+
+// XXX XXX XXX - TI Calling convention dictates that the last argument before
+// a series of vararg values on the stack must also be on the stack.
+
+	unsigned int bytes, i;
+	SmallVector<CCValAssign, 16> ArgLocs;
+	CCState CCInfo(CallConv, isVarArg, getTargetMachine(), ArgLocs,
+							*DAG.getContext());
+
+	CCInfo.AnalyzeCallOperands(Outs, CC_TMS320C64X);
+	bytes = CCInfo.getNextStackOffset();
+
+	Chain = DAG.getCALLSEQ_START(Chain, DAG.getConstant(bytes,
+						getPointerTy(), true));
+
+	SmallVector<std::pair<unsigned int, SDValue>, 16> reg_args;
+	SmallVector<SDValue, 16> stack_args;
+
+	for (i = 0; i < ArgLocs.size(); ++i) {
+		CCValAssign &va = ArgLocs[i];
+		SDValue arg = Outs[i].Val;
+
+		switch (va.getLocInfo()) {
+		default: llvm_unreachable("Unknown arg loc");
+		case CCValAssign::Full:
+			break;
+		case CCValAssign::SExt:
+			arg = DAG.getNode(ISD::SIGN_EXTEND, dl,
+						va.getLocVT(), arg);
+			break;
+		case CCValAssign::ZExt:
+			arg = DAG.getNode(ISD::ZERO_EXTEND, dl,
+						va.getLocVT(), arg);
+			break;
+		case CCValAssign::AExt:
+			arg = DAG.getNode(ISD::ANY_EXTEND, dl,
+						va.getLocVT(), arg);
+			break;
+		}
+
+		if (va.isRegLoc()) {
+			reg_args.push_back(std::make_pair(va.getLocReg(), arg));
+		} else if (va.isMemLoc()) {
+			SDValue stack_ptr = DAG.getCopyFromReg(Chain, dl,
+								TMS320C64X::A15,
+								getPointerTy());
+			SDValue addr = DAG.getNode(ISD::ADD,
+				dl, getPointerTy(), stack_ptr,
+				DAG.getIntPtrConstant(va.getLocMemOffset()));
+
+			SDValue store = DAG.getStore(Chain, dl, arg, addr,
+							NULL, 0);
+			stack_args.push_back(store);
+		} else {
+			llvm_unreachable("Invalid call argument location");
+		}
+	}
+
+	// We now have two sets of register / stack locations to load stuff
+	// into; apparently we can put the memory location ones into one big
+	// chain, because they can happen independantly
+
+	SDValue chain, in_flag;
+	if (!stack_args.empty()) {
+		chain = DAG.getNode(ISD::TokenFactor, dl, MVT::Other,
+					&stack_args[0], stack_args.size());
+	}
+
+	// This chains loading to specified registers sequentially
+	for (i = 0; i <= reg_args.size(); ++i) {
+		chain = DAG.getCopyToReg(chain, dl, reg_args[i].first,
+					reg_args[i].second, in_flag);
+		in_flag = Chain.getValue(1);
+	}
+
+	// Following what MSP430 does, convert GlobalAddress nodes to
+	// TargetGlobalAddresses.
+	if (GlobalAddressSDNode *g = dyn_cast<GlobalAddressSDNode>(Callee)) {
+		Callee = DAG.getTargetGlobalAddress(g->getGlobal(), MVT::i32);
+	}  else if (ExternalSymbolSDNode *e =
+				dyn_cast<ExternalSymbolSDNode>(Callee)) {
+		Callee = DAG.getTargetExternalSymbol(e->getSymbol(0, MVT::i32));
+	}
+
+	// Tie this all into a "Call"
+	SmallVector<SDValue, 16> ops;
+	ops.push_back(chain);
+	ops.push_back(Callee);
+
+	for (i = 0; i < reg_args.size(); ++i) {
+		ops.push_back(DAG.getRegister(reg_args[i].first,
+				reg_args[i].second.getValueType()));
+	}
+
+	if (in_flag.getNode())
+		ops.push_back(in_flag);
+
+	SDVTList node_types = DAG.getVTList(MVT::Other, MVT::Flag);
+	chain = DAG.getNode(TMS320C64X::callp, dl, node_types, &ops[0],
+							ops.size());
+	in_flag = chain.getValue(1);
+
+	chain = DAG.getCALLSEQ_END(chain,
+			DAG.getConstant(bytes, getPointerTy(), true),
+			DAG.getConstant(0, getPointerTy(), true), in_flag);
+	in_flag = chain.getValue(1);
+
+	return LowerCallResult(chain, in_flag, CallConv, isVarArg, Ins, dl,
+					DAG, InVals);
 }
