@@ -58,6 +58,8 @@ def mem_operand	: Operand<i32> {
 	let MIOperandInfo = (ops GPRegs, GPRegs);
 }
 
+def calltarget : Operand<i32>;
+
 def i8index : PatLeaf<(imm), [{
 	return ((int)N->getSExtValue() >= 0 && (int)N->getSExtValue() < 32);
 }]>;
