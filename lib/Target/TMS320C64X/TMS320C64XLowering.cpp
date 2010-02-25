@@ -264,15 +264,15 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 	// into; apparently we can put the memory location ones into one big
 	// chain, because they can happen independantly
 
-	SDValue chain, in_flag;
+	SDValue in_flag;
 	if (!stack_args.empty()) {
-		chain = DAG.getNode(ISD::TokenFactor, dl, MVT::Other,
+		Chain = DAG.getNode(ISD::TokenFactor, dl, MVT::Other,
 					&stack_args[0], stack_args.size());
 	}
 
 	// This chains loading to specified registers sequentially
-	for (i = 0; i <= reg_args.size(); ++i) {
-		chain = DAG.getCopyToReg(chain, dl, reg_args[i].first,
+	for (i = 0; i < reg_args.size(); ++i) {
+		Chain = DAG.getCopyToReg(Chain, dl, reg_args[i].first,
 					reg_args[i].second, in_flag);
 		in_flag = Chain.getValue(1);
 	}
@@ -283,12 +283,12 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 		Callee = DAG.getTargetGlobalAddress(g->getGlobal(), MVT::i32);
 	}  else if (ExternalSymbolSDNode *e =
 				dyn_cast<ExternalSymbolSDNode>(Callee)) {
-		Callee = DAG.getTargetExternalSymbol(e->getSymbol(0, MVT::i32));
+		Callee = DAG.getTargetExternalSymbol(e->getSymbol(), MVT::i32);
 	}
 
 	// Tie this all into a "Call"
 	SmallVector<SDValue, 16> ops;
-	ops.push_back(chain);
+	ops.push_back(Chain);
 	ops.push_back(Callee);
 
 	for (i = 0; i < reg_args.size(); ++i) {
