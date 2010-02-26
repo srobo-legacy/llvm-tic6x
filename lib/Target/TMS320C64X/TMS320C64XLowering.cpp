@@ -364,3 +364,17 @@ TMS320C64XLowering::LowerGlobalAddress(SDValue op, SelectionDAG &DAG)
 	return DAG.getNode(TMS320C64X::mvkall, op.getDebugLoc(), getPointerTy(),
 									res);
 }
+
+SDValue
+TMS320C64XLowering::LowerReturnAddr(SDValue op, SelectionDAG &DAG)
+{
+
+	if (cast<ConstantSDNode>(op.getOperand(0))->getZExtValue() != 0)
+		llvm_unreachable("LowerReturnAddr -> abnormal depth");
+
+	// Right now, we always store ret addr -> slot 0.
+	// Although it could be offset by something, not certain
+	SDValue retaddr = DAG.getFrameIndex(0, getPointerTy());
+	return DAG.getLoad(getPointerTy(), op.getDebugLoc(), DAG.getEntryNode(),
+							retaddr, NULL, 0);
+}
