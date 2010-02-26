@@ -12,6 +12,7 @@
 
 #include "TMS320C64XTargetMachine.h"
 #include "TMS320C64XRegisterInfo.h"
+#include "TMS320C64XInstrInfo.h"
 #include "llvm/DerivedTypes.h"
 #include "llvm/Function.h"
 #include "llvm/Intrinsics.h"
@@ -350,4 +351,16 @@ TMS320C64XLowering::LowerOperation(SDValue op,  SelectionDAG &DAG)
 	}
 
 	return op;
+}
+
+SDValue
+TMS320C64XLowering::LowerGlobalAddress(SDValue op, SelectionDAG &DAG)
+{
+
+	const GlobalValue *GV = cast<GlobalAddressSDNode>(op)->getGlobal();
+	int64_t offset = cast<GlobalAddressSDNode>(op)->getOffset();
+
+	SDValue res = DAG.getTargetGlobalAddress(GV, getPointerTy(), offset);
+	return DAG.getNode(TMS320C64X::mvkall, op.getDebugLoc(), getPointerTy(),
+									res);
 }

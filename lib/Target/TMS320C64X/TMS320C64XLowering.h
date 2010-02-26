@@ -53,6 +53,7 @@ public:
 				DebugLoc dl, SelectionDAG &DAG,
 				SmallVectorImpl<SDValue> &InVals);
 	SDValue LowerOperation(SDValue op, SelectionDAG &DAG);
+	SDValue LowerGlobalAddress(SDValue op, SelectionDAG &DAG);
 
 	const TMS320C64XTargetMachine &TM;
 };
