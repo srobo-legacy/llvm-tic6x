@@ -103,7 +103,19 @@ def callp : TMSInst<(outs), (ins calltarget:$dst),
 }
 
 
-// ????
+// misc
+
+def SDT_call_seq_start : SDCallSeqStart<[SDTCisVT<0, i32>]>;
+def SDT_call_seq_end : SDCallSeqEnd<[SDTCisVT<0, i32>, SDTCisVT<1, i32>]>;
+def callseq_start : SDNode<"ISD::CALLSEQ_START", SDT_call_seq_start,
+				[SDNPHasChain, SDNPOutFlag]>;
+def callseq_end : SDNode<"ISD::CALLSEQ_END", SDT_call_seq_end,
+				[SDNPHasChain, SDNPOptInFlag, SDNPOutFlag]>;
+
+def fake_call_start : TMSInst<(outs), (ins i32imm:$val), "#callstart",
+				[(callseq_start timm:$val)], UnitD>;
+def fake_call_end : TMSInst<(outs), (ins i32imm:$val, i32imm:$val2), "#callend",
+				[(callseq_end timm:$val, timm:$val2)], UnitD>;
 
 def retflag : SDNode<"TMSISD::RET_FLAG", SDTNone, [SDNPHasChain, SDNPOptInFlag]>;
 // FIXME: how the hell do we manage spilling of link register?
