@@ -301,7 +301,7 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 		ops.push_back(in_flag);
 
 	SDVTList node_types = DAG.getVTList(MVT::Other, MVT::Flag);
-	Chain = DAG.getNode(TMS320C64X::add_i5, dl, node_types, &ops[0],
+	Chain = DAG.getNode(TMSISD::CALL, dl, node_types, &ops[0],
 							ops.size());
 	in_flag = Chain.getValue(1);
 
