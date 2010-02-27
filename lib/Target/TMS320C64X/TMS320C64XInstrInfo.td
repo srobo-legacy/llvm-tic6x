@@ -76,7 +76,7 @@ def mvkl : TMSInst<(outs GPRegs:$reg), (ins i32imm:$val),
 // For following pattern we have to output something (the reg loaded) but also
 // need to input a register to set (from mvkl). So make this 2addr.
 let isTwoAddress = 1 in {
-def mvkh : TMSInst<(outs GPRegs:$bees), (ins GPRegs:$reg, i32imm:$val),
+def mvkh : TMSInst<(outs GPRegs:$reg), (ins i32imm:$val, GPRegs:$bees),
 	"mvkh $val, $reg", [], UnitS>;
 }
 
