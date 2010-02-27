@@ -19,6 +19,7 @@
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineConstantPool.h"
 #include "llvm/CodeGen/MachineInstr.h"
+#include "llvm/MC/MCStreamer.h"
 #include "llvm/Target/TargetAsmInfo.h"
 #include "llvm/Target/TargetLoweringObjectFile.h"
 #include "llvm/Target/TargetRegistry.h"
@@ -91,8 +92,57 @@ TMS320C64XAsmPrinter::runOnMachineFunction(MachineFunction &MF)
 void
 TMS320C64XAsmPrinter::PrintGlobalVariable(const GlobalVariable *GVar)
 {
+	unsigned int align, sz;
+	const TargetData *td = TM.getTargetData();
 
-	llvm_unreachable_internal("Unimplemented function PrintGlobalVariable");
+	// Comments elsewhere say we discard this because external globals
+	// require no code; why do we have to do that here though?
+	if (!GVar->hasInitializer())
+		return;
+
+	if (EmitSpecialLLVMGlobal(GVar))
+		return;
+
+	O << "\n\n";
+	std::string name = Mang->getMangledName(GVar);
+	Constant *C = GVar->getInitializer();
+	sz = td->getTypeAllocSize(C->getType());
+	align = td->getPreferredAlignment(GVar);
+
+	printVisibility(name, GVar->getVisibility());
+
+	OutStreamer.SwitchSection(getObjFileLowering().SectionForGlobal(GVar,
+								Mang, TM));
+
+	if (C->isNullValue() && !GVar->hasSection()) {
+		if (!GVar->isThreadLocal() &&
+			(GVar->hasLocalLinkage() || GVar->isWeakForLinker())) {
+			if (sz == 0)
+				sz = 1;
+
+			if (GVar->hasLocalLinkage())
+				O << "\t.local " << name << "\n";
+
+			O << TAI->getCOMMDirective() << name << "," << sz;
+			if (TAI->getCOMMDirectiveTakesAlignment())
+				O << "," << (1 << align);
+
+			O << "\n";
+			return;
+		}
+	}
+
+	// Insert here - linkage foo. Requires: understanding linkage foo.
+
+	EmitAlignment(align, GVar);
+
+	if (TAI->hasDotTypeDotSizeDirective()) {
+		O << "\t.type " << name << ",#object\n";
+		O << "\t.size " << name << "," << sz << "\n";
+	}
+
+	O << name << ":\n";
+	EmitGlobalConstant(C);
 }
 
 void
