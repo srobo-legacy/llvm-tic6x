@@ -361,7 +361,7 @@ TMS320C64XLowering::LowerGlobalAddress(SDValue op, SelectionDAG &DAG)
 	int64_t offset = cast<GlobalAddressSDNode>(op)->getOffset();
 
 	SDValue res = DAG.getTargetGlobalAddress(GV, getPointerTy(), offset);
-	return DAG.getNode(TMS320C64X::mvkall, op.getDebugLoc(), getPointerTy(),
+	return DAG.getNode(TMSISD::WRAPPER, op.getDebugLoc(), getPointerTy(),
 									res);
 }
 
