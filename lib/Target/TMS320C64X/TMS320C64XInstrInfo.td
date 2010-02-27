@@ -62,22 +62,28 @@ def mvk : TMSInst<(outs GPRegs:$reg), (ins i32imm:$val),
 	"mvk $val, $reg",
 	[(set GPRegs:$reg, mvk_pred:$val)], UnitS>;
 
-// FIXME: make mvkl and mvkh operate on halfword regs. Which needs hword regs.
-def mvkl : TMSInst<(outs GPRegs:$reg), (ins i32imm:$val),
-	"mvkl $val, $reg",
-	[(set GPRegs:$reg, set_lo:$val)], UnitS>;
-
-def mvkh : TMSInst<(outs GPRegs:$reg), (ins i32imm:$val),
-	"mvkh $val, $reg",
-	[(set GPRegs:$reg, set_hi:$val)], UnitS>;
-
-def mvkall: TMSInst<(outs GPRegs:$reg), (ins i32imm:$val),
-	"mvkall: fix badgers please",
-	[(set GPRegs:$reg, imm:$val)], UnitS>;
-
+// Match ints in the mvk range
 def : Pat<(i32 mvk_pred:$val), (mvk imm:$val)>;
-def : Pat<(i32 mvk_all_pred:$val), (mvkall imm:$val)>;
-def : Pat<(i32 (Wrapper tglobaladdr:$dst)), (mvkall tglobaladdr:$dst)>;
+
+// mvkl/mvkh: doesn't look like llvm can express setting a bitfield in a
+// register, and these two insns only set a halfword in one reg. So the only
+// full way of expressing this would be to split gpregs into halfword regs.
+// Instead, don't let mvkl/mvkh match anything, and use a pattern to match
+// and set 32 bit constants
+def mvkl : TMSInst<(outs GPRegs:$reg), (ins i32imm:$val),
+	"mvkl $val, $reg", [], UnitS>;
+
+// For following pattern we have to output something (the reg loaded) but also
+// need to input a register to set (from mvkl). So make this 2addr.
+let isTwoAddress = 1 in {
+def mvkh : TMSInst<(outs GPRegs:$bees), (ins GPRegs:$reg, i32imm:$val),
+	"mvkh $val, $reg", [], UnitS>;
+}
+
+def : Pat<(i32 mvk_all_pred:$val),
+	(mvkh mvk_all_pred:$val, (mvkl set_lo:$val))>;
+def : Pat<(i32 (Wrapper tglobaladdr:$val)),
+	(mvkh mvk_all_pred:$val, (mvkl set_lo:$val))>;
 
 // Loads: we can handle all post/pre inc/dec modes, and all indexing situations,
 // with a) alignment limitation, b) offset limitation, c) sign extension
