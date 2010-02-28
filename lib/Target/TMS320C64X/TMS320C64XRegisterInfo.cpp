@@ -124,6 +124,7 @@ TMS320C64XRegisterInfo::emitPrologue(MachineFunction &MF) const
 				: DebugLoc::getUnknownLoc());
 
 	frame_size = MFI->getStackSize();
+	frame_size += 8;
 	MFI->setOffsetAdjustment(8); // Return ptr, frame ptr
 
 	// Emit setup instructions
@@ -132,18 +133,10 @@ TMS320C64XRegisterInfo::emitPrologue(MachineFunction &MF) const
 	// enough to do that yet
 	BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::stw_idx))
 		.addReg(TMS320C64X::B15).addImm(0).addReg(TMS320C64X::B3);
-	BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::sub_i5), TMS320C64X::B15)
-			.addReg(TMS320C64X::B15).addImm(4);
+
 	// Store FP
 	BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::stw_idx))
-		.addReg(TMS320C64X::A15).addImm(0).addReg(TMS320C64X::B15);
-	BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::sub_i5), TMS320C64X::B15)
-			.addReg(TMS320C64X::B15).addImm(4);
-	// Load new FP, adjust SP to account for frame info
-	BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::add_i5), TMS320C64X::A15)
-			.addReg(TMS320C64X::B15).addImm(8);
-	if (frame_size > 0xFFFF)
-		llvm_unreachable("Frame size over 2^16 in emitPrologue");
+		.addReg(TMS320C64X::A15).addImm(-4).addReg(TMS320C64X::B15);
 
 	// On the assumption the stack size will be sizeable, load
 	// constant into volatile register.  XXX - doesn't appear to be a way
