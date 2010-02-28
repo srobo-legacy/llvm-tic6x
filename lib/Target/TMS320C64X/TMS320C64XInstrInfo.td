@@ -81,7 +81,7 @@ def mvkh : TMSInst<(outs GPRegs:$reg), (ins i32imm:$val, GPRegs:$bees),
 }
 
 def : Pat<(i32 mvk_all_pred:$val),
-	(mvkh mvk_all_pred:$val, (mvkl set_lo:$val))>;
+	(mvkh mvk_all_pred:$val, (mvkl mvk_all_pred:$val))>;
 def : Pat<(i32 (Wrapper tglobaladdr:$val)),
 	(mvkh tglobaladdr:$val, (mvkl tglobaladdr:$val))>;
 
