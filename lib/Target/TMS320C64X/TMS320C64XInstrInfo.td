@@ -109,6 +109,10 @@ def ldw : TMSInst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
 	"ldw $ptr, $dst",
 	[(set GPRegs:$dst, (sextloadi32 addr:$ptr))], UnitD>;
 
+def ldw_idx : TMSInst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
+	"ldw $ptr, $dst",
+	[(set GPRegs:$dst, (sextloadi32 idxaddr:$ptr))], UnitD>;
+
 def stb : TMSInst<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
 	"stb $reg, $ptr",
 	[(truncstorei8 GPRegs:$reg, addr:$ptr)], UnitD>;
