@@ -29,8 +29,9 @@ def TMS320C64Xcall : SDNode<"TMSISD::CALL", SDT_call,
 				[SDNPHasChain, SDNPOutFlag, SDNPOptInFlag]>;
 
 def retflag : SDNode<"TMSISD::RET_FLAG", SDTNone, [SDNPHasChain, SDNPOptInFlag]>;
-// FIXME: how the hell do we manage spilling of link register?
-def ret : TMSInst<(outs), (ins), "br B29 also explode", [(retflag)], UnitS>;
+let isReturn = 1, isTerminator = 1 in {
+	def ret : TMSInst<(outs), (ins), "br B3", [(retflag)], UnitS>;
+}
 
 
 
