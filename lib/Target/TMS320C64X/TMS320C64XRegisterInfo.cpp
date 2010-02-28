@@ -125,6 +125,7 @@ TMS320C64XRegisterInfo::emitPrologue(MachineFunction &MF) const
 				: DebugLoc::getUnknownLoc());
 
 	frame_size = MFI->getStackSize();
+	frame_size += 8;
 
 	// Emit setup instructions
 	// Store return pointer - we could use the correct addressing mode
