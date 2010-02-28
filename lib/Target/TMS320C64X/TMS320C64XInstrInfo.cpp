@@ -56,3 +56,17 @@ TMS320C64XInstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
 	BuildMI(MBB, I, DL, get(TMS320C64X::stw_idx)).addReg(TMS320C64X::A15)
 			.addFrameIndex(FI) .addReg(src_reg);
 }
+
+void
+TMS320C64XInstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
+		MachineBasicBlock::iterator MI, unsigned dst_reg, int frame_idx,
+		const TargetRegisterClass *rc) const
+{
+	DebugLoc DL = DebugLoc::getUnknownLoc();
+
+	if (rc != TMS320C64X::GPRegsRegisterClass)
+		llvm_unreachable("Unknown register class in loadslot");
+
+	BuildMI(MBB, MI, DL, get(TMS320C64X::ldw_idx)).addReg(TMS320C64X::A15)
+			.addFrameIndex(frame_idx).addReg(dst_reg);
+}

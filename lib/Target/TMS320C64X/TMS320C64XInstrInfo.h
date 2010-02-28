@@ -37,6 +37,10 @@ public:
 				MachineBasicBlock::iterator I,
 				unsigned src_reg, bool is_kill, int FI,
 				const TargetRegisterClass *rc) const;
+	virtual void loadRegFromStackSlot(MachineBasicBlock &MBB,
+				MachineBasicBlock::iterator MI,
+				unsigned dst_reg, int frame_idx,
+				const TargetRegisterClass *RC) const;
 };
 
 } // llvm
