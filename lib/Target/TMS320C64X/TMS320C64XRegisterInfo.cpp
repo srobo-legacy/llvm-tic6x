@@ -150,7 +150,7 @@ TMS320C64XRegisterInfo::emitPrologue(MachineFunction &MF) const
 	BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::mvkl), TMS320C64X::A0)
 			.addImm(frame_size);
 	BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::mvkh), TMS320C64X::A0)
-			.addImm(frame_size);
+			.addImm(frame_size).addReg(TMS320C64X::A0);
 	BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::sub_r), TMS320C64X::B15)
 			.addReg(TMS320C64X::B15).addReg(TMS320C64X::A0);
 }
