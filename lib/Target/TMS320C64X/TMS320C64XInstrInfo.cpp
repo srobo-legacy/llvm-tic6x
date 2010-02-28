@@ -54,7 +54,7 @@ TMS320C64XInstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
 		llvm_unreachable("Unknown register class in spillslot");
 
 	BuildMI(MBB, I, DL, get(TMS320C64X::stw_idx)).addReg(TMS320C64X::A15)
-			.addFrameIndex(FI) .addReg(src_reg);
+			.addFrameIndex(FI).addReg(src_reg);
 }
 
 void
