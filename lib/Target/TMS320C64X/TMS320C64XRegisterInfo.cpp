@@ -144,13 +144,21 @@ TMS320C64XRegisterInfo::emitPrologue(MachineFunction &MF) const
 			.addReg(TMS320C64X::B15).addImm(8);
 	if (frame_size > 0xFFFF)
 		llvm_unreachable("Frame size over 2^16 in emitPrologue");
+
 	// On the assumption the stack size will be sizeable, load
 	// constant into volatile register.  XXX - doesn't appear to be a way
 	// of generating a constant node from this position
-	BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::mvkl), TMS320C64X::A0)
+	if (frame_size < 0x8000) {
+		BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::mvk), TMS320C64X::A0)
 			.addImm(frame_size);
-	BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::mvkh), TMS320C64X::A0)
+	} else {
+		BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::mvkl),
+				TMS320C64X::A0).addImm(frame_size);
+		BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::mvkh),
+			TMS320C64X::A0)
 			.addImm(frame_size).addReg(TMS320C64X::A0);
+	}
+
 	BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::sub_r), TMS320C64X::B15)
 			.addReg(TMS320C64X::B15).addReg(TMS320C64X::A0);
 }
