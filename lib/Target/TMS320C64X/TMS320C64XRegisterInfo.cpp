@@ -136,7 +136,7 @@ TMS320C64XRegisterInfo::emitPrologue(MachineFunction &MF) const
 
 	// Store FP
 	BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::stw_idx))
-		.addReg(TMS320C64X::A15).addImm(-4).addReg(TMS320C64X::B15);
+		.addReg(TMS320C64X::B15).addImm(-4).addReg(TMS320C64X::A15);
 
 	// On the assumption the stack size will be sizeable, load
 	// constant into volatile register.  XXX - doesn't appear to be a way
