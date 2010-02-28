@@ -109,6 +109,7 @@ TMS320C64XRegisterInfo::eliminateFrameIndex(
 	assert(i < MI.getNumOperands() && "No FrameIndex in eliminateFrameIdx");
 	frame_index = MI.getOperand(i).getIndex();
 	offs = MF.getFrameInfo()->getObjectOffset(frame_index);
+
 	MI.getOperand(i).ChangeToImmediate(offs);
 }
 
