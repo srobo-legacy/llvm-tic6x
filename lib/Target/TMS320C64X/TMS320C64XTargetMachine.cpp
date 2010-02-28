@@ -33,7 +33,7 @@ TMS320C64XTargetMachine::TMS320C64XTargetMachine(const Target &T,
 	 * arithmatic, however it doesn't support it for all logic operations,
 	 * only a variety of alu ops. */
 	InstrInfo(*this), TLInfo(*this),
-	FrameInfo(TargetFrameInfo::StackGrowsDown, 4, -8)
+	FrameInfo(TargetFrameInfo::StackGrowsDown, 4, -4)
 {
 }
 
