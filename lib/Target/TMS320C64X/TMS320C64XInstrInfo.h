@@ -42,9 +42,13 @@ public:
 				MachineBasicBlock::iterator MI,
 				unsigned dst_reg, int frame_idx,
 				const TargetRegisterClass *RC) const;
-	const MachineInstrBuilder
-			&addDefaultPred(const MachineInstrBuilder &MIB);
 };
+
+inline const MachineInstrBuilder &addDefaultPred(const MachineInstrBuilder &MIB)
+{
+
+        return MIB.addImm(0).addReg(-1);
+}
 
 } // llvm
 

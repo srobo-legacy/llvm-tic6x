@@ -70,10 +70,3 @@ TMS320C64XInstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
 	BuildMI(MBB, MI, DL, get(TMS320C64X::ldw_idx))
 		.addReg(dst_reg).addReg(TMS320C64X::A15).addFrameIndex(frame_idx);
 }
-
-const MachineInstrBuilder &
-TMS320C64XInstrInfo::addDefaultPred(const MachineInstrBuilder &MIB)
-{
-
-	return MIB.addImm(0).addReg(-1);
-}
