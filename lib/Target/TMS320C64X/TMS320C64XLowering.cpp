@@ -66,10 +66,11 @@ TMS320C64XLowering::TMS320C64XLowering(TMS320C64XTargetMachine &tm) :
 	/* Curious that llvm has a select; tms320c64x doesn't though, expanding
 	 * apparently leads to SELECT_CC insns */
 	setOperationAction(ISD::SELECT, MVT::i32, Expand);
-	/* No setcc either, although we can emulate it */
-	setOperationAction(ISD::SETCC, MVT::i32, Expand);
-	/* No branchcc, but we have brcond */
-	setOperationAction(ISD::BR_CC, MVT::i32, Expand);
+	setOperationAction(ISD::SELECT, MVT::i32, Custom);
+	/* Manually beat condition code setting into cmps */
+	setOperationAction(ISD::SETCC, MVT::i32, Custom);
+	/* No branchcc, but we have brcond. Emulate */
+	setOperationAction(ISD::BR_CC, MVT::i32, Custom);
 
 	/* Probably is a membarrier, but I'm not aware of it right now */
 	setOperationAction(ISD::MEMBARRIER, MVT::Other, Expand);
