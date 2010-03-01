@@ -137,6 +137,10 @@ TMS320C64XRegisterInfo::emitPrologue(MachineFunction &MF) const
 	BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::stw_idx))
 		.addReg(TMS320C64X::B15).addImm(-4).addReg(TMS320C64X::A15);
 
+	// Setup our own FP using the current SP
+	BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::mv))
+		.addReg(TMS320C64X::A15).addReg(TMS320C64X::B15);
+
 	// On the assumption the stack size will be sizeable, load
 	// constant into volatile register.  XXX - doesn't appear to be a way
 	// of generating a constant node from this position
