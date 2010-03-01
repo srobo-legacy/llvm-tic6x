@@ -385,3 +385,10 @@ TMS320C64XLowering::LowerBRCC(SDValue op, SelectionDAG &DAG)
 
 	llvm_unreachable("LowerBRCC");
 }
+
+SDValue
+TMS320C64XLowering::LowerSETCC(SDValue op, SelectionDAG &DAG)
+{
+
+	llvm_unreachable("LowerSETCC");
+}

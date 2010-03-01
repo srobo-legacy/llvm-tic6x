@@ -58,6 +58,7 @@ public:
 	SDValue LowerGlobalAddress(SDValue op, SelectionDAG &DAG);
 	SDValue LowerReturnAddr(SDValue op, SelectionDAG &DAG);
 	SDValue LowerBRCC(SDValue op, SelectionDAG &DAG);
+	SDValue LowerSETCC(SDValue op, SelectionDAG &DAG);
 
 	const TMS320C64XTargetMachine &TM;
 };
