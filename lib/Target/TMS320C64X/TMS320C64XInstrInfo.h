@@ -15,6 +15,7 @@
 #include "TMS320C64XGenInstrNames.inc"
 #include "TMS320C64XGenInstrInfo.inc"
 #include "llvm/Target/TargetInstrInfo.h"
+#include "llvm/CodeGen/MachineInstrBuilder.h"
 
 namespace llvm {
 
@@ -41,6 +42,8 @@ public:
 				MachineBasicBlock::iterator MI,
 				unsigned dst_reg, int frame_idx,
 				const TargetRegisterClass *RC) const;
+	const MachineInstrBuilder
+			&addDefaultPred(const MachineInstrBuilder &MIB);
 };
 
 } // llvm
