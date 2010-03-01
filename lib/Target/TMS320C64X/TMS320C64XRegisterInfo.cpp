@@ -175,8 +175,8 @@ TMS320C64XRegisterInfo::emitEpilogue(MachineFunction &MF,
 
 	// To finish, nuke stack frame, restore FP, ret addr
 
-	BuildMI(MBB, MBBI, DL, TII.get(TMS320C64X::add_i5), TMS320C64X::B15)
-		.addReg(TMS320C64X::A15).addImm(0);
+	BuildMI(MBB, MBBI, DL, TII.get(TMS320C64X::mv))
+		.addReg(TMS320C64X::B15).addReg(TMS320C64X::A15);
 	BuildMI(MBB, MBBI, DL, TII.get(TMS320C64X::ldw_idx))
 		.addReg(TMS320C64X::A15).addReg(TMS320C64X::B15).addImm(-4);
 	BuildMI(MBB, MBBI, DL, TII.get(TMS320C64X::ldw_idx))
