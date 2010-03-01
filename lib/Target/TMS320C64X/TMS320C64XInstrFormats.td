@@ -117,6 +117,9 @@ def set_hi : PatLeaf<(imm), [{
 	return ((val & 0xFFFF0000) == val);
 }]>;
 
+def pred : PredicateOperand<OtherVT, (ops i32imm, GPRegs),
+			(ops (i32 0), (i32 0))>;
+
 class TMSInst<dag outs, dag ins, string mnemonic, list<dag> pattern, InstUnit u>
 							: Instruction {
 	// All insns are conditional unless stated otherwise
@@ -124,11 +127,8 @@ class TMSInst<dag outs, dag ins, string mnemonic, list<dag> pattern, InstUnit u>
 
 	let Namespace = "TMS320C64X";
 	let OutOperandList = outs;
-	let InOperandList = ins;
+	let InOperandList = !con(ins, (ops pred:$p));
 	let AsmString = mnemonic;
 	let Pattern = pattern;
 	InstUnit unit = u;
 }
-
-def pred : PredicateOperand<OtherVT, (ops i32imm, GPRegs),
-			(ops (i32 0), (i32 0))>;
