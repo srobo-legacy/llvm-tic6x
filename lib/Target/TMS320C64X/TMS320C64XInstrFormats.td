@@ -129,3 +129,6 @@ class TMSInst<dag outs, dag ins, string mnemonic, list<dag> pattern, InstUnit u>
 	let Pattern = pattern;
 	InstUnit unit = u;
 }
+
+def pred : PredicateOperand<OtherVT, (ops i32imm, GPRegs),
+			(ops (i32 0), (i32 0))>;
