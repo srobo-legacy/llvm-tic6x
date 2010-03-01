@@ -67,6 +67,6 @@ TMS320C64XInstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
 	if (rc != TMS320C64X::GPRegsRegisterClass)
 		llvm_unreachable("Unknown register class in loadslot");
 
-	BuildMI(MBB, MI, DL, get(TMS320C64X::ldw_idx)).addReg(TMS320C64X::A15)
-			.addFrameIndex(frame_idx).addReg(dst_reg);
+	BuildMI(MBB, MI, DL, get(TMS320C64X::ldw_idx))
+		.addReg(dst_reg).addReg(TMS320C64X::A15).addFrameIndex(frame_idx);
 }
