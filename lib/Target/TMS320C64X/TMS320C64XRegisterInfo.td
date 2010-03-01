@@ -14,6 +14,8 @@ class MainReg<bits<6> num, bit side, string n> : Register<n> {
 	let Namespace = "TMS320C64X";
 }
 
+def AlwaysExPred : MainReg<0, 0, "AlwaysEx">;
+
 def A0	:	MainReg<0, 0, "A0">, DwarfRegNum<[0]>;
 def A1	:	MainReg<1, 0, "A1">, DwarfRegNum<[1]>;
 def A2	:	MainReg<2, 0, "A2">, DwarfRegNum<[2]>;
