@@ -119,6 +119,9 @@ def set_hi : PatLeaf<(imm), [{
 
 class TMSInst<dag outs, dag ins, string mnemonic, list<dag> pattern, InstUnit u>
 							: Instruction {
+	// All insns are conditional unless stated otherwise
+	let isPredicable = 1;
+
 	let Namespace = "TMS320C64X";
 	let OutOperandList = outs;
 	let InOperandList = ins;
