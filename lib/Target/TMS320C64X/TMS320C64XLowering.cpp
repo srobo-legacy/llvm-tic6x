@@ -378,3 +378,10 @@ TMS320C64XLowering::LowerReturnAddr(SDValue op, SelectionDAG &DAG)
 	return DAG.getLoad(getPointerTy(), op.getDebugLoc(), DAG.getEntryNode(),
 							retaddr, NULL, 0);
 }
+
+SDValue
+TMS320C64XLowering::LowerBRCC(SDValue op, SelectionDAG &DAG)
+{
+
+	llvm_unreachable("LowerBRCC");
+}
