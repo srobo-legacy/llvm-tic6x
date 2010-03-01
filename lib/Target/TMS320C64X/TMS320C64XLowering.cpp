@@ -342,13 +342,12 @@ TMS320C64XLowering::LowerCallResult(SDValue Chain, SDValue InFlag,
 SDValue
 TMS320C64XLowering::LowerOperation(SDValue op,  SelectionDAG &DAG)
 {
-	const TargetInstrInfo *TII = DAG.getTarget().getInstrInfo();
-	const TargetInstrDesc &II = TII->get(op.getOpcode());
 	switch (op.getOpcode()) {
 	case ISD::GlobalAddress:	return LowerGlobalAddress(op, DAG);
 	case ISD::RETURNADDR:		return LowerReturnAddr(op, DAG);
+	case ISD::BR_CC:		return LowerBRCC(op, DAG);
 	default:
-		llvm_unreachable(II.getName());
+		llvm_unreachable(op.getNode()->getOperationName().c_str());
 	}
 
 	return op;
