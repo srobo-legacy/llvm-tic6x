@@ -53,4 +53,3 @@ inline const MachineInstrBuilder &addDefaultPred(const MachineInstrBuilder &MIB)
 } // llvm
 
 #endif // LLVM_TARGET_TMS320C64X_INSTRINFO_H
-
