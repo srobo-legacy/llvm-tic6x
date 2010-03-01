@@ -160,8 +160,24 @@ void
 TMS320C64XRegisterInfo::emitEpilogue(MachineFunction &MF,
 					MachineBasicBlock &MBB) const
 {
+	DebugLoc DL = DebugLoc::getUnknownLoc();
+	const MachineFrameInfo *MFI = MF.getFrameInfo();
+	MachineBasicBlock::iterator MBBI = prior(MBB.end());
 
-	llvm_unreachable_internal("Unimplemented function emitEpilogue\n");
+	if (MFI->hasVarSizedObjects())
+		llvm_unreachable("Can't currently support varsize stack frame");
+
+	if (MBBI->getOpcode() != TMS320C64X::ret)
+		llvm_unreachable("Can't insert epilogue before non-ret insn");
+
+	// To finish, nuke stack frame, restore FP, ret addr
+
+	BuildMI(MBB, MBBI, DL, TII.get(TMS320C64X::add_i5), TMS320C64X::B15)
+		.addReg(TMS320C64X::A15).addImm(0);
+	BuildMI(MBB, MBBI, DL, TII.get(TMS320C64X::ldw_idx))
+		.addReg(TMS320C64X::A15).addReg(TMS320C64X::B15).addImm(-4);
+	BuildMI(MBB, MBBI, DL, TII.get(TMS320C64X::ldw_idx))
+		.addReg(TMS320C64X::B3).addReg(TMS320C64X::B15).addImm(0);
 }
 
 int
