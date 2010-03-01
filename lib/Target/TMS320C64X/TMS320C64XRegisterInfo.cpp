@@ -130,33 +130,32 @@ TMS320C64XRegisterInfo::emitPrologue(MachineFunction &MF) const
 	// Store return pointer - we could use the correct addressing mode
 	// to decrement SP for us, but I don't know the infrastructure well
 	// enough to do that yet
-	BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::stw_idx))
-		.addReg(TMS320C64X::B15).addImm(0).addReg(TMS320C64X::B3);
+	addDefaultPred(BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::stw_idx))
+		.addReg(TMS320C64X::B15).addImm(0).addReg(TMS320C64X::B3));
 
 	// Store FP
-	BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::stw_idx))
-		.addReg(TMS320C64X::B15).addImm(-4).addReg(TMS320C64X::A15);
+	addDefaultPred(BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::stw_idx))
+		.addReg(TMS320C64X::B15).addImm(-4).addReg(TMS320C64X::A15));
 
 	// Setup our own FP using the current SP
-	BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::mv))
-		.addReg(TMS320C64X::A15).addReg(TMS320C64X::B15);
+	addDefaultPred(BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::mv))
+		.addReg(TMS320C64X::A15).addReg(TMS320C64X::B15));
 
 	// On the assumption the stack size will be sizeable, load
 	// constant into volatile register.  XXX - doesn't appear to be a way
 	// of generating a constant node from this position
 	if (frame_size < 0x8000) {
-		BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::mvk), TMS320C64X::A0)
-			.addImm(frame_size);
+		addDefaultPred(BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::mvk),
+					TMS320C64X::A0) .addImm(frame_size));
 	} else {
-		BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::mvkl),
-				TMS320C64X::A0).addImm(frame_size);
-		BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::mvkh),
-			TMS320C64X::A0)
-			.addImm(frame_size).addReg(TMS320C64X::A0);
+		addDefaultPred(BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::mvkl),
+				TMS320C64X::A0).addImm(frame_size));
+		addDefaultPred(BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::mvkh),
+			TMS320C64X::A0).addImm(frame_size).addReg(TMS320C64X::A0));
 	}
 
-	BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::sub_r), TMS320C64X::B15)
-			.addReg(TMS320C64X::B15).addReg(TMS320C64X::A0);
+	addDefaultPred(BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::sub_r),
+		TMS320C64X::B15).addReg(TMS320C64X::B15).addReg(TMS320C64X::A0));
 }
 
 void
@@ -175,12 +174,12 @@ TMS320C64XRegisterInfo::emitEpilogue(MachineFunction &MF,
 
 	// To finish, nuke stack frame, restore FP, ret addr
 
-	BuildMI(MBB, MBBI, DL, TII.get(TMS320C64X::mv))
-		.addReg(TMS320C64X::B15).addReg(TMS320C64X::A15);
-	BuildMI(MBB, MBBI, DL, TII.get(TMS320C64X::ldw_idx))
-		.addReg(TMS320C64X::A15).addReg(TMS320C64X::B15).addImm(-4);
-	BuildMI(MBB, MBBI, DL, TII.get(TMS320C64X::ldw_idx))
-		.addReg(TMS320C64X::B3).addReg(TMS320C64X::B15).addImm(0);
+	addDefaultPred(BuildMI(MBB, MBBI, DL, TII.get(TMS320C64X::mv))
+		.addReg(TMS320C64X::B15).addReg(TMS320C64X::A15));
+	addDefaultPred(BuildMI(MBB, MBBI, DL, TII.get(TMS320C64X::ldw_idx))
+		.addReg(TMS320C64X::A15).addReg(TMS320C64X::B15).addImm(-4));
+	addDefaultPred(BuildMI(MBB, MBBI, DL, TII.get(TMS320C64X::ldw_idx))
+		.addReg(TMS320C64X::B3).addReg(TMS320C64X::B15).addImm(0));
 }
 
 int
