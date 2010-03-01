@@ -33,6 +33,9 @@ let isReturn = 1, isTerminator = 1 in {
 	def ret : TMSInst<(outs), (ins), "br B3", [(retflag)], UnitS>;
 }
 
+def mv : TMSInst<(outs GPRegs:$out), (ins GPRegs:$in), "mv $in, $out", [],
+				UnitD>;
+
 
 
 
