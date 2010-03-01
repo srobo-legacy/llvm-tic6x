@@ -39,7 +39,8 @@ TMS320C64XInstrInfo::copyRegToReg(MachineBasicBlock &MBB,
 		llvm_unreachable("copyRegToReg sees nonexistant registerclass");
 
 	DebugLoc DL = DebugLoc::getUnknownLoc();
-	BuildMI(MBB, I, DL, get(TMS320C64X::mv), dst_reg).addReg(src_reg);
+	addDefaultPred(BuildMI(MBB, I, DL, get(TMS320C64X::mv), dst_reg)
+							.addReg(src_reg));
 	return true;
 }
 
@@ -53,8 +54,8 @@ TMS320C64XInstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
 	if (rc != TMS320C64X::GPRegsRegisterClass)
 		llvm_unreachable("Unknown register class in spillslot");
 
-	BuildMI(MBB, I, DL, get(TMS320C64X::stw_idx)).addReg(TMS320C64X::A15)
-			.addFrameIndex(FI).addReg(src_reg);
+	addDefaultPred(BuildMI(MBB, I, DL, get(TMS320C64X::stw_idx))
+		.addReg(TMS320C64X::A15) .addFrameIndex(FI).addReg(src_reg));
 }
 
 void
@@ -67,6 +68,6 @@ TMS320C64XInstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
 	if (rc != TMS320C64X::GPRegsRegisterClass)
 		llvm_unreachable("Unknown register class in loadslot");
 
-	BuildMI(MBB, MI, DL, get(TMS320C64X::ldw_idx))
-		.addReg(dst_reg).addReg(TMS320C64X::A15).addFrameIndex(frame_idx);
+	addDefaultPred(BuildMI(MBB, MI, DL, get(TMS320C64X::ldw_idx))
+		.addReg(dst_reg).addReg(TMS320C64X::A15).addFrameIndex(frame_idx));
 }
