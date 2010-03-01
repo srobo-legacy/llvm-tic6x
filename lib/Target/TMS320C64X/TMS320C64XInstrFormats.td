@@ -118,7 +118,7 @@ def set_hi : PatLeaf<(imm), [{
 }]>;
 
 def pred : PredicateOperand<OtherVT, (ops i32imm, GPRegs),
-			(ops (i32 0), (i32 0))>;
+			(ops (i32 0), (i32 -1))>;
 
 class TMSInst<dag outs, dag ins, string mnemonic, list<dag> pattern, InstUnit u>
 							: Instruction {
