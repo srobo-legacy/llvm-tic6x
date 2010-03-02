@@ -59,6 +59,7 @@ def mem_operand	: Operand<i32> {
 }
 
 def calltarget : Operand<i32>;
+def brtarget : Operand<OtherVT>;
 
 def i8index : PatLeaf<(imm), [{
 	return ((int)N->getSExtValue() >= 0 && (int)N->getSExtValue() < 32);

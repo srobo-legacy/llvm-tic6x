@@ -11,10 +11,12 @@
 // misc, to begin with
 
 def SDT_Wrapper : SDTypeProfile<1, 1, [SDTCisSameAs<0, 1>, SDTCisPtrTy<0>]>;
+def SDT_brcond : SDTypeProfile<0, 2, [SDTCisVT<0, OtherVT>]>;
 def SDT_call : SDTypeProfile<0, -1, [SDTCisVT<0, iPTR>]>;
 def SDT_call_seq_start : SDCallSeqStart<[SDTCisVT<0, i32>]>;
 def SDT_call_seq_end : SDCallSeqEnd<[SDTCisVT<0, i32>, SDTCisVT<1, i32>]>;
 def Wrapper : SDNode<"TMSISD::WRAPPER", SDT_Wrapper>;
+def brcond_node : SDNode<"TMSISD::BRCOND", SDT_brcond, [SDNPHasChain]>;
 def callseq_start : SDNode<"ISD::CALLSEQ_START", SDT_call_seq_start,
 				[SDNPHasChain, SDNPOutFlag]>;
 def callseq_end : SDNode<"ISD::CALLSEQ_END", SDT_call_seq_end,
@@ -135,6 +137,11 @@ def stw_idx : TMSInst<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
 
 
 // Branch / call instructions
+
+def ti_brcond : TMSInst<(outs), (ins brtarget:$block, nodefault_pred:$bees), "b $block",
+			[(brcond_node bb:$block, predwrapper:$bees)], UnitS> {
+	let InOperandList = (ins brtarget:$block, nodefault_pred:$bees);
+}
 
 def callp : TMSInst<(outs), (ins calltarget:$dst),
 			"callp $dst", [(TMS320C64Xcall tglobaladdr:$dst)],
