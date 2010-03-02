@@ -27,6 +27,7 @@ public:
 	SDNode *Select(SDValue op);
 	bool select_addr(SDValue op, SDValue N, SDValue &R1, SDValue &R2);
 	bool select_idxaddr(SDValue op, SDValue N, SDValue &R1, SDValue &R2);
+	bool bounce_predicate(SDValue op, SDValue N, SDValue &R1, SDValue &R2);
 	const char *getPassName() const {
 		return "TMS320C64X Instruction Selection";
 	}
@@ -137,6 +138,15 @@ TMS320C64XInstSelectorPass::select_idxaddr(SDValue op, SDValue addr,
 	base = addr;
 	offs = CurDAG->getTargetConstant(0, MVT::i32);
 	return true;
+}
+
+bool
+TMS320C64XInstSelectorPass::bounce_predicate(SDValue op, SDValue N, SDValue
+							&base, SDValue &offs)
+{
+
+	__asm__("int $3");
+	llvm_unreachable("bounce_predicate");
 }
 
 SDNode *
