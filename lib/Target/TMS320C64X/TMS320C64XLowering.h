@@ -21,6 +21,7 @@ namespace llvm {
 namespace TMSISD {
 	enum {
 		FIRST_NUMBER = ISD::BUILTIN_OP_END,
+		BRCOND,
 		CALL,
 		RET_FLAG,
 		WRAPPER

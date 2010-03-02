@@ -387,7 +387,12 @@ TMS320C64XLowering::LowerBRCC(SDValue op, SelectionDAG &DAG)
 	SDValue Chain = LowerSETCC(DAG.getSetCC(dl, MVT::i32, op.getOperand(2),
 		op.getOperand(3), cast<CondCodeSDNode>(op.getOperand(1))->get())
 									,DAG);
-#error ENOTYET
+
+	// Generate our own brcond form, operands BB, const/reg for predicate
+	Chain = DAG.getNode(TMSISD::BRCOND, dl, MVT::Other, op.getOperand(4),
+					DAG.getConstant(1, MVT::i32), Chain);
+
+	return Chain;
 }
 
 SDValue
