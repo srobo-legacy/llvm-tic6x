@@ -32,7 +32,10 @@ public:
 		return "TMS320C64X Instruction Selection";
 	}
 
+// What the fail.
+#define UNKNOWN MVT::i32
 #include "TMS320C64XGenDAGISel.inc"
+#undef UNKNOWN
 };
 }
 
