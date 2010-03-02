@@ -121,6 +121,9 @@ def set_hi : PatLeaf<(imm), [{
 def pred : PredicateOperand<OtherVT, (ops i32imm, PredRegs),
 			(ops (i32 0), (i32 0))>;
 
+def nodefault_pred : PredicateOperand<OtherVT, (ops i32imm, PredRegs),
+			(ops)>;
+
 class TMSInst<dag outs, dag ins, string mnemonic, list<dag> pattern, InstUnit u>
 							: Instruction {
 	// All insns are conditional unless stated otherwise
