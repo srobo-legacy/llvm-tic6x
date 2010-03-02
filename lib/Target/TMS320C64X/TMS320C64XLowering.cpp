@@ -382,8 +382,12 @@ TMS320C64XLowering::LowerReturnAddr(SDValue op, SelectionDAG &DAG)
 SDValue
 TMS320C64XLowering::LowerBRCC(SDValue op, SelectionDAG &DAG)
 {
+	DebugLoc dl = DebugLoc::getUnknownLoc();
 
-	llvm_unreachable("LowerBRCC");
+	SDValue Chain = LowerSETCC(DAG.getSetCC(dl, MVT::i32, op.getOperand(2),
+		op.getOperand(3), cast<CondCodeSDNode>(op.getOperand(1))->get())
+									,DAG);
+#error ENOTYET
 }
 
 SDValue
