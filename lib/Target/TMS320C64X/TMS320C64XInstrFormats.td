@@ -102,7 +102,7 @@ def mvk_pred : PatLeaf<(imm), [{
 }], mvk_xform>;
 
 def mvk_all_pred : PatLeaf<(imm), [{
-	return true;
+	return (N == N); // Avoid unused N warning
 }], NOOP_SDNodeXForm>;
 
 // ~
