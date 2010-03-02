@@ -81,6 +81,9 @@ def B29	:	MainReg<61, 1, "B29">, DwarfRegNum<[61]>;
 def B30	:	MainReg<62, 1, "B30">, DwarfRegNum<[62]>;
 def B31	:	MainReg<63, 1, "B31">, DwarfRegNum<[63]>;
 
+def PredRegs : RegisterClass<"TMS320C64X", [i32], 32,
+	[ A0, A1, A2, B0, B1, B2, AlwaysExPred ]>;
+
 def GPRegs : RegisterClass<"TMS320C64X", [i32], 32,
 	[
 		// A10-A15, B10-B15 are nonvolatile, B15 SP, A15 FP.
