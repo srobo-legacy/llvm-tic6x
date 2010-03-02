@@ -16,6 +16,7 @@ def SDT_call : SDTypeProfile<0, -1, [SDTCisVT<0, iPTR>]>;
 def SDT_call_seq_start : SDCallSeqStart<[SDTCisVT<0, i32>]>;
 def SDT_call_seq_end : SDCallSeqEnd<[SDTCisVT<0, i32>, SDTCisVT<1, i32>]>;
 def Wrapper : SDNode<"TMSISD::WRAPPER", SDT_Wrapper>;
+def predwrapper : ComplexPattern<OtherVT, 2, "bounce_predicate", [], []>;
 def brcond_node : SDNode<"TMSISD::BRCOND", SDT_brcond, [SDNPHasChain]>;
 def callseq_start : SDNode<"ISD::CALLSEQ_START", SDT_call_seq_start,
 				[SDNPHasChain, SDNPOutFlag]>;
