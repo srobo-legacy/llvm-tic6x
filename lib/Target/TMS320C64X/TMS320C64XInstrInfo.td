@@ -17,6 +17,10 @@ def SDT_call_seq_start : SDCallSeqStart<[SDTCisVT<0, i32>]>;
 def SDT_call_seq_end : SDCallSeqEnd<[SDTCisVT<0, i32>, SDTCisVT<1, i32>]>;
 def SDT_cmp : SDTypeProfile<1, 2, [SDTCisInt<0>, SDTCisSameAs<0, 1>]>;
 
+// This just copies the last two operands to the node being operated upon into
+// the output operands: this makes tablegen happy. Note that this will probably
+// explode if ever applied to an automagically generated node, should only be
+// used for custom-generated-nodes
 def predwrapper : ComplexPattern<OtherVT, 2, "bounce_predicate", [], []>;
 
 def brcond_node : SDNode<"TMSISD::BRCOND", SDT_brcond, [SDNPHasChain]>;
