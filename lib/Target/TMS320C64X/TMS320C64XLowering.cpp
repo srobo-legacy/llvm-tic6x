@@ -398,6 +398,7 @@ TMS320C64XLowering::LowerBRCC(SDValue op, SelectionDAG &DAG)
 SDValue
 TMS320C64XLowering::LowerSETCC(SDValue op, SelectionDAG &DAG)
 {
+	unsigned int opcode;
 	SDValue setop, tmp;
 	SDValue lhs = op.getOperand(0);
 	SDValue rhs = op.getOperand(1);
@@ -427,39 +428,41 @@ TMS320C64XLowering::LowerSETCC(SDValue op, SelectionDAG &DAG)
 		llvm_unreachable("Unsupported condcode");
 	case ISD::SETEQ:
 	case ISD::SETUEQ:
-		setop = DAG.getNode(TMSISD::CMPEQ, dl, MVT::i32);
+		opcode = TMSISD::CMPEQ;
 		break;
 	case ISD::SETUGT:
-		setop = DAG.getNode(TMSISD::CMPEGTU, dl, MVT::i32);
+		opcode = TMSISD::CMPGTU;
 		break;
 	case ISD::SETUGE:
-		setop = DAG.getNode(TMSISD::CMPELTU, dl, MVT::i32);
+		opcode = TMSISD::CMPLTU;
 		SWAP();
 		break;
 	case ISD::SETULT:
-		setop = DAG.getNode(TMSISD::CMPELTU, dl, MVT::i32);
+		opcode = TMSISD::CMPLTU;
 		break;
 	case ISD::SETULE:
-		setop = DAG.getNode(TMSISD::CMPEGTU, dl, MVT::i32);
+		opcode = TMSISD::CMPGTU;
 		SWAP();
 		break;
 	case ISD::SETUNE:
 		llvm_unreachable("Halp. Can't do setne's");
 	case ISD::SETGT:
-		setop = DAG.getNode(TMSISD::CMPGT, dl, MVT::i32);
+		opcode = TMSISD::CMPGT;
 		break;
 	case ISD::SETGE:
-		setop = DAG.getNode(TMSISD::CMPLT, dl, MVT::i32);
+		opcode = TMSISD::CMPLT;
 		SWAP();
 		break;
 	case ISD::SETLT:
-		setop = DAG.getNode(TMSISD::CMPLT, dl, MVT::i32);
+		opcode = TMSISD::CMPLT;
 		break;
 	case ISD::SETLE:
-		setop = DAG.getNode(TMSISD::CMPGT, dl, MVT::i32);
+		opcode = TMSISD::CMPGT;
 		SWAP();
 		break;
 	case ISD::SETNE:
 		llvm_unreachable("Halp. Can't do setnes");
 	}
+
+	return  DAG.getNode(opcode, dl, MVT::i32, lhs, rhs);
 }
