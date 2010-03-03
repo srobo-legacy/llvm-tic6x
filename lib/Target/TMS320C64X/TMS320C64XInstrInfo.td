@@ -173,8 +173,8 @@ def cmpltu :TMSInst<(outs GPRegs:$out), (ins GPRegs:$src1, GPRegs:$src2),
 
 // Branch / call instructions
 
-def ti_brcond : TMSInst<(outs), (ins brtarget:$block, nodefault_pred:$bees), "b $block",
-			[(brcond_node bb:$block, predwrapper:$bees)], UnitS> {
+def ti_brcond : TMSInst<(outs), (ins brtarget:$block, nodefault_pred:$bees),
+	"b $block", [(brcond_node bb:$block, predwrapper:$bees)], UnitS> {
 	let InOperandList = (ins brtarget:$block, nodefault_pred:$bees);
 }
 
