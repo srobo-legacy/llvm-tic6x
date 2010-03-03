@@ -398,6 +398,37 @@ TMS320C64XLowering::LowerBRCC(SDValue op, SelectionDAG &DAG)
 SDValue
 TMS320C64XLowering::LowerSETCC(SDValue op, SelectionDAG &DAG)
 {
+	SDValue lhs = op.getOperand(0);
+	SDValue rhs = op.getOperand(1);
+	ISD::CondCode cc = cast<CondCodeSDNode>(op.getOperand(2))->get();
 
-	llvm_unreachable("LowerSETCC");
+	switch (cc) {
+	case ISD::SETFALSE:
+	case ISD::SETTRUE:
+	case ISD::SETFALSE2:
+	case ISD::SETTRUE2:
+	case ISD::SETCC_INVALID:
+	case ISD::SETOEQ:
+	case ISD::SETOGT:
+	case ISD::SETOGE:
+	case ISD::SETOLT:
+	case ISD::SETOLE:
+	case ISD::SETONE:
+	case ISD::SETO:
+		llvm_unreachable("Unsupported condcode");
+	case ISD::SETUO:
+	case ISD::SETUEQ:
+	case ISD::SETUGT:
+	case ISD::SETUGE:
+	case ISD::SETULT:
+	case ISD::SETULE:
+	case ISD::SETUNE:
+	case ISD::SETEQ:
+	case ISD::SETGT:
+	case ISD::SETGE:
+	case ISD::SETLT:
+	case ISD::SETLE:
+	case ISD::SETNE:
+		llvm_unreachable("Unimplemented condcode");
+	}
 }
