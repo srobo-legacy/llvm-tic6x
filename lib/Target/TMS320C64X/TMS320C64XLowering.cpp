@@ -382,15 +382,22 @@ TMS320C64XLowering::LowerReturnAddr(SDValue op, SelectionDAG &DAG)
 SDValue
 TMS320C64XLowering::LowerBRCC(SDValue op, SelectionDAG &DAG)
 {
+	int pred = 1;
 	DebugLoc dl = DebugLoc::getUnknownLoc();
+	ISD::CondCode cc = cast<CondCodeSDNode>(op.getOperand(1))->get();
+
+	// Can't do setne: instead invert predicate
+	if (cc == ISD::SETNE || cc== ISD::SETUNE) {
+		cc = ISD::SETEQ;
+		pred = 0;
+	}
 
 	SDValue Chain = LowerSETCC(DAG.getSetCC(dl, MVT::i32, op.getOperand(2),
-		op.getOperand(3), cast<CondCodeSDNode>(op.getOperand(1))->get())
-									,DAG);
+						op.getOperand(3), cc), DAG);
 
 	// Generate our own brcond form, operands BB, const/reg for predicate
 	Chain = DAG.getNode(TMSISD::BRCOND, dl, MVT::Other, op.getOperand(4),
-					DAG.getConstant(1, MVT::i32), Chain);
+					DAG.getConstant(pred, MVT::i32), Chain);
 
 	return Chain;
 }
