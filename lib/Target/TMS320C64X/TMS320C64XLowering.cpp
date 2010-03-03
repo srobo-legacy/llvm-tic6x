@@ -446,10 +446,20 @@ TMS320C64XLowering::LowerSETCC(SDValue op, SelectionDAG &DAG)
 	case ISD::SETUNE:
 		llvm_unreachable("Halp. Can't do setne's");
 	case ISD::SETGT:
+		setop = DAG.getNode(TMSISD::CMPGT, dl, MVT::i32);
+		break;
 	case ISD::SETGE:
+		setop = DAG.getNode(TMSISD::CMPLT, dl, MVT::i32);
+		SWAP();
+		break;
 	case ISD::SETLT:
+		setop = DAG.getNode(TMSISD::CMPLT, dl, MVT::i32);
+		break;
 	case ISD::SETLE:
+		setop = DAG.getNode(TMSISD::CMPGT, dl, MVT::i32);
+		SWAP();
+		break;
 	case ISD::SETNE:
-		llvm_unreachable("Unimplemented condcode");
+		llvm_unreachable("Halp. Can't do setnes");
 	}
 }
