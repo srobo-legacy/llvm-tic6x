@@ -41,6 +41,7 @@ public:
 	~TMS320C64XLowering();
 
 	unsigned getFunctionAlignment(const Function *F) const;
+	const char *getTargetNodeName(unsigned op) const;
 	SDValue LowerFormalArguments(SDValue Chain,
 				unsigned CallConv, bool isVarArg,
 				const SmallVectorImpl<ISD::InputArg> &Ins,

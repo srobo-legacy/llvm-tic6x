@@ -91,6 +91,24 @@ TMS320C64XLowering::~TMS320C64XLowering()
 	return;
 }
 
+const char *
+TMS320C64XLowering::getTargetNodeName(unsigned op) const
+{
+
+	switch (op) {
+	default: return NULL;
+	case TMSISD::BRCOND:		return "TMSISD::BRCOND";
+	case TMSISD::CMPEQ:		return "TMSISD::CMPEQ";
+	case TMSISD::CMPGT:		return "TMSISD::CMPGT";
+	case TMSISD::CMPGTU:		return "TMSISD::CMPGTU";
+	case TMSISD::CMPLT:		return "TMSISD::CMPLT";
+	case TMSISD::CMPLTU:		return "TMSISD::CMPLTU";
+	case TMSISD::CALL:		return "TMSISD::CALL";
+	case TMSISD::RET_FLAG:		return "TMSISD::RET_FLAG";
+	case TMSISD::WRAPPER:		return "TMSISD::WRAPPER";
+	}
+}
+
 unsigned
 TMS320C64XLowering::getFunctionAlignment(Function const*) const
 {
