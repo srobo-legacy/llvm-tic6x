@@ -425,6 +425,7 @@ TMS320C64XLowering::LowerSETCC(SDValue op, SelectionDAG &DAG)
 	case ISD::SETO:
 	case ISD::SETUO:
 		llvm_unreachable("Unsupported condcode");
+	case ISD::SETEQ:
 	case ISD::SETUEQ:
 		setop = DAG.getNode(TMSISD::CMPEQ, dl, MVT::i32);
 		break;
@@ -444,7 +445,6 @@ TMS320C64XLowering::LowerSETCC(SDValue op, SelectionDAG &DAG)
 		break;
 	case ISD::SETUNE:
 		llvm_unreachable("Halp. Can't do setne's");
-	case ISD::SETEQ:
 	case ISD::SETGT:
 	case ISD::SETGE:
 	case ISD::SETLT:
