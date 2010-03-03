@@ -398,9 +398,17 @@ TMS320C64XLowering::LowerBRCC(SDValue op, SelectionDAG &DAG)
 SDValue
 TMS320C64XLowering::LowerSETCC(SDValue op, SelectionDAG &DAG)
 {
+	SDValue setop, tmp;
 	SDValue lhs = op.getOperand(0);
 	SDValue rhs = op.getOperand(1);
 	ISD::CondCode cc = cast<CondCodeSDNode>(op.getOperand(2))->get();
+	DebugLoc dl = DebugLoc::getUnknownLoc();
+
+#define SWAP() {		\
+	tmp = lhs;		\
+	lhs = rhs;		\
+	rhs = tmp;		\
+}
 
 	switch (cc) {
 	case ISD::SETFALSE:
@@ -418,11 +426,24 @@ TMS320C64XLowering::LowerSETCC(SDValue op, SelectionDAG &DAG)
 	case ISD::SETUO:
 		llvm_unreachable("Unsupported condcode");
 	case ISD::SETUEQ:
+		setop = DAG.getNode(TMSISD::CMPEQ, dl, MVT::i32);
+		break;
 	case ISD::SETUGT:
+		setop = DAG.getNode(TMSISD::CMPEGTU, dl, MVT::i32);
+		break;
 	case ISD::SETUGE:
+		setop = DAG.getNode(TMSISD::CMPELTU, dl, MVT::i32);
+		SWAP();
+		break;
 	case ISD::SETULT:
+		setop = DAG.getNode(TMSISD::CMPELTU, dl, MVT::i32);
+		break;
 	case ISD::SETULE:
+		setop = DAG.getNode(TMSISD::CMPEGTU, dl, MVT::i32);
+		SWAP();
+		break;
 	case ISD::SETUNE:
+		llvm_unreachable("Halp. Can't do setne's");
 	case ISD::SETEQ:
 	case ISD::SETGT:
 	case ISD::SETGE:
