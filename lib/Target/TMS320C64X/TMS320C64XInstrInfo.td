@@ -144,6 +144,32 @@ def stw_idx : TMSInst<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
 	[(store GPRegs:$reg, idxaddr:$ptr)], UnitD>;
 
 
+// Comparisons
+
+def cmpeq : TMSInst<(outs GPRegs:$out), (ins GPRegs:$src1, GPRegs:$src2),
+		"cmpeq $src1, $src2, $out",
+		[(set GPRegs:$out, (cmpeq_node GPRegs:$src1, GPRegs:$src2))],
+		UnitL>;
+
+def cmpgt :TMSInst<(outs GPRegs:$out), (ins GPRegs:$src1, GPRegs:$src2),
+		"cmpgt $src1, $src2, $out",
+		[(set GPRegs:$out, (cmpgt_node GPRegs:$src1, GPRegs:$src2))],
+		UnitL>;
+
+def cmpgtu :TMSInst<(outs GPRegs:$out), (ins GPRegs:$src1, GPRegs:$src2),
+		"cmpgtu $src1, $src2, $out",
+		[(set GPRegs:$out, (cmpgtu_node GPRegs:$src1, GPRegs:$src2))],
+		UnitL>;
+
+def cmplt :TMSInst<(outs GPRegs:$out), (ins GPRegs:$src1, GPRegs:$src2),
+		"cmplt $src1, $src2, $out",
+		[(set GPRegs:$out, (cmplt_node GPRegs:$src1, GPRegs:$src2))],
+		UnitL>;
+
+def cmpltu :TMSInst<(outs GPRegs:$out), (ins GPRegs:$src1, GPRegs:$src2),
+		"cmpltu $src1, $src2, $out",
+		[(set GPRegs:$out, (cmpgt_node GPRegs:$src1, GPRegs:$src2))],
+		UnitL>;
 
 // Branch / call instructions
 
