@@ -15,13 +15,21 @@ def SDT_brcond : SDTypeProfile<0, 2, [SDTCisVT<0, OtherVT>]>;
 def SDT_call : SDTypeProfile<0, -1, [SDTCisVT<0, iPTR>]>;
 def SDT_call_seq_start : SDCallSeqStart<[SDTCisVT<0, i32>]>;
 def SDT_call_seq_end : SDCallSeqEnd<[SDTCisVT<0, i32>, SDTCisVT<1, i32>]>;
-def Wrapper : SDNode<"TMSISD::WRAPPER", SDT_Wrapper>;
+def SDT_cmp : SDTypeProfile<1, 2, [SDTCisInt<0>, SDTCisSameAs<0, 1>]>;
+
 def predwrapper : ComplexPattern<OtherVT, 2, "bounce_predicate", [], []>;
+
 def brcond_node : SDNode<"TMSISD::BRCOND", SDT_brcond, [SDNPHasChain]>;
 def callseq_start : SDNode<"ISD::CALLSEQ_START", SDT_call_seq_start,
 				[SDNPHasChain, SDNPOutFlag]>;
 def callseq_end : SDNode<"ISD::CALLSEQ_END", SDT_call_seq_end,
 				[SDNPHasChain, SDNPOptInFlag, SDNPOutFlag]>;
+def cmpeq_node : SDNode<"TMSISD::CMPEQ", SDT_cmp, [SDNPHasChain]>;
+def cmpgt_node : SDNode<"TMSISD::CMPGT", SDT_cmp, [SDNPHasChain]>;
+def cmpgtu_node : SDNode<"TMSISD::CMPGTU", SDT_cmp, [SDNPHasChain]>;
+def cmplt_node : SDNode<"TMSISD::CMPLT", SDT_cmp, [SDNPHasChain]>;
+def cmpltu_node : SDNode<"TMSISD::CMPLTU", SDT_cmp, [SDNPHasChain]>;
+def Wrapper : SDNode<"TMSISD::WRAPPER", SDT_Wrapper>;
 
 def fake_call_start : TMSInst<(outs), (ins i32imm:$val), "#callstart",
 				[(callseq_start timm:$val)], UnitD>;
