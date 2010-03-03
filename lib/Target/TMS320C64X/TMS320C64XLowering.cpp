@@ -415,8 +415,8 @@ TMS320C64XLowering::LowerSETCC(SDValue op, SelectionDAG &DAG)
 	case ISD::SETOLE:
 	case ISD::SETONE:
 	case ISD::SETO:
-		llvm_unreachable("Unsupported condcode");
 	case ISD::SETUO:
+		llvm_unreachable("Unsupported condcode");
 	case ISD::SETUEQ:
 	case ISD::SETUGT:
 	case ISD::SETUGE:
