@@ -147,9 +147,14 @@ bool
 TMS320C64XInstSelectorPass::bounce_predicate(SDValue op, SDValue N, SDValue
 							&base, SDValue &offs)
 {
+	int sz;
 
-	__asm__("int $3");
-	llvm_unreachable("bounce_predicate");
+	// We assume that whoever generated this knew what they were doing,
+	// and that they've placed the predecate operands in the last two
+	// operand positions. So just return those.
+	sz = op.getNumOperands();
+	base = op.getOperand(sz-2);
+	offs = op.getOperand(sz-1);
 }
 
 SDNode *
