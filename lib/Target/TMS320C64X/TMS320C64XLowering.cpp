@@ -364,6 +364,7 @@ TMS320C64XLowering::LowerOperation(SDValue op,  SelectionDAG &DAG)
 	case ISD::GlobalAddress:	return LowerGlobalAddress(op, DAG);
 	case ISD::RETURNADDR:		return LowerReturnAddr(op, DAG);
 	case ISD::BR_CC:		return LowerBRCC(op, DAG);
+	case ISD::SETCC:		return LowerSETCC(op, DAG);
 	default:
 		llvm_unreachable(op.getNode()->getOperationName().c_str());
 	}
