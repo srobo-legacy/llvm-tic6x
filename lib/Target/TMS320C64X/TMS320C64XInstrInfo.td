@@ -171,7 +171,7 @@ def cmplt :TMSInst<(outs GPRegs:$out), (ins GPRegs:$src1, GPRegs:$src2),
 
 def cmpltu :TMSInst<(outs GPRegs:$out), (ins GPRegs:$src1, GPRegs:$src2),
 		"cmpltu $src1, $src2, $out",
-		[(set GPRegs:$out, (cmpgt_node GPRegs:$src1, GPRegs:$src2))],
+		[(set GPRegs:$out, (cmpltu_node GPRegs:$src1, GPRegs:$src2))],
 		UnitL>;
 
 // Branch / call instructions
