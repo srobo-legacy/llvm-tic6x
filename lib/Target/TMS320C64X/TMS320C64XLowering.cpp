@@ -77,7 +77,6 @@ TMS320C64XLowering::TMS320C64XLowering(TMS320C64XTargetMachine &tm) :
 
 	/* Should also inject other invalid operations here */
 
-
 	setStackPointerRegisterToSaveRestore(TMS320C64X::B30);
 
 	computeRegisterProperties();
