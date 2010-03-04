@@ -9,6 +9,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TMS320C64XInstrInfo.h"
+#include "TMS320C64XRegisterInfo.h"
 #include "TMS320C64XTargetMachine.h"
 #include "llvm/Function.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
@@ -35,8 +36,14 @@ TMS320C64XInstrInfo::copyRegToReg(MachineBasicBlock &MBB,
 				const TargetRegisterClass *src_class) const
 {
 
-	if (dst_class != src_class)
+	if ((dst_class != &TMS320C64X::GPRegsRegClass &&
+			dst_class != &TMS320C64X::PredRegsRegClass) || (
+			src_class != &TMS320C64X::GPRegsRegClass &&
+			src_class != &TMS320C64X::PredRegsRegClass))
 		llvm_unreachable("copyRegToReg sees nonexistant registerclass");
+
+	if (dst_class == &TMS320C64X::PredRegsRegClass)
+		llvm_unreachable("Do Not Want: copying to AlwaysExPred reg");
 
 	DebugLoc DL = DebugLoc::getUnknownLoc();
 	addDefaultPred(BuildMI(MBB, I, DL, get(TMS320C64X::mv), dst_reg)
