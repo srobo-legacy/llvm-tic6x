@@ -155,6 +155,7 @@ TMS320C64XInstSelectorPass::bounce_predicate(SDValue op, SDValue N, SDValue
 	sz = op.getNumOperands();
 	base = op.getOperand(sz-2);
 	offs = op.getOperand(sz-1);
+	return true;
 }
 
 SDNode *
