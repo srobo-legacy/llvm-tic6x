@@ -415,8 +415,8 @@ TMS320C64XLowering::LowerBRCC(SDValue op, SelectionDAG &DAG)
 						op.getOperand(3), cc), DAG);
 
 	// Generate our own brcond form, operands BB, const/reg for predicate
-	Chain = DAG.getNode(TMSISD::BRCOND, dl, MVT::Other, Chain,
-		op.getOperand(4), DAG.getConstant(pred, MVT::i32), Chain);
+	Chain = DAG.getNode(TMSISD::BRCOND, dl, MVT::Other, op.getOperand(0),
+		op.getOperand(4), DAG.getTargetConstant(pred, MVT::i32), Chain);
 
 	return Chain;
 }
