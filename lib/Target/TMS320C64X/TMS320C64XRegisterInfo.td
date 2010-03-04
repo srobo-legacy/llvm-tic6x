@@ -81,9 +81,35 @@ def B29	:	MainReg<61, 1, "B29">, DwarfRegNum<[61]>;
 def B30	:	MainReg<62, 1, "B30">, DwarfRegNum<[62]>;
 def B31	:	MainReg<63, 1, "B31">, DwarfRegNum<[63]>;
 
-def PredRegs : RegisterClass<"TMS320C64X", [i32], 32,
-	[ A0, A1, A2, B0, B1, B2, AlwaysExPred ]>;
 
+// Predicate registers: things that can be used for conditional execution
+// in instructions: A0-2, B0-2. Also contains AlwaysExPred, a symbolic register
+// to represent cases where we always execute. Must never be allocated for
+// general purpose
+def PredRegs : RegisterClass<"TMS320C64X", [i32], 32,
+	[ A0, A1, A2, B0, B1, B2, AlwaysExPred ]>
+{
+let MethodProtos = [{
+	iterator allocation_order_begin(const MachineFunction &MF) const;
+	iterator allocation_order_end(const MachineFunction &MF) const;
+}];
+let MethodBodies = [{
+	PredRegsClass::iterator
+	PredRegsClass::allocation_order_begin(const MachineFunction &MF)
+									const {
+		 return begin();
+	}
+	PredRegsClass::iterator
+	PredRegsClass::allocation_order_end(const MachineFunction &MF)
+									const {
+		/* Don't allow AlwaysExPred to be allocated */
+		return end()-1;
+	}
+}];
+}
+
+
+// Normal, general purpose 32 bit registers
 def GPRegs : RegisterClass<"TMS320C64X", [i32], 32,
 	[
 		// A10-A15, B10-B15 are nonvolatile, B15 SP, A15 FP.
@@ -121,7 +147,8 @@ let MethodBodies = [{
 }];
 }
 
-/* Copy+paste from above, but with different types */
+
+// Our general purpose registers, but in vector form
 def VectorRegs : RegisterClass<"TMS320C64X", [v4i8,v2i16], 32,
 	[
 		/* See comments above */
