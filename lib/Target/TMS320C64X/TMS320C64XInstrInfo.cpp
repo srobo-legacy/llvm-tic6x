@@ -42,9 +42,6 @@ TMS320C64XInstrInfo::copyRegToReg(MachineBasicBlock &MBB,
 			src_class != &TMS320C64X::PredRegsRegClass))
 		llvm_unreachable("copyRegToReg sees nonexistant registerclass");
 
-	if (dst_class == &TMS320C64X::PredRegsRegClass)
-		llvm_unreachable("Do Not Want: copying to AlwaysExPred reg");
-
 	DebugLoc DL = DebugLoc::getUnknownLoc();
 	addDefaultPred(BuildMI(MBB, I, DL, get(TMS320C64X::mv), dst_reg)
 							.addReg(src_reg));
