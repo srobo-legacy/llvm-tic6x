@@ -124,11 +124,11 @@ def ldhu : TMSInst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
 
 def ldw : TMSInst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
 	"ldw $ptr, $dst",
-	[(set GPRegs:$dst, (sextloadi32 addr:$ptr))], UnitD>;
+	[(set GPRegs:$dst, (load addr:$ptr))], UnitD>;
 
 def ldw_idx : TMSInst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
 	"ldw $ptr, $dst",
-	[(set GPRegs:$dst, (sextloadi32 idxaddr:$ptr))], UnitD>;
+	[(set GPRegs:$dst, (load idxaddr:$ptr))], UnitD>;
 
 def stb : TMSInst<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
 	"stb $reg, $ptr",
