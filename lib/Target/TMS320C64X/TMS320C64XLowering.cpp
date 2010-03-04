@@ -127,7 +127,6 @@ TMS320C64XLowering::LowerFormalArguments(SDValue Chain,
 	unsigned int i;
 
 	MachineFunction &MF = DAG.getMachineFunction();
-//	MachineRegisterInfo &RegInfo = MF.getRegInfo();
 	MachineFrameInfo *MFI = MF.getFrameInfo();
 
 	CCState CCInfo(CallConv, isVarArg, getTargetMachine(), ArgLocs,
