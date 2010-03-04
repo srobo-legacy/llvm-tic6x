@@ -119,7 +119,7 @@ def set_hi : PatLeaf<(imm), [{
 }]>;
 
 def pred : PredicateOperand<OtherVT, (ops i32imm, PredRegs),
-			(ops (i32 0), (i32 0))>;
+			(ops (i32 0), (i32 AlwaysExPred))>;
 
 def nodefault_pred : PredicateOperand<OtherVT, (ops i32imm, PredRegs),
 			(ops)>;
