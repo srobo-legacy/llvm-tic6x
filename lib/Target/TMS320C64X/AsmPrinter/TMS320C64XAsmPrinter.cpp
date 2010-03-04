@@ -37,6 +37,7 @@ public:
 		return "TMS320C64X Assembly Printer";
 	}
 
+	void print_pre_instruction(const MachineInstr *MI);
 	void printInstruction(const MachineInstr *MI);
 	bool runOnMachineFunction(MachineFunction &F);
 	void PrintGlobalVariable(const GlobalVariable *GVar);
@@ -82,11 +83,47 @@ TMS320C64XAsmPrinter::runOnMachineFunction(MachineFunction &MF)
 
 		for (MachineBasicBlock::const_iterator II = I->begin(),
 				E = I->end(); II != E; ++II) {
+			print_pre_instruction(II);
 			printInstruction(II);
 		}
 	}
 
 	return false;
+}
+
+void
+TMS320C64XAsmPrinter::print_pre_instruction(const MachineInstr *MI)
+{
+	int pred_idx, nz, reg;
+	char c;
+	const TargetRegisterInfo &RI = *TM.getRegisterInfo();
+
+	pred_idx = MI->findFirstPredOperandIdx();
+
+	if (pred_idx == -1) {
+		// No predicate here
+		O << "        ";
+		return;
+	}
+
+	nz = MI->getOperand(pred_idx).getImm();
+	reg = MI->getOperand(pred_idx+1).getReg();
+
+	if (reg == TMS320C64X::AlwaysExPred) {
+		O << "        ";
+		return;
+	}
+
+
+	if (nz)
+		c = ' ';
+	else
+		c = '!';
+
+	if (!TargetRegisterInfo::isPhysicalRegister(reg))
+		llvm_unreachable("Nonphysical register used for predicate");
+
+	O << " [" << c << RI.get(reg).AsmName << "] ";
 }
 
 void
