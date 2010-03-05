@@ -51,6 +51,23 @@ def mv : TMSInst<(outs GPRegs:$out), (ins GPRegs:$in), "mv $in, $out", [],
 				UnitD>;
 
 
+// Shifts and rotates
+
+def srl_r : TMSInst<(outs GPRegs:$out), (ins GPRegs:$reg, GPRegs:$shift),
+	"shr $reg, $shift, $out",
+	[(set GPRegs:$out, (srl GPRegs:$reg, GPRegs:$shift))], UnitS>;
+
+def srl_i5 : TMSInst<(outs GPRegs:$out), (ins GPRegs:$reg, i32imm:$shift),
+	"shr $reg, $shift, $out",
+	[(set GPRegs:$out, (srl GPRegs:$reg, (i8 uconst5:$shift)))], UnitS>;
+
+def shl_r : TMSInst<(outs GPRegs:$out), (ins GPRegs:$reg, GPRegs:$shift),
+	"shl $reg, $shift, $out",
+	[(set GPRegs:$out, (shl GPRegs:$reg, GPRegs:$shift))], UnitS>;
+
+def shl_i5 : TMSInst<(outs GPRegs:$out), (ins GPRegs:$reg, i32imm:$shift),
+	"shl $reg, $shift, $out",
+	[(set GPRegs:$out, (shl GPRegs:$reg, (i8 uconst5:$shift)))], UnitS>;
 
 
 //Some arithmatic and logic
