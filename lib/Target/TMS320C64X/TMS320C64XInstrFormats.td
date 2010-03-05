@@ -86,6 +86,14 @@ def sconst5 : PatLeaf<(imm), [{
 	return (val <= 15 && val >= -16);
 }], sconst5_xform>;
 
+def uconst5_xform : SDNodeXForm<imm, [{
+	return CurDAG->getTargetConstant((int)N->getZExtValue(), MVT::i32);
+}]>;
+def uconst5 : PatLeaf<(imm), [{
+	int val = (int)N->getZExtValue();
+	return (val >= 0 && val < 32);
+}], uconst5_xform>;
+
 def uconst15_xform : SDNodeXForm<imm, [{
 	return CurDAG->getTargetConstant((int)N->getZExtValue(), MVT::i32);
 }]>;
