@@ -140,9 +140,17 @@ def ldb : TMSInst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
 	"ldb $ptr, $dst",
 	[(set GPRegs:$dst, (sextloadi8 addr:$ptr))], UnitD>;
 
+def ldb_idx : TMSInst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
+	"ldb $ptr, $dst",
+	[(set GPRegs:$dst, (sextloadi8 idxaddr:$ptr))], UnitD>;
+
 def ldbu : TMSInst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
 	"ldbu $ptr, $dst",
 	[(set GPRegs:$dst, (zextloadi8 addr:$ptr))], UnitD>;
+
+def ldbu_idx : TMSInst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
+	"ldbu $ptr, $dst",
+	[(set GPRegs:$dst, (zextloadi8 idxaddr:$ptr))], UnitD>;
 
 // FIXME: Memory alignment ;_;
 def ldh : TMSInst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
