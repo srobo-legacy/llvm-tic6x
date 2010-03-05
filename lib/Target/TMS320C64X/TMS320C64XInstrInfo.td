@@ -65,6 +65,16 @@ def add_i5 : TMSInst<(outs GPRegs:$reg),
 	[(set GPRegs:$reg, (add GPRegs:$reg1, sconst5:$immarg))],
 	UnitL>;
 
+def and_r : TMSInst<(outs GPRegs:$reg), (ins GPRegs:$reg1, GPRegs:$reg2),
+	"and $reg1, reg2, $reg",
+	[(set GPRegs:$reg, (and GPRegs:$reg1, GPRegs:$reg2))], UnitL>;
+
+def and_i5 : TMSInst<(outs GPRegs:$reg),
+	(ins GPRegs:$reg1, i32imm:$immarg),
+	"and $reg1, $immarg, $reg",
+	[(set GPRegs:$reg, (and GPRegs:$reg1, sconst5:$immarg))],
+	UnitL>;
+
 def sub_r : TMSInst<(outs GPRegs:$reg), (ins GPRegs:$reg1, GPRegs:$reg2),
 	"sub $reg1, $reg2, $reg",
 	[(set GPRegs:$reg, (sub GPRegs:$reg1, GPRegs:$reg2))], UnitL>;
