@@ -115,14 +115,14 @@ def GPRegs : RegisterClass<"TMS320C64X", [i32], 32,
 		// A10-A15, B10-B15 are nonvolatile, B15 SP, A15 FP.
 		// B14 is a data page pointer used by TIs C compiler for
 		// the near memory model; we'll treat as reserved
-		A0, A1, A2, A3, A4, A5, A6, A7,
-		A8, A9, B0, B1, B2, B3, B4, B5, B6, B7,
-		B8, A16, A17, A18, A19, A20, A21, A22, A23,
+		A3, A4, A5, A6, A7, A8, A9, B3, B4, B5, B6, B7, B8,
+		A16, A17, A18, A19, A20, A21, A22, A23,
 		A24, A25, A26, A27, A28, A29, A30, A31,
 		B16, B17, B18, B19, B20, B21, B22, B23,
 		B24, B25, B26, B27, B28, B29, B30, B31,
 		/* Sparc and others put volatile / reserved registers at the
 		 * end to decrease likelyhood of being allocated */
+		A0, A1, A2, B0, B1, B2,  //Predicate regs
 		A10, A11, A12, A13, A14,
 		B10, B11, B12, B13,
 		A15, B14, B15
@@ -152,12 +152,12 @@ let MethodBodies = [{
 def VectorRegs : RegisterClass<"TMS320C64X", [v4i8,v2i16], 32,
 	[
 		/* See comments above */
-		A0, A1, A2, A3, A4, A5, A6, A7,
-		A8, A9, B0, B1, B2, B3, B4, B5, B6, B7,
-		B8, A16, A17, A18, A19, A20, A21, A22, A23,
+		A3, A4, A5, A6, A7, A8, A9, B3, B4, B5, B6, B7, B8,
+		A16, A17, A18, A19, A20, A21, A22, A23,
 		A24, A25, A26, A27, A28, A29, A30, A31,
 		B16, B17, B18, B19, B20, B21, B22, B23,
 		B24, B25, B26, B27, B28, B29, B30, B31,
+		A0, A1, A2, B0, B1, B2,
 		A10, A11, A12, A13, A14,
 		B10, B11, B12, B13,
 		A15, B14, B15
