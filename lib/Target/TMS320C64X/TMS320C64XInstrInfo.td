@@ -173,6 +173,10 @@ def stb : TMSInst<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
 	"stb $reg, $ptr",
 	[(truncstorei8 GPRegs:$reg, addr:$ptr)], UnitD>;
 
+def stb_idx : TMSInst<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
+	"stb $reg, $ptr",
+	[(truncstorei8 GPRegs:$reg, idxaddr:$ptr)], UnitD>;
+
 def sth : TMSInst<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
 	"sth $reg, $ptr",
 	[(truncstorei16 GPRegs:$reg, addr:$ptr)], UnitD>;
