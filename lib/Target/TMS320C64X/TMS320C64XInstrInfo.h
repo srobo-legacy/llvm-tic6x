@@ -21,6 +21,15 @@ namespace llvm {
 
 class TMS320C64XTargetMachine;
 
+namespace TMS320C64XII {
+	enum {
+		unit_d = 0,
+		unit_s = 1,
+		unit_l = 2,
+		unit_m = 3
+	};
+}
+
 class TMS320C64XInstrInfo : public TargetInstrInfoImpl {
 	const TMS320C64XRegisterInfo RI;
 	TMS320C64XTargetMachine &TM;

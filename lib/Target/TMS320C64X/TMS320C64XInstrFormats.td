@@ -48,10 +48,10 @@ class InstUnit<int u> {
 	int unit = u;
 }
 
-def UnitL	: InstUnit<0>;
-def UnitS	: InstUnit<1>;
-def UnitD	: InstUnit<2>;
-def UnitM	: InstUnit<3>;
+def unit_d	: InstUnit<0>;
+def unit_s	: InstUnit<1>;
+def unit_l	: InstUnit<2>;
+def unit_m	: InstUnit<3>;
 
 def mem_operand	: Operand<i32> {
 	let PrintMethod = "printMemOperand";
