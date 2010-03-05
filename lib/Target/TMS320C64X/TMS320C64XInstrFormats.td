@@ -132,7 +132,7 @@ def pred : PredicateOperand<OtherVT, (ops timm, PredRegs),
 def nodefault_pred : PredicateOperand<OtherVT, (ops timm, PredRegs),
 			(ops)>;
 
-class TMSInst<dag outs, dag ins, string mnemonic, list<dag> pattern, InstUnit u>
+class TMSInst<dag outs, dag ins, string mnemonic, list<dag> pattern>
 							: Instruction {
 	// All insns are conditional unless stated otherwise
 	let isPredicable = 1;
@@ -142,5 +142,4 @@ class TMSInst<dag outs, dag ins, string mnemonic, list<dag> pattern, InstUnit u>
 	let InOperandList = !con(ins, (ops pred:$p));
 	let AsmString = mnemonic;
 	let Pattern = pattern;
-	InstUnit unit = u;
 }
