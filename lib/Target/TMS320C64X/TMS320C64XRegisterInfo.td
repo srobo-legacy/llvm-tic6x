@@ -147,6 +147,62 @@ let MethodBodies = [{
 }];
 }
 
+// Same regiseters, but seperate into different sides
+def ARegs : RegisterClass<"TMS320C64X", [i32], 32,
+	[
+		A3, A4, A5, A6, A7, A8, A9,
+		A16, A17, A18, A19, A20, A21, A22, A23,
+		A24, A25, A26, A27, A28, A29, A30, A31,
+		A0, A1, A2,			// Predicate regs
+		A10, A11, A12, A13, A14,	// Volatile
+		A15,				// Reserved
+	] >
+{
+let MethodProtos = [{
+	iterator allocation_order_begin(const MachineFunction &MF) const;
+	iterator allocation_order_end(const MachineFunction &MF) const;
+}];
+let MethodBodies = [{
+	GPRegsClass::iterator
+	GPRegsClass::allocation_order_begin(const MachineFunction &MF)
+									const {
+		 return begin();
+	}
+	GPRegsClass::iterator
+	GPRegsClass::allocation_order_end(const MachineFunction &MF)
+									const {
+		return end()-1;
+	}
+}];
+}
+
+def BRegs : RegisterClass<"TMS320C64X", [i32], 32,
+	[
+		B3, B4, B5, B6, B7, B8,
+		B16, B17, B18, B19, B20, B21, B22, B23,
+		B24, B25, B26, B27, B28, B29, B30, B31,
+		B0, B1, B2,			// Predicate regs
+		B10, B11, B12, B13,		// Volatilie regs
+		B14, B15
+	] >
+{
+let MethodProtos = [{
+	iterator allocation_order_begin(const MachineFunction &MF) const;
+	iterator allocation_order_end(const MachineFunction &MF) const;
+}];
+let MethodBodies = [{
+	GPRegsClass::iterator
+	GPRegsClass::allocation_order_begin(const MachineFunction &MF)
+									const {
+		 return begin();
+	}
+	GPRegsClass::iterator
+	GPRegsClass::allocation_order_end(const MachineFunction &MF)
+									const {
+		return end()-2;
+	}
+}];
+}
 
 // Our general purpose registers, but in vector form
 def VectorRegs : RegisterClass<"TMS320C64X", [v4i8,v2i16], 32,
