@@ -132,8 +132,8 @@ def pred : PredicateOperand<OtherVT, (ops timm, PredRegs),
 def nodefault_pred : PredicateOperand<OtherVT, (ops timm, PredRegs),
 			(ops)>;
 
-class TMSInst<dag outs, dag ins, string mnemonic, list<dag> pattern>
-							: Instruction {
+class inst<dag outs, dag ins, string mnemonic, list<dag> pattern, int side,
+			InstUnit u> : Instruction {
 	// All insns are conditional unless stated otherwise
 	let isPredicable = 1;
 
@@ -142,4 +142,46 @@ class TMSInst<dag outs, dag ins, string mnemonic, list<dag> pattern>
 	let InOperandList = !con(ins, (ops pred:$p));
 	let AsmString = mnemonic;
 	let Pattern = pattern;
+
+	InstUnit unit = u;
+	int unit_no = side;
+}
+
+multiclass norm_inst<dag outs, dag ins, string mnemonic, list <dag>pattern,
+			InstUnit u> {
+	def _1 : inst<outs, ins, mnemonic, pattern, 0, u>;
+	def _2 : inst<outs, ins, mnemonic, pattern, 1, u>;
+}
+
+multiclass inst_rr<string mnemonic, list <dag>pattern, InstUnit u> {
+	def _rr1 : inst<(outs GPRegs:$outreg),
+			(ins GPRegs:$srcreg1, GPRegs:$srcreg2),
+			!strconcat(mnemonic, " $srcreg1, $srcreg2, $outreg"),
+			pattern, 0, u>;
+	def _rr2 : inst<(outs GPRegs:$outreg),
+			(ins GPRegs:$srcreg1, GPRegs:$srcreg2),
+			!strconcat(mnemonic, " $srcreg1, $srcreg2, $outreg"),
+			pattern, 1, u>;
+}
+
+multiclass inst_ri<string mnemonic, dag imm, list <dag>pattern, InstUnit u> {
+	def _rr1 : inst<(outs GPRegs:$outreg),
+			!con((ins GPRegs:$srcreg1), imm),
+			!strconcat(mnemonic, " $srcreg1, $imm, $outreg"),
+			pattern, 0, u>;
+	def _rr2 : inst<(outs GPRegs:$outreg),
+			!con((ins GPRegs:$srcreg1), imm),
+			!strconcat(mnemonic, " $srcreg1, $imm, $outreg"),
+			pattern, 1, u>;
+}
+
+multiclass inst_ir<string mnemonic, dag imm, list <dag>pattern, InstUnit u> {
+	def _rr1 : inst<(outs GPRegs:$outreg),
+			!con(imm, (ins GPRegs:$srcreg2)),
+			!strconcat(mnemonic, " $imm, $srcreg2, $outreg"),
+			pattern, 0, u>;
+	def _rr2 : inst<(outs GPRegs:$outreg),
+			!con(imm, (ins GPRegs:$srcreg2)),
+			!strconcat(mnemonic, " $imm, $srcreg2, $outreg"),
+			pattern, 1, u>;
 }
