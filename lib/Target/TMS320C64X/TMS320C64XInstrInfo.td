@@ -103,6 +103,10 @@ def : Pat<(i32 mvk_all_pred:$val),
 def : Pat<(i32 (Wrapper tglobaladdr:$val)),
 	(mvkh tglobaladdr:$val, (mvkl tglobaladdr:$val))>;
 
+def lea_fail : TMSInst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
+		"add ${ptr:facebees}, $dst", [(set GPRegs:$dst, idxaddr:$ptr)],
+		UnitL>;
+
 // Loads: we can handle all post/pre inc/dec modes, and all indexing situations,
 // with a) alignment limitation, b) offset limitation, c) sign extension
 def ldb : TMSInst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
