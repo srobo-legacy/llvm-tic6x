@@ -106,19 +106,19 @@ defm and_d : inst_rx<"and", unit_d, and, 0>;
 defm and_d : inst_xr<"and", unit_d, and, 1>;
 defm and_d : inst_xi<"and", (i32 sconst5:$imm), unit_d, and, 1>;
 
-def and_i5 : TMSInst<(outs GPRegs:$reg),
-	(ins GPRegs:$reg1, i32imm:$immarg),
-	"and $reg1, $immarg, $reg",
-	[(set GPRegs:$reg, (and GPRegs:$reg1, sconst5:$immarg))]>;
+def sub_p_rx : pseudo_rx<"sub", unit_l, sub, 0>;
+def sub_p_xr : pseudo_xr<"sub", unit_l, sub, 0>;
+def sub_p_xi : pseudo_ri<"sub", (i32 uconst5:$imm), unit_d, sub, 0>;
 
-def sub_r : TMSInst<(outs GPRegs:$reg), (ins GPRegs:$reg1, GPRegs:$reg2),
-	"sub $reg1, $reg2, $reg",
-	[(set GPRegs:$reg, (sub GPRegs:$reg1, GPRegs:$reg2))]>;
-
-def sub_i5 : TMSInst<(outs GPRegs:$reg),
-	(ins GPRegs:$reg1, i32imm:$immarg),
-	"sub $reg1, $immarg, $reg",
-	[(set GPRegs:$reg, (sub GPRegs:$reg1, sconst5:$immarg))]>;
+defm sub_l : inst_rx<"sub", unit_l, sub, 0>;
+defm sub_l : inst_xr<"sub", unit_l, sub, 0>;
+// l unit has a const form, but it's subtract-reg-from-const, which is
+// pretty useless, but also won't be swallowed by tablegen
+defm sub_s : inst_rx<"sub", unit_s, sub, 0>;
+// s unit also has subtract-from-const form
+defm sub_d : inst_rr<"sub", unit_d, sub, 0>;
+defm sub_d : inst_ri<"sub", (i32 uconst5:$imm), unit_d, sub, 0>;
+defm sub_d : inst_xr<"sub", unit_d, sub, 0>;
 
 // Loading consts: almost always as halfwords
 def mvk : TMSInst<(outs GPRegs:$reg), (ins i32imm:$val),
