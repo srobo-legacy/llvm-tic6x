@@ -153,7 +153,7 @@ multiclass norm_inst<dag outs, dag ins, string mnemonic, list <dag>pattern,
 	def _2 : inst<outs, ins, mnemonic, pattern, 1, u>;
 }
 
-multiclass inst_rr<string mnemonic, list <dag>pattern, InstUnit u> {
+multiclass inst_rr<string mnemonic, InstUnit u, list <dag>pattern> {
 	def _rr1 : inst<(outs GPRegs:$outreg),
 			(ins GPRegs:$srcreg1, GPRegs:$srcreg2),
 			!strconcat(mnemonic, " $srcreg1, $srcreg2, $outreg"),
@@ -164,7 +164,7 @@ multiclass inst_rr<string mnemonic, list <dag>pattern, InstUnit u> {
 			pattern, 1, u>;
 }
 
-multiclass inst_ri<string mnemonic, dag imm, list <dag>pattern, InstUnit u> {
+multiclass inst_ri<string mnemonic, dag imm, InstUnit u, list <dag>pattern> {
 	def _rr1 : inst<(outs GPRegs:$outreg),
 			!con((ins GPRegs:$srcreg1), imm),
 			!strconcat(mnemonic, " $srcreg1, $imm, $outreg"),
@@ -175,7 +175,7 @@ multiclass inst_ri<string mnemonic, dag imm, list <dag>pattern, InstUnit u> {
 			pattern, 1, u>;
 }
 
-multiclass inst_ir<string mnemonic, dag imm, list <dag>pattern, InstUnit u> {
+multiclass inst_ir<string mnemonic, dag imm, InstUnit u, list <dag>pattern> {
 	def _rr1 : inst<(outs GPRegs:$outreg),
 			!con(imm, (ins GPRegs:$srcreg2)),
 			!strconcat(mnemonic, " $imm, $srcreg2, $outreg"),
