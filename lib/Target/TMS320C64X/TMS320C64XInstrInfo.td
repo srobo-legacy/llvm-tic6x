@@ -92,6 +92,20 @@ def addk_p : pseudo_ri<"addk", (i32 sconst16:$imm), unit_s, add, 0>;
 defm addk : inst_ri<"addk", (i32 sconst16:$imm), unit_s, add, 0>;
 }
 
+def and_p_rx : pseudo_rx<"and", unit_l, and, 0>;
+def and_p_xr : pseudo_xr<"and", unit_l, and, 1>;
+def and_p_xi : pseudo_xi<"and", (i32 sconst5:$imm), unit_l, and, 1>;
+
+defm and_l : inst_rx<"and", unit_l, and, 0>;
+defm and_l : inst_xr<"and", unit_l, and, 1>;
+defm and_l : inst_xi<"and", (i32 sconst5:$imm), unit_l, and, 1>;
+defm and_s : inst_rx<"and", unit_s, and, 0>;
+defm and_s : inst_xr<"and", unit_s, and, 1>;
+defm and_s : inst_xi<"and", (i32 sconst5:$imm), unit_s, and, 1>;
+defm and_d : inst_rx<"and", unit_d, and, 0>;
+defm and_d : inst_xr<"and", unit_d, and, 1>;
+defm and_d : inst_xi<"and", (i32 sconst5:$imm), unit_d, and, 1>;
+
 def and_i5 : TMSInst<(outs GPRegs:$reg),
 	(ins GPRegs:$reg1, i32imm:$immarg),
 	"and $reg1, $immarg, $reg",
