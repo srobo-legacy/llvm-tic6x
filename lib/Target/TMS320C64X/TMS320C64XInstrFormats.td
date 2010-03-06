@@ -181,6 +181,7 @@ class inst<dag outs, dag ins, string mnemonic, list<dag> pattern, int side,
 
 	InstUnit unit = u;
 	int unit_no = side;
+	int delay_slots = 0;
 }
 
 multiclass norm_inst<dag outs, dag ins, string mnemonic, list <dag>pattern,
