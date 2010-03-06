@@ -185,6 +185,31 @@ multiclass inst_rr<string mnemonic, InstUnit u, list <dag>pattern> {
 			pattern, 1, u>;
 }
 
+// Double register, second is xpath
+// Note that I'd love to add an extra level of indirection to reduce replication
+// but it doesn't look like tablegen can stitch dags together at that level.
+multiclass inst_rx<string mnemonic, InstUnit u, list <dag>pattern> {
+	def _rx1 : inst<(outs ARegs:$outreg),
+			(ins ARegs:$srcreg1, GPRegs:$srcreg2),
+			!strconcat(mnemonic, " $srcreg1, $srcreg2, $outreg"),
+			pattern, 0, u>;
+	def _rx2 : inst<(outs BRegs:$outreg),
+			(ins BRegs:$srcreg1, GPRegs:$srcreg2),
+			!strconcat(mnemonic, " $srcreg1, $srcreg2, $outreg"),
+			pattern, 1, u>;
+}
+
+multiclass inst_xr<string mnemonic, InstUnit u, list <dag>pattern> {
+	def _xr1 : inst<(outs ARegs:$outreg),
+			(ins GPRegs:$srcreg1, ARegs:$srcreg2),
+			!strconcat(mnemonic, " $srcreg1, $srcreg2, $outreg"),
+			pattern, 0, u>;
+	def _xr2 : inst<(outs BRegs:$outreg),
+			(ins GPRegs:$srcreg1, BRegs:$srcreg2),
+			!strconcat(mnemonic, " $srcreg1, $srcreg2, $outreg"),
+			pattern, 1, u>;
+}
+
 // One register, one immediate
 multiclass inst_ri<string mnemonic, dag imm, InstUnit u, list <dag>pattern> {
 	def _rr1 : inst<(outs ARegs:$outreg),
