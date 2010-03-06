@@ -160,9 +160,9 @@ defm mvkh_s : inst_ri<"mvkh", (i32 i32imm:$imm), unit_s, add, 0>;
 }
 
 def : Pat<(i32 mvk_all_pred:$val),
-	(mvkh mvk_all_pred:$val, (mvkl mvk_all_pred:$val))>;
+	(mvkh_p mvk_all_pred:$val, (mvkl_p mvk_all_pred:$val))>;
 def : Pat<(i32 (Wrapper tglobaladdr:$val)),
-	(mvkh tglobaladdr:$val, (mvkl tglobaladdr:$val))>;
+	(mvkh_p tglobaladdr:$val, (mvkl_p tglobaladdr:$val))>;
 
 def lea_fail : TMSInst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
 		"add ${ptr:facebees}, $dst", [(set GPRegs:$dst, idxaddr:$ptr)]>;
