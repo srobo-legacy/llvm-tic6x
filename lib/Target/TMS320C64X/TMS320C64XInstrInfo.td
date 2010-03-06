@@ -45,11 +45,7 @@ def TMS320C64Xcall : SDNode<"TMSISD::CALL", SDT_call,
 				[SDNPHasChain, SDNPOutFlag, SDNPOptInFlag]>;
 
 def retflag : SDNode<"TMSISD::RET_FLAG", SDTNone, [SDNPHasChain, SDNPOptInFlag]>;
-let isReturn = 1, isTerminator = 1 in {
-	def ret : TMSInst<(outs), (ins), "br B3", [(retflag)]>;
-}
 
-def mv : TMSInst<(outs GPRegs:$out), (ins GPRegs:$in), "mv $in, $out", []>;
 
 
 // Shifts and rotates
@@ -226,4 +222,10 @@ def callp : TMSInst<(outs), (ins calltarget:$dst),
 		A20, A21, A22, A23, A24, A25, A26, A27, A28, A29, A30, A31,
 		B0, B1, B2, B3, B4, B5, B6, B7, B8, B9, B16, B17, B18, B19,
 		B20, B21, B22, B23, B24, B25, B26, B27, B28, B29, B30, B31];
+}
+
+let isReturn = 1, isTerminator = 1 in {
+	// NB: branch-to-register can only work on unit S2
+	// Epilogue code should juggle the return addr into B3.
+	def ret : inst<(outs), (ins), "br B3", [(retflag)], 1, unit_s>;
 }
