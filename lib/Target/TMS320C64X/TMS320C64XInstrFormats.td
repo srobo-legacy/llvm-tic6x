@@ -200,12 +200,57 @@ class inst<dag outs, dag ins, string mnemonic, list<dag> pattern, int side,
 	let OutOperandList = outs;
 	let InOperandList = !con(ins, (ops pred:$p));
 	let AsmString = mnemonic;
-	let Pattern = pattern;
+
+	// Match nothing; set sched_pattern for a future tablegen backend
+	// to play with. pseudo instrs over-ride this behavior.
+	list<dag> sched_pattern = pattern;
+	let Pattern = [];
 
 	InstUnit unit = u;
 	int unit_no = side;
 	int delay_slots = 0;
 }
+
+class pseudo_rr<string mnemonic, InstUnit u, SDNode op, int swap> :
+		inst<(outs ARegs:$dst), (ins ARegs:$src1, ARegs:$src2), "",
+		[(set ARegs:$dst, (op ARegs:$src1, ARegs:$src2))], 0, u> {
+			let AsmString = !if(swap,
+			!strconcat(mnemonic, " $src2, $src1, $dst"),
+			!strconcat(mnemonic, " $src1, $src2, $dst"));
+			let Pattern = sched_pattern;
+		}
+
+class pseudo_rx<string mnemonic, InstUnit u, SDNode op, int swap> :
+		inst<(outs ARegs:$dst), (ins ARegs:$src1, GPRegs:$src2), "",
+		[(set ARegs:$dst, (op ARegs:$src1, GPRegs:$src2))], 0, u> {
+			let AsmString = !if(swap,
+			!strconcat(mnemonic, " $src2, $src1, $dst"),
+			!strconcat(mnemonic, " $src1, $src2, $dst"));
+		}
+
+class pseudo_xr<string mnemonic, InstUnit u, SDNode op, int swap> :
+		inst<(outs ARegs:$dst), (ins GPRegs:$src1, ARegs:$src2), "",
+		[(set ARegs:$dst, (op GPRegs:$src1, ARegs:$src2))], 0, u> {
+			let AsmString = !if(swap,
+			!strconcat(mnemonic, " $src2, $src1, $dst"),
+			!strconcat(mnemonic, " $src1, $src2, $dst"));
+		}
+
+class pseudo_ri<string mnemonic, dag imm, InstUnit u, SDNode op, int swap> :
+		inst<(outs ARegs:$dst), (ins ARegs:$src1, i32imm:$imm), "",
+		[(set ARegs:$dst, (op ARegs:$src1, imm))], 0, u> {
+			let AsmString = !if(swap,
+			!strconcat(mnemonic, " $imm, $src1, $dst"),
+			!strconcat(mnemonic, " $src1, $imm, $dst"));
+		}
+
+class pseudo_xi<string mnemonic, InstUnit u, SDNode op, int swap> :
+		inst<(outs ARegs:$dst), (ins GPRegs:$src1, i32imm:$imm), "",
+		[(set ARegs:$dst, (op GPRegs:$src1, imm))], 0, u> {
+			let AsmString = !if(swap,
+			!strconcat(mnemonic, " $imm, $src1, $dst"),
+			!strconcat(mnemonic, " $src1, $imm, $dst"));
+		}
 
 multiclass norm_inst<dag outs, dag ins, string mnemonic, list <dag>pattern,
 			InstUnit u> {
