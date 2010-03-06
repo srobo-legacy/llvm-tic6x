@@ -155,7 +155,7 @@ def ARegs : RegisterClass<"TMS320C64X", [i32], 32,
 		A24, A25, A26, A27, A28, A29, A30, A31,
 		A0, A1, A2,			// Predicate regs
 		A10, A11, A12, A13, A14,	// Volatile
-		A15,				// Reserved
+		A15				// Reserved
 	] >
 {
 let MethodProtos = [{
