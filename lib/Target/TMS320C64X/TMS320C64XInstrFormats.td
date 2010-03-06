@@ -173,35 +173,38 @@ multiclass norm_inst<dag outs, dag ins, string mnemonic, list <dag>pattern,
 	def _2 : inst<outs, ins, mnemonic, pattern, 1, u>;
 }
 
+// Plain double register operand
 multiclass inst_rr<string mnemonic, InstUnit u, list <dag>pattern> {
-	def _rr1 : inst<(outs GPRegs:$outreg),
-			(ins GPRegs:$srcreg1, GPRegs:$srcreg2),
+	def _rr1 : inst<(outs ARegs:$outreg),
+			(ins ARegs:$srcreg1, ARegs:$srcreg2),
 			!strconcat(mnemonic, " $srcreg1, $srcreg2, $outreg"),
 			pattern, 0, u>;
-	def _rr2 : inst<(outs GPRegs:$outreg),
-			(ins GPRegs:$srcreg1, GPRegs:$srcreg2),
+	def _rr2 : inst<(outs BRegs:$outreg),
+			(ins BRegs:$srcreg1, BRegs:$srcreg2),
 			!strconcat(mnemonic, " $srcreg1, $srcreg2, $outreg"),
 			pattern, 1, u>;
 }
 
+// One register, one immediate
 multiclass inst_ri<string mnemonic, dag imm, InstUnit u, list <dag>pattern> {
-	def _rr1 : inst<(outs GPRegs:$outreg),
-			!con((ins GPRegs:$srcreg1), imm),
+	def _rr1 : inst<(outs ARegs:$outreg),
+			!con((ins ARegs:$srcreg1), imm),
 			!strconcat(mnemonic, " $srcreg1, $imm, $outreg"),
 			pattern, 0, u>;
-	def _rr2 : inst<(outs GPRegs:$outreg),
-			!con((ins GPRegs:$srcreg1), imm),
+	def _rr2 : inst<(outs BRegs:$outreg),
+			!con((ins BRegs:$srcreg1), imm),
 			!strconcat(mnemonic, " $srcreg1, $imm, $outreg"),
 			pattern, 1, u>;
 }
 
+// One reg one imm again, but reversed
 multiclass inst_ir<string mnemonic, dag imm, InstUnit u, list <dag>pattern> {
-	def _rr1 : inst<(outs GPRegs:$outreg),
-			!con(imm, (ins GPRegs:$srcreg2)),
+	def _rr1 : inst<(outs ARegs:$outreg),
+			!con(imm, (ins ARegs:$srcreg2)),
 			!strconcat(mnemonic, " $imm, $srcreg2, $outreg"),
 			pattern, 0, u>;
-	def _rr2 : inst<(outs GPRegs:$outreg),
-			!con(imm, (ins GPRegs:$srcreg2)),
+	def _rr2 : inst<(outs BRegs:$outreg),
+			!con(imm, (ins BRegs:$srcreg2)),
 			!strconcat(mnemonic, " $imm, $srcreg2, $outreg"),
 			pattern, 1, u>;
 }
