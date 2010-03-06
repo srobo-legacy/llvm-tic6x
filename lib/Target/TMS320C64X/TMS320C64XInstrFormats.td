@@ -222,6 +222,18 @@ multiclass inst_ri<string mnemonic, dag imm, InstUnit u, list <dag>pattern> {
 			pattern, 1, u>;
 }
 
+// One xpath reg, one imm
+multiclass inst_xi<string mnemonic, dag imm, InstUnit u, list <dag>pattern> {
+	def _xi1 : inst<(outs ARegs:$outreg),
+			!con((ins GPRegs:$srcreg1), imm),
+			!strconcat(mnemonic, " $srcreg1, $imm, $outreg"),
+			pattern, 0, u>;
+	def _xr2 : inst<(outs BRegs:$outreg),
+			!con((ins GPRegs:$srcreg1), imm),
+			!strconcat(mnemonic, " $srcreg1, $imm, $outreg"),
+			pattern, 1, u>;
+}
+
 // One reg one imm again, but reversed
 multiclass inst_ir<string mnemonic, dag imm, InstUnit u, list <dag>pattern> {
 	def _rr1 : inst<(outs ARegs:$outreg),
@@ -230,6 +242,18 @@ multiclass inst_ir<string mnemonic, dag imm, InstUnit u, list <dag>pattern> {
 			pattern, 0, u>;
 	def _rr2 : inst<(outs BRegs:$outreg),
 			!con(imm, (ins BRegs:$srcreg2)),
+			!strconcat(mnemonic, " $imm, $srcreg2, $outreg"),
+			pattern, 1, u>;
+}
+
+// One xpath reg one imm
+multiclass inst_ix<string mnemonic, dag imm, InstUnit u, list <dag>pattern> {
+	def _rr1 : inst<(outs ARegs:$outreg),
+			!con(imm, (ins GPRegs:$srcreg2)),
+			!strconcat(mnemonic, " $imm, $srcreg2, $outreg"),
+			pattern, 0, u>;
+	def _rr2 : inst<(outs BRegs:$outreg),
+			!con(imm, (ins GPRegs:$srcreg2)),
 			!strconcat(mnemonic, " $imm, $srcreg2, $outreg"),
 			pattern, 1, u>;
 }
