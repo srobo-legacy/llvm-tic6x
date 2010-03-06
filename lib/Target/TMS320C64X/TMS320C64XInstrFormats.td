@@ -303,39 +303,3 @@ multiclass inst_xi<string mnemonic, dag imm, InstUnit u, SDNode op, int swap> {
 				!strconcat(mnemonic, " $src1, $imm, $dst"));
 			}
 }
-
-// One reg one imm again, but reversed
-multiclass inst_ir<string mnemonic, dag imm, InstUnit u, SDNode op, int swap> {
-	def _ir1 : inst<(outs ARegs:$dst), (ins i32imm:$imm,ARegs:$src2), "",
-			[(set ARegs:$dst, (op imm, ARegs:$src2))],
-			0, u> {
-				let AsmString = !if(swap,
-				!strconcat(mnemonic, " $src2, $imm, $dst"),
-				!strconcat(mnemonic, " $imm, $src2, $dst"));
-			}
-	def _ir2 : inst<(outs BRegs:$dst), (ins i32imm:$imm, BRegs:$src2), "",
-			[(set BRegs:$dst, (op imm, BRegs:$src2))],
-			1, u> {
-				let AsmString = !if(swap,
-				!strconcat(mnemonic, " $src2, $imm, $dst"),
-				!strconcat(mnemonic, " $imm, $src2, $dst"));
-			}
-}
-
-// One xpath reg one imm
-multiclass inst_ix<string mnemonic, dag imm, InstUnit u, SDNode op, int swap> {
-	def _ix1 : inst<(outs ARegs:$dst), (ins i32imm:$imm, GPRegs:$src2), "",
-			[(set ARegs:$dst, (op imm, GPRegs:$src2))],
-			0, u> {
-				let AsmString = !if(swap,
-				!strconcat(mnemonic, " $src2, $imm, $dst"),
-				!strconcat(mnemonic, " $imm, $src2, $dst"));
-			}
-	def _ix2 : inst<(outs BRegs:$dst), (ins i32imm:$imm, GPRegs:$src2), "",
-			[(set BRegs:$dst, (op imm, GPRegs:$src2))],
-			1, u> {
-				let AsmString = !if(swap,
-				!strconcat(mnemonic, " $src2, $imm, $dst"),
-				!strconcat(mnemonic, " $imm, $src2, $dst"));
-			}
-}
