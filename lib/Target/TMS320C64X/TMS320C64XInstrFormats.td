@@ -291,7 +291,7 @@ multiclass inst_ir<string mnemonic, dag imm, InstUnit u, SDNode op, int swap> {
 				!strconcat(mnemonic, " $imm, $src2, $dst"));
 			}
 	def _ir2 : inst<(outs BRegs:$dst), (ins i32imm:$imm, BRegs:$src2), "",
-			[(set ARegs:$dst, (op imm, BRegs:$src2))],
+			[(set BRegs:$dst, (op imm, BRegs:$src2))],
 			1, u> {
 				let AsmString = !if(swap,
 				!strconcat(mnemonic, " $src2, $imm, $dst"),
