@@ -66,18 +66,26 @@ defm shl : inst_xi<"shl", (i32 uconst5:$imm), unit_s, shl, 0>;
 
 //Some arithmatic and logic
 
-def add_r : TMSInst<(outs GPRegs:$reg), (ins GPRegs:$reg1, GPRegs:$reg2),
-	"add $reg1, $reg2, $reg",
-	[(set GPRegs:$reg, (add GPRegs:$reg1, GPRegs:$reg2))]>;
+// Instr definition (spru732h p94) states that when printing we should use
+// src1, src2 if the xform is used (src2), and src2, src1 if we use the xform
+// and a constant.
+// XXX - for unit D, depending on the form the constant can be sign extended
+// or zero extended; potential for datasheet bugs or data entry bugs here
+def add_p_rx : pseudo_rx<"add", unit_l, add, 0>;
+def add_p_xr : pseudo_xr<"add", unit_l, add, 1>;
+def add_p_xi : pseudo_xi<"add", (i32 sconst5:$imm), unit_l, add, 0>;
 
-def add_i5 : TMSInst<(outs GPRegs:$reg),
-	(ins GPRegs:$reg1, i32imm:$immarg),
-	"add $reg1, $immarg, $reg",
-	[(set GPRegs:$reg, (add GPRegs:$reg1, sconst5:$immarg))]>;
-
-def and_r : TMSInst<(outs GPRegs:$reg), (ins GPRegs:$reg1, GPRegs:$reg2),
-	"and $reg1, reg2, $reg",
-	[(set GPRegs:$reg, (and GPRegs:$reg1, GPRegs:$reg2))]>;
+defm add_l : inst_rx<"add", unit_l, add, 0>;
+defm add_l : inst_xr<"add", unit_l, add, 1>;
+defm add_l : inst_xi<"add", (i32 sconst5:$imm), unit_l, add, 0>;
+defm add_s : inst_rx<"add", unit_s, add, 0>;
+defm add_s : inst_xr<"add", unit_s, add, 1>;
+defm add_s : inst_xi<"add", (i32 sconst5:$imm), unit_s, add, 0>;
+defm add_d : inst_rr<"add", unit_d, add, 0>;
+defm add_d : inst_ri<"add", (i32 uconst5:$imm), unit_d, add, 0>;
+defm add_d : inst_rx<"add", unit_d, add, 0>;
+defm add_d : inst_xr<"add", unit_d, add, 1>;
+defm add_d : inst_xi<"add", (i32 sconst5:$imm), unit_d, add, 0>;
 
 def and_i5 : TMSInst<(outs GPRegs:$reg),
 	(ins GPRegs:$reg1, i32imm:$immarg),
