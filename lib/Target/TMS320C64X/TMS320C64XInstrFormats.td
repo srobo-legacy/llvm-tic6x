@@ -212,11 +212,11 @@ multiclass inst_xr<string mnemonic, InstUnit u, list <dag>pattern> {
 
 // One register, one immediate
 multiclass inst_ri<string mnemonic, dag imm, InstUnit u, list <dag>pattern> {
-	def _rr1 : inst<(outs ARegs:$dst),
+	def _ri1 : inst<(outs ARegs:$dst),
 			!con((ins ARegs:$src1), imm),
 			!strconcat(mnemonic, " $src1, $imm, $dst"),
 			pattern, 0, u>;
-	def _rr2 : inst<(outs BRegs:$dst),
+	def _ri2 : inst<(outs BRegs:$dst),
 			!con((ins BRegs:$src1), imm),
 			!strconcat(mnemonic, " $src1, $imm, $dst"),
 			pattern, 1, u>;
@@ -228,7 +228,7 @@ multiclass inst_xi<string mnemonic, dag imm, InstUnit u, list <dag>pattern> {
 			!con((ins GPRegs:$src1), imm),
 			!strconcat(mnemonic, " $src1, $imm, $dst"),
 			pattern, 0, u>;
-	def _xr2 : inst<(outs BRegs:$dst),
+	def _xi2 : inst<(outs BRegs:$dst),
 			!con((ins GPRegs:$src1), imm),
 			!strconcat(mnemonic, " $src1, $imm, $dst"),
 			pattern, 1, u>;
@@ -236,11 +236,11 @@ multiclass inst_xi<string mnemonic, dag imm, InstUnit u, list <dag>pattern> {
 
 // One reg one imm again, but reversed
 multiclass inst_ir<string mnemonic, dag imm, InstUnit u, list <dag>pattern> {
-	def _rr1 : inst<(outs ARegs:$dst),
+	def _ir1 : inst<(outs ARegs:$dst),
 			!con(imm, (ins ARegs:$src2)),
 			!strconcat(mnemonic, " $imm, $src2, $dst"),
 			pattern, 0, u>;
-	def _rr2 : inst<(outs BRegs:$dst),
+	def _ir2 : inst<(outs BRegs:$dst),
 			!con(imm, (ins BRegs:$src2)),
 			!strconcat(mnemonic, " $imm, $src2, $dst"),
 			pattern, 1, u>;
@@ -248,11 +248,11 @@ multiclass inst_ir<string mnemonic, dag imm, InstUnit u, list <dag>pattern> {
 
 // One xpath reg one imm
 multiclass inst_ix<string mnemonic, dag imm, InstUnit u, list <dag>pattern> {
-	def _rr1 : inst<(outs ARegs:$dst),
+	def _ix1 : inst<(outs ARegs:$dst),
 			!con(imm, (ins GPRegs:$src2)),
 			!strconcat(mnemonic, " $imm, $src2, $dst"),
 			pattern, 0, u>;
-	def _rr2 : inst<(outs BRegs:$dst),
+	def _ix2 : inst<(outs BRegs:$dst),
 			!con(imm, (ins GPRegs:$src2)),
 			!strconcat(mnemonic, " $imm, $src2, $dst"),
 			pattern, 1, u>;
