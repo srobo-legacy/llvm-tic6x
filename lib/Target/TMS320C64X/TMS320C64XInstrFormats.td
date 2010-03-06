@@ -165,6 +165,29 @@ def nodefault_pred : PredicateOperand<OtherVT, (ops timm, PredRegs),
 // the SDNode of the operator (neat trick from sparcs instrformats.td),
 // and a "swap" integer operand, which selects whether the operand order is
 // reversed when emmitted. Will it work, who can say.
+//
+// UPDATE: Tactical clarinet eye-strike
+//
+// Tablegen won't permit multiple instructions to match the same pattern, which
+// torpedoes trying to generate VLIW parallelism at the instruction selection
+// level. New tactic: we have a high-level pseudo-instruction, that represents
+// all the different forms the insn can take. This only executes on one side of
+// the processor, and only in one slot.
+//
+// We then have a set of "real" instructions, that represent the different forms
+// and sides and units the instruction can have. We then have the option of
+// using the singled-sided, non-parallel implementation. Or setting the
+// usesCustomDAGSchedInserter flag on the psuedo-insts, and morphing them
+// into parallel {unit,side} specific insns. Only the former will be implemented
+// for now, the latter is an area of expansion that can be targetted when I'm
+// not actually on fire.
+//
+// Implementing the latter will require two things - making a tablegen backend
+// that spits out code to find what insns are valid to map the pseudo onto. In
+// its current form tablegen output isn't sufficient to do this. After that, a
+// register pass is needed to ensure correct legalisation of register
+// allocation. AKA, making sure that the xpath is only used once per execution
+// packet.
 
 
 
