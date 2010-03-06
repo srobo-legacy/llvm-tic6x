@@ -53,17 +53,13 @@ def mv : inst<(outs GPRegs:$out), (ins GPRegs:$in), "mv $in, $out", [], 0,
 
 // Shifts and rotates
 
-defm srl : inst_rx<"shr", unit_s,
-	[(set GPRegs:$dst, (srl GPRegs:$src2, GPRegs:$src1))]>;
+defm srl : inst_rx<"shr", unit_s, srl, 0>;
 
-defm srl : inst_ix<"shr", (i32imm:$src1), unit_s,
-	[(set GPRegs:$dst, (srl GPRegs:$src2, (i8 uconst5:$src1)))]>;
+defm srl : inst_ix<"shr", (i32 uconst5:$imm), unit_s, srl, 0>;
 
-defm shl : inst_rx<"shl", unit_s,
-	[(set GPRegs:$dst, (shl GPRegs:$src2, GPRegs:$src1))]>;
+defm shl : inst_rx<"shl", unit_s, shl, 0>;
 
-defm shl : inst_ix<"shl", (i32imm:$src1), unit_s,
-	[(set GPRegs:$dst, (shl GPRegs:$src2, (i8 uconst5:$src1)))]>;
+defm shl : inst_ix<"shl", (i32 uconst5:$imm), unit_s, shl, 0>;
 
 
 //Some arithmatic and logic
