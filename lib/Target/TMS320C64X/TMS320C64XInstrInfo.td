@@ -53,13 +53,13 @@ def mv : inst<(outs GPRegs:$out), (ins GPRegs:$in), "mv $in, $out", [], 0,
 
 // Shifts and rotates
 
-defm srl : inst_rx<"shr", unit_s, srl, 0>;
+defm srl : inst_xr<"shr", unit_s, srl, 0>;
 
-defm srl : inst_ix<"shr", (i32 uconst5:$imm), unit_s, srl, 0>;
+defm srl : inst_xi<"shr", (i32 uconst5:$imm), unit_s, srl, 0>;
 
-defm shl : inst_rx<"shl", unit_s, shl, 0>;
+defm shl : inst_xr<"shl", unit_s, shl, 0>;
 
-defm shl : inst_ix<"shl", (i32 uconst5:$imm), unit_s, shl, 0>;
+defm shl : inst_xi<"shl", (i32 uconst5:$imm), unit_s, shl, 0>;
 
 
 //Some arithmatic and logic
