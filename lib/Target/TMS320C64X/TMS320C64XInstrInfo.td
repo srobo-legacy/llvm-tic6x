@@ -50,21 +50,17 @@ def retflag : SDNode<"TMSISD::RET_FLAG", SDTNone, [SDNPHasChain, SDNPOptInFlag]>
 
 // Shifts and rotates
 
-def srl_r : TMSInst<(outs GPRegs:$out), (ins GPRegs:$reg, GPRegs:$shift),
-	"shr $reg, $shift, $out",
-	[(set GPRegs:$out, (srl GPRegs:$reg, GPRegs:$shift))]>;
+defm srl : inst_rx<"shr", unit_s,
+	[(set GPRegs:$dst, (srl GPRegs:$src2, GPRegs:$src1))]>;
 
-def srl_i5 : TMSInst<(outs GPRegs:$out), (ins GPRegs:$reg, i32imm:$shift),
-	"shr $reg, $shift, $out",
-	[(set GPRegs:$out, (srl GPRegs:$reg, (i8 uconst5:$shift)))]>;
+defm srl : inst_ix<"shr", (i32imm:$src1), unit_s,
+	[(set GPRegs:$dst, (srl GPRegs:$src2, (i8 uconst5:$src1)))]>;
 
-def shl_r : TMSInst<(outs GPRegs:$out), (ins GPRegs:$reg, GPRegs:$shift),
-	"shl $reg, $shift, $out",
-	[(set GPRegs:$out, (shl GPRegs:$reg, GPRegs:$shift))]>;
+defm shl : inst_rx<"shl", unit_s,
+	[(set GPRegs:$dst, (shl GPRegs:$src2, GPRegs:$src1))]>;
 
-def shl_i5 : TMSInst<(outs GPRegs:$out), (ins GPRegs:$reg, i32imm:$shift),
-	"shl $reg, $shift, $out",
-	[(set GPRegs:$out, (shl GPRegs:$reg, (i8 uconst5:$shift)))]>;
+defm shl : inst_ix<"shl", (i32imm:$src1), unit_s,
+	[(set GPRegs:$dst, (shl GPRegs:$src2, (i8 uconst5:$src1)))]>;
 
 
 //Some arithmatic and logic
