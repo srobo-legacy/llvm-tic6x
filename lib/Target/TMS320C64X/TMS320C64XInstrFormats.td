@@ -132,6 +132,26 @@ def pred : PredicateOperand<OtherVT, (ops timm, PredRegs),
 def nodefault_pred : PredicateOperand<OtherVT, (ops timm, PredRegs),
 			(ops)>;
 
+
+// A note on how we're formatting instruction representation.
+//
+// All instructions we care about right now have at _least_ a destination
+// register operand, almost always one source register operand, generally two,
+// sometimes an immediate instead. In general, instructions can only access
+// registers on one side of the processor. Which side they're on is defined by
+// where the destination register is (you can only write back to your own side).
+//
+// So for many instructions, all registers used will have to be on one side,
+// hence a lot of the templating below orientates about all registers being in
+// either ARegs or BRegs, but not both.
+//
+// Some instructions can use the "crosspath" (xpath), and access both banks of
+// registers - but, only one insn on each side of the processor in any cycle.
+// So to cater for those some insns have one operand as GPRegs rather than
+// ARegs or BRes
+
+
+
 class inst<dag outs, dag ins, string mnemonic, list<dag> pattern, int side,
 			InstUnit u> : Instruction {
 	// All insns are conditional unless stated otherwise
