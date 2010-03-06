@@ -244,7 +244,7 @@ class pseudo_ri<string mnemonic, dag imm, InstUnit u, SDNode op, int swap> :
 			!strconcat(mnemonic, " $src1, $imm, $dst"));
 		}
 
-class pseudo_xi<string mnemonic, InstUnit u, SDNode op, int swap> :
+class pseudo_xi<string mnemonic, dag imm, InstUnit u, SDNode op, int swap> :
 		inst<(outs ARegs:$dst), (ins GPRegs:$src1, i32imm:$imm), "",
 		[(set ARegs:$dst, (op GPRegs:$src1, imm))], 0, u> {
 			let AsmString = !if(swap,
