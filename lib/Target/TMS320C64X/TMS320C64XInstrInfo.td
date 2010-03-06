@@ -87,6 +87,11 @@ defm add_d : inst_rx<"add", unit_d, add, 0>;
 defm add_d : inst_xr<"add", unit_d, add, 1>;
 defm add_d : inst_xi<"add", (i32 sconst5:$imm), unit_d, add, 0>;
 
+let Constraints = "$src1 = $dst", AsmString = "addk $imm, $dst" in {
+def addk_p : pseudo_ri<"addk", (i32 sconst16:$imm), unit_s, add, 0>;
+defm addk : inst_ri<"addk", (i32 sconst16:$imm), unit_s, add, 0>;
+}
+
 def and_i5 : TMSInst<(outs GPRegs:$reg),
 	(ins GPRegs:$reg1, i32imm:$immarg),
 	"and $reg1, $immarg, $reg",
