@@ -143,14 +143,21 @@ def : Pat<(i32 mvk_pred:$val), (mvk_p imm:$val)>;
 // full way of expressing this would be to split gpregs into halfword regs.
 // Instead, don't let mvkl/mvkh match anything, and use a pattern to match
 // and set 32 bit constants
-def mvkl : TMSInst<(outs GPRegs:$reg), (ins i32imm:$val),
-	"mvkl $val, $reg", []>;
 
-// For following pattern we have to output something (the reg loaded) but also
-// need to input a register to set (from mvkl). So make this 2addr.
-def mvkh : TMSInst<(outs GPRegs:$reg), (ins i32imm:$val, GPRegs:$bees),
-	"mvkh $val, $bees", []> {
-	let Constraints = "$bees = $reg";
+let InOperandList = (ins i32imm:$imm, pred:$p), AsmString = "mvkl $imm, $dst" in
+{
+def mvkl_p : pseudo_rr<"mvkl", unit_s, add, 0> {
+	let Pattern = [];
+}
+defm mvkl_s : inst_rr<"mvkl", unit_s, add, 0>;
+}
+
+let InOperandList = (ins i32imm:$imm, pred:$p), AsmString = "mvkh $imm, $dst" in
+{
+def mvkh_p : pseudo_rr<"mvkh", unit_s, add, 0> {
+	let Pattern = [];
+}
+defm mvkh_s : inst_rr<"mvkh", unit_s, add, 0>;
 }
 
 def : Pat<(i32 mvk_all_pred:$val),
