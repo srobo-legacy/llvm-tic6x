@@ -34,10 +34,10 @@ def cmplt_node : SDNode<"TMSISD::CMPLT", SDTIntBinOp, [SDNPOutFlag]>;
 def cmpltu_node : SDNode<"TMSISD::CMPLTU", SDTIntBinOp, [SDNPOutFlag]>;
 def Wrapper : SDNode<"TMSISD::WRAPPER", SDT_Wrapper>;
 
-def fake_call_start : TMSInst<(outs), (ins i32imm:$val), "#callstart",
-				[(callseq_start timm:$val)]>;
-def fake_call_end : TMSInst<(outs), (ins i32imm:$val, i32imm:$val2), "#callend",
-				[(callseq_end timm:$val, timm:$val2)]>;
+def fake_call_start : inst<(outs), (ins i32imm:$val), "#callstart",
+		[(callseq_start timm:$val)], 0, unit_d>;
+def fake_call_end : inst<(outs), (ins i32imm:$val, i32imm:$val2), "#callend",
+		[(callseq_end timm:$val, timm:$val2)], 0, unit_d>;
 
 def TMS320C64Xcall : SDNode<"TMSISD::CALL", SDT_call,
 				[SDNPHasChain, SDNPOutFlag, SDNPOptInFlag]>;
