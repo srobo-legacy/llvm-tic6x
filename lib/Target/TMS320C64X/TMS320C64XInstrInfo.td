@@ -34,6 +34,8 @@ def cmplt_node : SDNode<"TMSISD::CMPLT", SDTIntBinOp, [SDNPOutFlag]>;
 def cmpltu_node : SDNode<"TMSISD::CMPLTU", SDTIntBinOp, [SDNPOutFlag]>;
 def Wrapper : SDNode<"TMSISD::WRAPPER", SDT_Wrapper>;
 
+// XXX These should probably be marked as for codegen modelling only.
+// Don't have flexibility to test right now though.
 def fake_call_start : inst<(outs), (ins i32imm:$val), "#callstart",
 		[(callseq_start timm:$val)], 0, unit_d>;
 def fake_call_end : inst<(outs), (ins i32imm:$val, i32imm:$val2), "#callend",
