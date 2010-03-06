@@ -46,6 +46,9 @@ def TMS320C64Xcall : SDNode<"TMSISD::CALL", SDT_call,
 
 def retflag : SDNode<"TMSISD::RET_FLAG", SDTNone, [SDNPHasChain, SDNPOptInFlag]>;
 
+// FIXME: mv can be in any s/d/l slot
+def mv : inst<(outs GPRegs:$out), (ins GPRegs:$in), "mv $in, $out", [], 0,
+								unit_s>;
 
 
 // Shifts and rotates
