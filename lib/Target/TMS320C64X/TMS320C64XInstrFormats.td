@@ -149,6 +149,22 @@ def nodefault_pred : PredicateOperand<OtherVT, (ops timm, PredRegs),
 // registers - but, only one insn on each side of the processor in any cycle.
 // So to cater for those some insns have one operand as GPRegs rather than
 // ARegs or BRes
+//
+// UPDATE: I'm covered in bees
+//
+// Some significant suckage has been averted at the expense of my eyes. Add to
+// the above the fact that, to allow immediates we need to inject a dag
+// specifying the predicate into the pattern. We also need to move the pattern
+// into the multiclass, to allow side-specific register classes to be used.
+//
+// Also throw into this control over what order the operands match the operator
+// node, and that this might have to be flipped to support what the assembler
+// expects.
+//
+// So what we have, is death in a cake. Solution: pass in a dag for imms,
+// the SDNode of the operator (neat trick from sparcs instrformats.td),
+// and a "swap" integer operand, which selects whether the operand order is
+// reversed when emmitted. Will it work, who can say.
 
 
 
