@@ -120,13 +120,23 @@ defm sub_d : inst_rr<"sub", unit_d, sub, 0>;
 defm sub_d : inst_ri<"sub", (i32 uconst5:$imm), unit_d, sub, 0>;
 defm sub_d : inst_xr<"sub", unit_d, sub, 0>;
 
-// Loading consts: almost always as halfwords
-def mvk : TMSInst<(outs GPRegs:$reg), (ins i32imm:$val),
-	"mvk $val, $reg",
-	[(set GPRegs:$reg, mvk_pred:$val)]>;
+// Loading consts: almost always as halfwords. Put our own bodges on top
+// of these instruction definitions - we want the simple specifications for
+// pseudo and real instructions, but also to eliminate the register operand.
+// We also don't want to pattern match anything, use explicit patterns for that
+
+let InOperandList = (ins i32imm:$imm, pred:$p), AsmString = "mvk $imm, $dst" in{
+def mvk_p : pseudo_rr<"mvk", unit_s, add, 0> {
+	let Pattern = [];
+}
+
+defm mvk_s : inst_rr<"mvk", unit_s, add, 0>;
+defm mvk_l : inst_rr<"mvk", unit_l, add, 0>;
+defm mvk_d : inst_rr<"mvk", unit_d, add, 0>;
+}
 
 // Match ints in the mvk range
-def : Pat<(i32 mvk_pred:$val), (mvk imm:$val)>;
+def : Pat<(i32 mvk_pred:$val), (mvk_p imm:$val)>;
 
 // mvkl/mvkh: doesn't look like llvm can express setting a bitfield in a
 // register, and these two insns only set a halfword in one reg. So the only
