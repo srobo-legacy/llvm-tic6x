@@ -206,13 +206,18 @@ defm cmpgtu : inst_rx<"cmpgtu", unit_l, cmpgtu_node, 0>;
 defm cmpgtu : inst_xr<"cmpgtu", unit_l, cmpgtu_node, 1>;
 defm cmpgtu : inst_xi<"cmpgtu", (i32 uconst4:$imm), unit_l, cmpgtu_node, 1>;
 
-def cmplt :TMSInst<(outs GPRegs:$out), (ins GPRegs:$src1, GPRegs:$src2),
-		"cmplt $src1, $src2, $out",
-		[(set GPRegs:$out, (cmplt_node GPRegs:$src1, GPRegs:$src2))]>;
+def cmplt_p_rr : pseudo_rr<"cmplt", unit_l, cmplt_node, 0>;
+def cmplt_p_ri : pseudo_ri<"cmplt", (i32 sconst5:$imm), unit_l, cmplt_node, 1>;
+defm cmplt : inst_rx<"cmplt", unit_l, cmplt_node, 0>;
+defm cmplt : inst_xr<"cmplt", unit_l, cmplt_node, 1>;
+defm cmplt : inst_xi<"cmplt", (i32 sconst5:$imm), unit_l, cmplt_node, 1>;
 
-def cmpltu :TMSInst<(outs GPRegs:$out), (ins GPRegs:$src1, GPRegs:$src2),
-		"cmpltu $src1, $src2, $out",
-		[(set GPRegs:$out, (cmpltu_node GPRegs:$src1, GPRegs:$src2))]>;
+def cmpltu_p_rr : pseudo_rr<"cmpltu", unit_l, cmpltu_node, 0>;
+def cmpltu_p_ri : pseudo_ri<"cmpltu", (i32 uconst4:$imm), unit_l, cmpltu_node,
+									1>;
+defm cmpltu : inst_rx<"cmpltu", unit_l, cmpltu_node, 0>;
+defm cmpltu : inst_xr<"cmpltu", unit_l, cmpltu_node, 1>;
+defm cmpltu : inst_xi<"cmpltu", (i32 uconst4:$imm), unit_l, cmpltu_node, 1>;
 
 // Branch / call instructions
 
