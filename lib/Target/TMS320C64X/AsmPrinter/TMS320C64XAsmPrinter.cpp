@@ -38,7 +38,7 @@ public:
 	}
 
 	void print_pre_instruction(const MachineInstr *MI);
-	void print_predicate(const MachineInstr *MI);
+	bool print_predicate(const MachineInstr *MI);
 	void printInstruction(const MachineInstr *MI);
 	bool runOnMachineFunction(MachineFunction &F);
 	void PrintGlobalVariable(const GlobalVariable *GVar);
@@ -95,12 +95,13 @@ TMS320C64XAsmPrinter::runOnMachineFunction(MachineFunction &MF)
 void
 TMS320C64XAsmPrinter::print_pre_instruction(const MachineInstr *MI)
 {
+	bool predicate;
 	char n, u;
 	const TargetInstrDesc desc = MI->getDesc();
 
 	// Print predicate first
 
-	print_predicate(MI);
+	predicate = print_predicate(MI);
 
 	// For /all/ instructions, print unit and side specifier - at some
 	// point I might beat the assembler into not caring, but until then,
@@ -128,14 +129,17 @@ TMS320C64XAsmPrinter::print_pre_instruction(const MachineInstr *MI)
 	else
 		n = '1';
 
-	O << "\t.";
+	if (!predicate)
+		O << "\t";
+
+	O << ".";
 	O << u;
 	O << n;
 
 	return;
 }
 
-void
+bool
 TMS320C64XAsmPrinter::print_predicate(const MachineInstr *MI)
 {
 	int pred_idx, nz, reg;
@@ -146,16 +150,16 @@ TMS320C64XAsmPrinter::print_predicate(const MachineInstr *MI)
 
 	if (pred_idx == -1) {
 		// No predicate here
-		O << "        ";
-		return;
+		O << "\t";
+		return false;
 	}
 
 	nz = MI->getOperand(pred_idx).getImm();
 	reg = MI->getOperand(pred_idx+1).getReg();
 
 	if (reg == TMS320C64X::AlwaysExPred) {
-		O << "        ";
-		return;
+		O << "\t";
+		return false;
 	}
 
 
@@ -167,7 +171,8 @@ TMS320C64XAsmPrinter::print_predicate(const MachineInstr *MI)
 	if (!TargetRegisterInfo::isPhysicalRegister(reg))
 		llvm_unreachable("Nonphysical register used for predicate");
 
-	O << " [" << c << RI.get(reg).AsmName << "] ";
+	O << "\t[" << c << RI.get(reg).AsmName << "]\t";
+	return true;
 }
 
 void
