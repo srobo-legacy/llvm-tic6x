@@ -187,9 +187,11 @@ defm word_idx : meminst<"w", load, store, (i32 idxaddr:$ptr)>;
 
 // Comparisons
 
-def cmpeq : TMSInst<(outs GPRegs:$out), (ins GPRegs:$src1, GPRegs:$src2),
-		"cmpeq $src1, $src2, $out",
-		[(set GPRegs:$out, (cmpeq_node GPRegs:$src1, GPRegs:$src2))]>;
+def cmpeq_p_rr : pseudo_rr<"cmpeq", unit_l, cmpeq_node, 0>;
+def cmpeq_p_ri : pseudo_ri<"cmpeq", (i32 sconst5:$imm), unit_l, cmpeq_node, 1>;
+defm cmpeq : inst_rx<"cmpeq", unit_l, cmpeq_node, 0>;
+defm cmpeq : inst_xr<"cmpeq", unit_l, cmpeq_node, 1>;
+defm cmpeq : inst_xi<"cmpeq", (i32 sconst5:$imm), unit_l, cmpeq_node, 1>;
 
 def cmpgt :TMSInst<(outs GPRegs:$out), (ins GPRegs:$src1, GPRegs:$src2),
 		"cmpgt $src1, $src2, $out",
