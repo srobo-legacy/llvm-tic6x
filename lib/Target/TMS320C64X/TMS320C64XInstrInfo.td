@@ -176,14 +176,10 @@ defm byte_idx : meminst<"b", sextloadi8, truncstorei8, (i32 idxaddr:$ptr)>;
 defm ubyte_addr : meminst_load<"bu", zextloadi8, (i32 addr:$ptr)>;
 defm ubyte_idx : meminst_load<"bu", zextloadi8, (i32 idxaddr:$ptr)>;
 
-// FIXME: Memory alignment ;_;
-def ldh : TMSInst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
-	"ldh $ptr, $dst",
-	[(set GPRegs:$dst, (sextloadi16 addr:$ptr))]>;
-
-def ldhu : TMSInst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
-	"ldhu $ptr, $dst",
-	[(set GPRegs:$dst, (zextloadi16 addr:$ptr))]>;
+defm hword_addr : meminst<"h", sextloadi16, truncstorei16, (i32 addr:$ptr)>;
+defm hword_idx : meminst<"h", sextloadi16, truncstorei16, (i32 idxaddr:$ptr)>;
+defm hword_addr : meminst_load<"hu", zextloadi8, (i32 addr:$ptr)>;
+defm hword_idx : meminst_load<"hu", zextloadi8, (i32 idxaddr:$ptr)>;
 
 def ldw : TMSInst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
 	"ldw $ptr, $dst",
@@ -192,10 +188,6 @@ def ldw : TMSInst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
 def ldw_idx : TMSInst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
 	"ldw $ptr, $dst",
 	[(set GPRegs:$dst, (load idxaddr:$ptr))]>;
-
-def sth : TMSInst<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
-	"sth $reg, $ptr",
-	[(truncstorei16 GPRegs:$reg, addr:$ptr)]>;
 
 def stw : TMSInst<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
 	"stw $reg, $ptr",
