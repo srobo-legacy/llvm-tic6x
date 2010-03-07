@@ -26,8 +26,13 @@ namespace TMS320C64XII {
 		unit_d = 0,
 		unit_s = 1,
 		unit_l = 2,
-		unit_m = 3
+		unit_m = 3,
+		unit_1 = 0,
+		unit_2 = 4 // Flag bit
 	};
+#define GET_UNIT(x) ((x) & 3)
+#define GET_SIDE(x) ((x) & 4)
+#define GET_DELAY_SLOTS(x) (((x) >> 3) & 0x7)
 }
 
 class TMS320C64XInstrInfo : public TargetInstrInfoImpl {
