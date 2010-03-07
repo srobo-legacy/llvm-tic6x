@@ -38,6 +38,7 @@ public:
 	}
 
 	void print_pre_instruction(const MachineInstr *MI);
+	void print_predicate(const MachineInstr *MI);
 	void printInstruction(const MachineInstr *MI);
 	bool runOnMachineFunction(MachineFunction &F);
 	void PrintGlobalVariable(const GlobalVariable *GVar);
@@ -92,7 +93,7 @@ TMS320C64XAsmPrinter::runOnMachineFunction(MachineFunction &MF)
 }
 
 void
-TMS320C64XAsmPrinter::print_pre_instruction(const MachineInstr *MI)
+TMS320C64XAsmPrinter::print_predicate(const MachineInstr *MI)
 {
 	int pred_idx, nz, reg;
 	char c;
