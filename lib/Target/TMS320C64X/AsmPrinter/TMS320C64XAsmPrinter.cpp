@@ -93,6 +93,49 @@ TMS320C64XAsmPrinter::runOnMachineFunction(MachineFunction &MF)
 }
 
 void
+TMS320C64XAsmPrinter::print_pre_instruction(const MachineInstr *MI)
+{
+	char n, u;
+	const TargetInstrDesc desc = MI->getDesc();
+
+	// Print predicate first
+
+	print_predicate(MI);
+
+	// For /all/ instructions, print unit and side specifier - at some
+	// point I might beat the assembler into not caring, but until then,
+	// it's obligatory
+
+	switch (GET_UNIT(desc.TSFlags)) {
+		case TMS320C64XII::unit_l:
+			u = 'L';
+			break;
+		case TMS320C64XII::unit_s:
+			u = 'S';
+			break;
+		case TMS320C64XII::unit_d:
+			u = 'D';
+			break;
+		case TMS320C64XII::unit_m:
+			u = 'M';
+			break;
+		default:
+			llvm_unreachable("unknown unit when printing insn");
+	}
+
+	if (GET_SIDE(desc.TSFlags) & TMS320C64XII::unit_2)
+		n = '2';
+	else
+		n = '1';
+
+	O << "\t.";
+	O << u;
+	O << n;
+
+	return;
+}
+
+void
 TMS320C64XAsmPrinter::print_predicate(const MachineInstr *MI)
 {
 	int pred_idx, nz, reg;
