@@ -251,14 +251,19 @@ multiclass meminst_load<string mnemonic, PatFrag op, dag ptr> {
 		!strconcat("ld",!strconcat(mnemonic, "$ptr, $dst")),
 		[(set GPRegs:$dst, (op ptr))], 0, unit_d> {
 			let Pattern = sched_pattern;
+			let delay_slots = 4;
 		}
 
 	def _load1 : inst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
 		!strconcat("ld",!strconcat(mnemonic, "$ptr, $dst")),
-		[(set GPRegs:$dst, (op ptr))], 0, unit_d>;
+		[(set GPRegs:$dst, (op ptr))], 0, unit_d> {
+			let delay_slots = 4;
+		}
 	def _load2 : inst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
 		!strconcat("ld",!strconcat(mnemonic, "$ptr, $dst")),
-		[(set GPRegs:$dst, (op ptr))], 1, unit_d>;
+		[(set GPRegs:$dst, (op ptr))], 1, unit_d> {
+			let delay_slots = 4;
+		}
 }
 
 multiclass meminst_store<string mnemonic, PatFrag op, dag ptr> {
