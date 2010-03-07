@@ -178,8 +178,8 @@ defm ubyte_idx : meminst_load<"bu", zextloadi8, (i32 idxaddr:$ptr)>;
 
 defm hword_addr : meminst<"h", sextloadi16, truncstorei16, (i32 addr:$ptr)>;
 defm hword_idx : meminst<"h", sextloadi16, truncstorei16, (i32 idxaddr:$ptr)>;
-defm hword_addr : meminst_load<"hu", zextloadi8, (i32 addr:$ptr)>;
-defm hword_idx : meminst_load<"hu", zextloadi8, (i32 idxaddr:$ptr)>;
+defm uhword_addr : meminst_load<"hu", zextloadi8, (i32 addr:$ptr)>;
+defm uhword_idx : meminst_load<"hu", zextloadi8, (i32 idxaddr:$ptr)>;
 
 def ldw : TMSInst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
 	"ldw $ptr, $dst",
