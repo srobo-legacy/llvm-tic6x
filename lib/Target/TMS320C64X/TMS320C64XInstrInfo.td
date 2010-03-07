@@ -38,9 +38,13 @@ def Wrapper : SDNode<"TMSISD::WRAPPER", SDT_Wrapper>;
 // XXX These should probably be marked as for codegen modelling only.
 // Don't have flexibility to test right now though.
 def fake_call_start : inst<(outs), (ins i32imm:$val), "#callstart",
-		[(callseq_start timm:$val)], 0, unit_d>;
+		[(callseq_start timm:$val)], 0, unit_d> {
+	let Pattern = sched_pattern;
+}
 def fake_call_end : inst<(outs), (ins i32imm:$val, i32imm:$val2), "#callend",
-		[(callseq_end timm:$val, timm:$val2)], 0, unit_d>;
+		[(callseq_end timm:$val, timm:$val2)], 0, unit_d> {
+	let Pattern = sched_pattern;
+}
 
 def TMS320C64Xcall : SDNode<"TMSISD::CALL", SDT_call,
 				[SDNPHasChain, SDNPOutFlag, SDNPOptInFlag]>;
