@@ -239,31 +239,31 @@ class pseudo_ri<string mnemonic, dag imm, InstUnit u, SDNode op, int swap> :
 
 multiclass meminst_load<string mnemonic, PatFrag op, dag ptr> {
 	def _load_p : inst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
-		!strconcat("l",!strconcat(mnemonic, "$ptr, $dst")),
+		!strconcat("ld",!strconcat(mnemonic, "$ptr, $dst")),
 		[(set GPRegs:$dst, (op ptr))], 0, unit_d> {
 			let Pattern = sched_pattern;
 		}
 
 	def _load1 : inst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
-		!strconcat("l",!strconcat(mnemonic, "$ptr, $dst")),
+		!strconcat("ld",!strconcat(mnemonic, "$ptr, $dst")),
 		[(set GPRegs:$dst, (op ptr))], 0, unit_d>;
 	def _load2 : inst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
-		!strconcat("l",!strconcat(mnemonic, "$ptr, $dst")),
+		!strconcat("ld",!strconcat(mnemonic, "$ptr, $dst")),
 		[(set GPRegs:$dst, (op ptr))], 1, unit_d>;
 }
 
 multiclass meminst_store<string mnemonic, PatFrag op, dag ptr> {
 	def _store_p : inst<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
-		!strconcat("s",!strconcat(mnemonic, "$reg, $ptr")),
+		!strconcat("st",!strconcat(mnemonic, "$reg, $ptr")),
 		[(op GPRegs:$reg, ptr)], 0, unit_d> {
 			let Pattern = sched_pattern;
 		}
 
 	def _store1 : inst<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
-		!strconcat("s",!strconcat(mnemonic, "$reg, $ptr")),
+		!strconcat("st",!strconcat(mnemonic, "$reg, $ptr")),
 		[(op GPRegs:$reg, ptr)], 0, unit_d>;
 	def _store2 : inst<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
-		!strconcat("s",!strconcat(mnemonic, "$reg, $ptr")),
+		!strconcat("st",!strconcat(mnemonic, "$reg, $ptr")),
 		[(op GPRegs:$reg, ptr)], 1, unit_d>;
 }
 
