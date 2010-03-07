@@ -222,9 +222,10 @@ class inst<dag outs, dag ins, string mnemonic, list<dag> pattern, bit side,
 	list<dag> sched_pattern = pattern;
 	let Pattern = [];
 
-	bits<2> unit_bits = u.unit;
+	InstUnit unit = u;
+	bits<2> unit_bits = unit.unit;
 	bit unit_no = side;
-	int delay_slots = 0;
+	bits<3> delay_slots = 0; // Range of 0 -> 4
 }
 
 class pseudo_rr<string mnemonic, InstUnit u, SDNode op, int swap> :
