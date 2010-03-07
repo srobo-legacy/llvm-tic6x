@@ -193,13 +193,18 @@ defm cmpeq : inst_rx<"cmpeq", unit_l, cmpeq_node, 0>;
 defm cmpeq : inst_xr<"cmpeq", unit_l, cmpeq_node, 1>;
 defm cmpeq : inst_xi<"cmpeq", (i32 sconst5:$imm), unit_l, cmpeq_node, 1>;
 
-def cmpgt :TMSInst<(outs GPRegs:$out), (ins GPRegs:$src1, GPRegs:$src2),
-		"cmpgt $src1, $src2, $out",
-		[(set GPRegs:$out, (cmpgt_node GPRegs:$src1, GPRegs:$src2))]>;
+def cmpgt_p_rr : pseudo_rr<"cmpgt", unit_l, cmpgt_node, 0>;
+def cmpgt_p_ri : pseudo_ri<"cmpgt", (i32 sconst5:$imm), unit_l, cmpgt_node, 1>;
+defm cmpgt : inst_rx<"cmpgt", unit_l, cmpgt_node, 0>;
+defm cmpgt : inst_xr<"cmpgt", unit_l, cmpgt_node, 1>;
+defm cmpgt : inst_xi<"cmpgt", (i32 sconst5:$imm), unit_l, cmpgt_node, 1>;
 
-def cmpgtu :TMSInst<(outs GPRegs:$out), (ins GPRegs:$src1, GPRegs:$src2),
-		"cmpgtu $src1, $src2, $out",
-		[(set GPRegs:$out, (cmpgtu_node GPRegs:$src1, GPRegs:$src2))]>;
+def cmpgtu_p_rr : pseudo_rr<"cmpgtu", unit_l, cmpgtu_node, 0>;
+def cmpgtu_p_ri : pseudo_ri<"cmpgtu", (i32 uconst4:$imm), unit_l, cmpgtu_node,
+									1>;
+defm cmpgtu : inst_rx<"cmpgtu", unit_l, cmpgtu_node, 0>;
+defm cmpgtu : inst_xr<"cmpgtu", unit_l, cmpgtu_node, 1>;
+defm cmpgtu : inst_xi<"cmpgtu", (i32 uconst4:$imm), unit_l, cmpgtu_node, 1>;
 
 def cmplt :TMSInst<(outs GPRegs:$out), (ins GPRegs:$src1, GPRegs:$src2),
 		"cmplt $src1, $src2, $out",
