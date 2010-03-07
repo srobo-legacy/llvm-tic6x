@@ -44,8 +44,8 @@ def PostDecImm	: AddrMode<11>;
 def PlainReg	: AddrMode<12>;
 def PlainImm	: AddrMode<13>;
 
-class InstUnit<int u> {
-	int unit = u;
+class InstUnit<bits<2> u> {
+	bits<2> unit = u;
 }
 
 def unit_d	: InstUnit<0>;
@@ -207,7 +207,7 @@ def nodefault_pred : PredicateOperand<OtherVT, (ops timm, PredRegs),
 
 
 
-class inst<dag outs, dag ins, string mnemonic, list<dag> pattern, int side,
+class inst<dag outs, dag ins, string mnemonic, list<dag> pattern, bit side,
 			InstUnit u> : Instruction {
 	// All insns are conditional unless stated otherwise
 	let isPredicable = 1;
@@ -222,8 +222,8 @@ class inst<dag outs, dag ins, string mnemonic, list<dag> pattern, int side,
 	list<dag> sched_pattern = pattern;
 	let Pattern = [];
 
-	InstUnit unit = u;
-	int unit_no = side;
+	bits<2> unit_bits = u.unit;
+	bit unit_no = side;
 	int delay_slots = 0;
 }
 
