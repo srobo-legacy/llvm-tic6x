@@ -27,7 +27,8 @@ def callseq_start : SDNode<"ISD::CALLSEQ_START", SDT_call_seq_start,
 				[SDNPHasChain, SDNPOutFlag]>;
 def callseq_end : SDNode<"ISD::CALLSEQ_END", SDT_call_seq_end,
 				[SDNPHasChain, SDNPOptInFlag, SDNPOutFlag]>;
-def cmpeq_node : SDNode<"TMSISD::CMPEQ", SDTIntBinOp, [SDNPOutFlag]>;
+def cmpeq_node : SDNode<"TMSISD::CMPEQ", SDTIntBinOp,
+				[SDNPOutFlag, SDNPCommutative]>;
 def cmpgt_node : SDNode<"TMSISD::CMPGT", SDTIntBinOp, [SDNPOutFlag]>;
 def cmpgtu_node : SDNode<"TMSISD::CMPGTU", SDTIntBinOp, [SDNPOutFlag]>;
 def cmplt_node : SDNode<"TMSISD::CMPLT", SDTIntBinOp, [SDNPOutFlag]>;
