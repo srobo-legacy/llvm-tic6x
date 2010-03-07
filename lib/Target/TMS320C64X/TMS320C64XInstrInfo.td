@@ -258,8 +258,13 @@ def callp_1 : inst<(outs), (ins calltarget:$dst),
 def callp_2 : inst<(outs), (ins calltarget:$dst),
 		"callp $dst", [(TMS320C64Xcall tglobaladdr:$dst)], 1, unit_s>;
 }
-let isReturn = 1, isTerminator = 1 in {
-	// NB: branch-to-register can only work on unit S2
-	// Epilogue code should juggle the return addr into B3.
-	def ret : inst<(outs), (ins), "br B3", [(retflag)], 1, unit_s>;
+
+// NB: branch-to-register can only work on unit S2
+// Epilogue code should juggle the return addr into B3.
+// We only define one instruction in this form, scheduling shouldn't
+// have any reason touching this anyway.
+def ret : inst<(outs), (ins), "bnop B3, 5", [(retflag)], 1, unit_s> {
+	let isReturn = 1;
+	let isTerminator = 1;
+	let Pattern = sched_pattern;
 }
