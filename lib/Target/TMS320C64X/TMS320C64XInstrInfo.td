@@ -242,6 +242,8 @@ def brcond_2 : inst<(outs), (ins), "b $block",
 		[(brcond_node bb:$block, predwrapper:$bees)], 1, unit_s>;
 }
 
+// XXX XXX XXX: callp is a c64x+ instruction, which the assembler is unlikely
+// to swallow right now. How does TI do branches-with-return-addr on c64x?
 let isCall = 1,
 	Defs = [A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A16, A17, A18, A19,
 		A20, A21, A22, A23, A24, A25, A26, A27, A28, A29, A30, A31,
