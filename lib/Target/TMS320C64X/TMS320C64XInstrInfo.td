@@ -174,7 +174,9 @@ def : Pat<(i32 (Wrapper tglobaladdr:$val)),
 // FIXME: Work out what on earth to do with lea
 def lea_fail : inst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
 		"add ${ptr:facebees}, $dst", [(set GPRegs:$dst, idxaddr:$ptr)],
-		0, unit_l>;
+		0, unit_l> {
+	let Pattern = sched_pattern;
+}
 
 
 // Memory access: we can handle all post/pre inc/dec modes, and all indexing
