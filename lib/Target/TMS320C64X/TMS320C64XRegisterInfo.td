@@ -163,13 +163,13 @@ let MethodProtos = [{
 	iterator allocation_order_end(const MachineFunction &MF) const;
 }];
 let MethodBodies = [{
-	GPRegsClass::iterator
-	GPRegsClass::allocation_order_begin(const MachineFunction &MF)
+	ARegsClass::iterator
+	ARegsClass::allocation_order_begin(const MachineFunction &MF)
 									const {
 		 return begin();
 	}
-	GPRegsClass::iterator
-	GPRegsClass::allocation_order_end(const MachineFunction &MF)
+	ARegsClass::iterator
+	ARegsClass::allocation_order_end(const MachineFunction &MF)
 									const {
 		return end()-1;
 	}
@@ -191,13 +191,13 @@ let MethodProtos = [{
 	iterator allocation_order_end(const MachineFunction &MF) const;
 }];
 let MethodBodies = [{
-	GPRegsClass::iterator
-	GPRegsClass::allocation_order_begin(const MachineFunction &MF)
+	BRegsClass::iterator
+	BRegsClass::allocation_order_begin(const MachineFunction &MF)
 									const {
 		 return begin();
 	}
-	GPRegsClass::iterator
-	GPRegsClass::allocation_order_end(const MachineFunction &MF)
+	BRegsClass::iterator
+	BRegsClass::allocation_order_end(const MachineFunction &MF)
 									const {
 		return end()-2;
 	}
