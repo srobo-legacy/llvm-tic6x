@@ -228,24 +228,6 @@ class pseudo_rr<string mnemonic, InstUnit u, SDNode op, int swap> :
 			let Pattern = sched_pattern;
 		}
 
-class pseudo_rx<string mnemonic, InstUnit u, SDNode op, int swap> :
-		inst<(outs ARegs:$dst), (ins ARegs:$src1, GPRegs:$src2), "",
-		[(set ARegs:$dst, (op ARegs:$src1, GPRegs:$src2))], 0, u> {
-			let AsmString = !if(swap,
-			!strconcat(mnemonic, " $src2, $src1, $dst"),
-			!strconcat(mnemonic, " $src1, $src2, $dst"));
-			let Pattern = sched_pattern;
-		}
-
-class pseudo_xr<string mnemonic, InstUnit u, SDNode op, int swap> :
-		inst<(outs ARegs:$dst), (ins GPRegs:$src1, ARegs:$src2), "",
-		[(set ARegs:$dst, (op GPRegs:$src1, ARegs:$src2))], 0, u> {
-			let AsmString = !if(swap,
-			!strconcat(mnemonic, " $src2, $src1, $dst"),
-			!strconcat(mnemonic, " $src1, $src2, $dst"));
-			let Pattern = sched_pattern;
-		}
-
 class pseudo_ri<string mnemonic, dag imm, InstUnit u, SDNode op, int swap> :
 		inst<(outs ARegs:$dst), (ins ARegs:$src1, i32imm:$imm), "",
 		[(set ARegs:$dst, (op ARegs:$src1, imm))], 0, u> {
@@ -255,14 +237,6 @@ class pseudo_ri<string mnemonic, dag imm, InstUnit u, SDNode op, int swap> :
 			let Pattern = sched_pattern;
 		}
 
-class pseudo_xi<string mnemonic, dag imm, InstUnit u, SDNode op, int swap> :
-		inst<(outs ARegs:$dst), (ins GPRegs:$src1, i32imm:$imm), "",
-		[(set ARegs:$dst, (op GPRegs:$src1, imm))], 0, u> {
-			let AsmString = !if(swap,
-			!strconcat(mnemonic, " $imm, $src1, $dst"),
-			!strconcat(mnemonic, " $src1, $imm, $dst"));
-			let Pattern = sched_pattern;
-		}
 
 multiclass norm_inst<dag outs, dag ins, string mnemonic, list <dag>pattern,
 			InstUnit u> {
