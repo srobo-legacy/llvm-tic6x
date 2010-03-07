@@ -78,6 +78,14 @@ def i32index : PatLeaf<(imm), [{
 def addr : ComplexPattern<i32, 2, "select_addr", [], []>;
 def idxaddr : ComplexPattern<i32, 2, "select_idxaddr", [frameindex], []>;
 
+def uconst4_xform : SDNodeXForm<imm, [{
+	return CurDAG->getTargetConstant((int)N->getSExtValue(), MVT::i32);
+}]>;
+def uconst4 : PatLeaf<(imm), [{
+	int val = (int)N->getSExtValue();
+	return (val <= 15 && val >= 0);
+}], uconst4_xform>;
+
 def sconst5_xform : SDNodeXForm<imm, [{
 	return CurDAG->getTargetConstant((int)N->getSExtValue(), MVT::i32);
 }]>;
