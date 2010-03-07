@@ -181,22 +181,8 @@ defm hword_idx : meminst<"h", sextloadi16, truncstorei16, (i32 idxaddr:$ptr)>;
 defm uhword_addr : meminst_load<"hu", zextloadi8, (i32 addr:$ptr)>;
 defm uhword_idx : meminst_load<"hu", zextloadi8, (i32 idxaddr:$ptr)>;
 
-def ldw : TMSInst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
-	"ldw $ptr, $dst",
-	[(set GPRegs:$dst, (load addr:$ptr))]>;
-
-def ldw_idx : TMSInst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
-	"ldw $ptr, $dst",
-	[(set GPRegs:$dst, (load idxaddr:$ptr))]>;
-
-def stw : TMSInst<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
-	"stw $reg, $ptr",
-	[(store GPRegs:$reg, addr:$ptr)]>;
-
-def stw_idx : TMSInst<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
-	"stw $reg, $ptr",
-	[(store GPRegs:$reg, idxaddr:$ptr)]>;
-
+defm word_addr : meminst<"w", load, store, (i32 addr:$ptr)>;
+defm word_idx : meminst<"w", load, store, (i32 idxaddr:$ptr)>;
 
 // Comparisons
 
