@@ -166,24 +166,15 @@ def lea_fail : inst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
 		"add ${ptr:facebees}, $dst", [(set GPRegs:$dst, idxaddr:$ptr)],
 		0, unit_l>;
 
-/*
-// Loads: we can handle all post/pre inc/dec modes, and all indexing situations,
-// with a) alignment limitation, b) offset limitation, c) sign extension
-def ldb : TMSInst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
-	"ldb $ptr, $dst",
-	[(set GPRegs:$dst, (sextloadi8 addr:$ptr))]>;
 
-def ldb_idx : TMSInst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
-	"ldb $ptr, $dst",
-	[(set GPRegs:$dst, (sextloadi8 idxaddr:$ptr))]>;
+// Memory access: we can handle all post/pre inc/dec modes, and all indexing
+// situations, with a) alignment limitation, b) offset limitation,
+// c) sign extension
 
-def ldbu : TMSInst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
-	"ldbu $ptr, $dst",
-	[(set GPRegs:$dst, (zextloadi8 addr:$ptr))]>;
-
-def ldbu_idx : TMSInst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
-	"ldbu $ptr, $dst",
-	[(set GPRegs:$dst, (zextloadi8 idxaddr:$ptr))]>;
+defm byte_addr : meminst<"db", sextloadi8, truncstorei8, (i32 addr:$ptr)>;
+defm byte_idx : meminst<"db", sextloadi8, truncstorei8, (i32 idxaddr:$ptr)>;
+defm ubyte_addr : meminst_load<"dbu", zextloadi8, (i32 addr:$ptr)>;
+defm ubyte_idx : meminst_load<"dbu", zextloadi8, (i32 idxaddr:$ptr)>;
 
 // FIXME: Memory alignment ;_;
 def ldh : TMSInst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
@@ -201,14 +192,6 @@ def ldw : TMSInst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
 def ldw_idx : TMSInst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
 	"ldw $ptr, $dst",
 	[(set GPRegs:$dst, (load idxaddr:$ptr))]>;
-
-def stb : TMSInst<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
-	"stb $reg, $ptr",
-	[(truncstorei8 GPRegs:$reg, addr:$ptr)]>;
-
-def stb_idx : TMSInst<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
-	"stb $reg, $ptr",
-	[(truncstorei8 GPRegs:$reg, idxaddr:$ptr)]>;
 
 def sth : TMSInst<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
 	"sth $reg, $ptr",
