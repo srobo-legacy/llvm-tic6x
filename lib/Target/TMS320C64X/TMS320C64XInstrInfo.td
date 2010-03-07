@@ -71,9 +71,8 @@ defm shl : inst_xi<"shl", (i32 uconst5:$imm), unit_s, shl, 0>;
 // and a constant.
 // XXX - for unit D, depending on the form the constant can be sign extended
 // or zero extended; potential for datasheet bugs or data entry bugs here
-def add_p_rx : pseudo_rx<"add", unit_l, add, 0>;
-def add_p_xr : pseudo_xr<"add", unit_l, add, 1>;
-def add_p_xi : pseudo_xi<"add", (i32 sconst5:$imm), unit_l, add, 0>;
+def add_p_rr : pseudo_rr<"add", unit_l, tiadd, 0>;
+def add_p_ri : pseudo_ri<"add", (i32 sconst5:$imm), unit_l, tiadd, 0>;
 
 defm add_l : inst_rx<"add", unit_l, add, 0>;
 defm add_l : inst_xr<"add", unit_l, add, 1>;
@@ -92,9 +91,8 @@ def addk_p : pseudo_ri<"addk", (i32 sconst16:$imm), unit_s, add, 0>;
 defm addk : inst_ri<"addk", (i32 sconst16:$imm), unit_s, add, 0>;
 }
 
-def and_p_rx : pseudo_rx<"and", unit_l, and, 0>;
-def and_p_xr : pseudo_xr<"and", unit_l, and, 1>;
-def and_p_xi : pseudo_xi<"and", (i32 sconst5:$imm), unit_l, and, 1>;
+def and_p_rr : pseudo_rr<"and", unit_l, and, 0>;
+def and_p_ri : pseudo_ri<"and", (i32 sconst5:$imm), unit_l, and, 1>;
 
 defm and_l : inst_rx<"and", unit_l, and, 0>;
 defm and_l : inst_xr<"and", unit_l, and, 1>;
@@ -106,9 +104,8 @@ defm and_d : inst_rx<"and", unit_d, and, 0>;
 defm and_d : inst_xr<"and", unit_d, and, 1>;
 defm and_d : inst_xi<"and", (i32 sconst5:$imm), unit_d, and, 1>;
 
-def sub_p_rx : pseudo_rx<"sub", unit_l, sub, 0>;
-def sub_p_xr : pseudo_xr<"sub", unit_l, sub, 0>;
-def sub_p_xi : pseudo_ri<"sub", (i32 uconst5:$imm), unit_d, sub, 0>;
+def sub_p_rr : pseudo_rr<"sub", unit_l, sub, 0>;
+def sub_p_ri : pseudo_ri<"sub", (i32 uconst5:$imm), unit_d, sub, 0>;
 
 defm sub_l : inst_rx<"sub", unit_l, sub, 0>;
 defm sub_l : inst_xr<"sub", unit_l, sub, 0>;
