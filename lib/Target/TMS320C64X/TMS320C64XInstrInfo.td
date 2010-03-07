@@ -171,10 +171,10 @@ def lea_fail : inst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
 // situations, with a) alignment limitation, b) offset limitation,
 // c) sign extension
 
-defm byte_addr : meminst<"db", sextloadi8, truncstorei8, (i32 addr:$ptr)>;
-defm byte_idx : meminst<"db", sextloadi8, truncstorei8, (i32 idxaddr:$ptr)>;
-defm ubyte_addr : meminst_load<"dbu", zextloadi8, (i32 addr:$ptr)>;
-defm ubyte_idx : meminst_load<"dbu", zextloadi8, (i32 idxaddr:$ptr)>;
+defm byte_addr : meminst<"b", sextloadi8, truncstorei8, (i32 addr:$ptr)>;
+defm byte_idx : meminst<"b", sextloadi8, truncstorei8, (i32 idxaddr:$ptr)>;
+defm ubyte_addr : meminst_load<"bu", zextloadi8, (i32 addr:$ptr)>;
+defm ubyte_idx : meminst_load<"bu", zextloadi8, (i32 idxaddr:$ptr)>;
 
 // FIXME: Memory alignment ;_;
 def ldh : TMSInst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
