@@ -71,8 +71,8 @@ defm shl : inst_xi<"shl", (i32 uconst5:$imm), unit_s, shl, 0>;
 // and a constant.
 // XXX - for unit D, depending on the form the constant can be sign extended
 // or zero extended; potential for datasheet bugs or data entry bugs here
-def add_p_rr : pseudo_rr<"add", unit_l, tiadd, 0>;
-def add_p_ri : pseudo_ri<"add", (i32 sconst5:$imm), unit_l, tiadd, 0>;
+def add_p_rr : pseudo_rr<"add", unit_l, add, 0>;
+def add_p_ri : pseudo_ri<"add", (i32 sconst5:$imm), unit_l, add, 0>;
 
 defm add_l : inst_rx<"add", unit_l, add, 0>;
 defm add_l : inst_xr<"add", unit_l, add, 1>;
