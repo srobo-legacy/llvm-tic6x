@@ -154,11 +154,16 @@ def mvkl_p : pseudo_rr<"mvkl", unit_s, add, 0> {
 defm mvkl_s : inst_rr<"mvkl", unit_s, add, 0>;
 }
 
-let Constraints = "$src1 = $dst", AsmString = "mvkh $imm, $dst" in {
-def mvkh_p : pseudo_ri<"mvkh", (ins i32imm:$imm), unit_s, add, 0> {
-	let Pattern = [];
+def mvkh_p : inst<(outs GPRegs:$dst), (ins i32imm:$imm, GPRegs:$src1),
+		"mvkh $imm, $dst", [], 0, unit_s> {
+	let Constraints = "$src1 = $dst";
 }
-defm mvkh_s : inst_ri<"mvkh", (i32 i32imm:$imm), unit_s, add, 0>;
+
+let Constraints = "$src1 = $dst" in {
+def mvkh_1 : inst<(outs ARegs:$dst), (ins i32imm:$imm, ARegs:$src1),
+		"mvkh $imm, $dst", [], 0, unit_s>;
+def mvkh_2 : inst<(outs BRegs:$dst), (ins i32imm:$imm, BRegs:$src1),
+		"mvkh $imm, $dst", [], 1, unit_s>;
 }
 
 def : Pat<(i32 mvk_all_pred:$val),
