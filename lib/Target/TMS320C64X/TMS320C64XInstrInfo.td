@@ -221,23 +221,41 @@ defm cmpltu : inst_xi<"cmpltu", (i32 uconst4:$imm), unit_l, cmpltu_node, 1>;
 
 // Branch / call instructions
 
-def branch : TMSInst<(outs), (ins brtarget:$block), "b $block",
-			[(br bb:$block)]>;
+def branch_p : inst<(outs), (ins brtarget:$block), "b $block", [(br bb:$block)],
+				0, unit_s> {
+	let Pattern = sched_pattern;
+}
+def branch_1 : inst<(outs), (ins brtarget:$block), "b $block", [(br bb:$block)],
+				0, unit_s>;
+def branch_2 : inst<(outs), (ins brtarget:$block), "b $block", [(br bb:$block)],
+				1, unit_s>;
 
-def ti_brcond : TMSInst<(outs), (ins brtarget:$block, nodefault_pred:$bees),
-	"b $block", [(brcond_node bb:$block, predwrapper:$bees)]> {
-	let InOperandList = (ins brtarget:$block, nodefault_pred:$bees);
+
+let InOperandList = (ins brtarget:$block, nodefault_pred:$bees) in {
+def brcond_p : inst<(outs), (ins), "b $block",
+		[(brcond_node bb:$block, predwrapper:$bees)], 0, unit_s> {
+	let Pattern = sched_pattern;
+}
+def brcond_1 : inst<(outs), (ins), "b $block",
+		[(brcond_node bb:$block, predwrapper:$bees)], 0, unit_s>;
+def brcond_2 : inst<(outs), (ins), "b $block",
+		[(brcond_node bb:$block, predwrapper:$bees)], 1, unit_s>;
 }
 
-def callp : TMSInst<(outs), (ins calltarget:$dst),
-			"callp $dst", [(TMS320C64Xcall tglobaladdr:$dst)]> {
-	let isCall = 1;
-	let Defs = [A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A16, A17, A18, A19,
+let isCall = 1,
+	Defs = [A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A16, A17, A18, A19,
 		A20, A21, A22, A23, A24, A25, A26, A27, A28, A29, A30, A31,
 		B0, B1, B2, B3, B4, B5, B6, B7, B8, B9, B16, B17, B18, B19,
-		B20, B21, B22, B23, B24, B25, B26, B27, B28, B29, B30, B31];
+		B20, B21, B22, B23, B24, B25, B26, B27, B28, B29, B30, B31] in {
+def callp_p : inst<(outs), (ins calltarget:$dst),
+		"callp $dst", [(TMS320C64Xcall tglobaladdr:$dst)], 0, unit_s> {
+	let Pattern = sched_pattern;
 }
-
+def callp_1 : inst<(outs), (ins calltarget:$dst),
+		"callp $dst", [(TMS320C64Xcall tglobaladdr:$dst)], 0, unit_s>;
+def callp_2 : inst<(outs), (ins calltarget:$dst),
+		"callp $dst", [(TMS320C64Xcall tglobaladdr:$dst)], 1, unit_s>;
+}
 let isReturn = 1, isTerminator = 1 in {
 	// NB: branch-to-register can only work on unit S2
 	// Epilogue code should juggle the return addr into B3.
