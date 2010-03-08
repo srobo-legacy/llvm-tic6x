@@ -52,7 +52,7 @@ def TMS320C64Xcall : SDNode<"TMSISD::CALL", SDT_call,
 def retflag : SDNode<"TMSISD::RET_FLAG", SDTNone, [SDNPHasChain, SDNPOptInFlag]>;
 
 // FIXME: mv can be in any s/d/l slot
-def mv : inst<(outs GPRegs:$out), (ins GPRegs:$in), "mv\t$in,\t$out", [], 0,
+def mv : inst<(outs GPRegs:$out), (ins GPRegs:$in), "mv\t$s\t$in,\t$out", [], 0,
 								unit_s>;
 
 
@@ -91,7 +91,7 @@ defm add_d : inst_rx<"add", unit_d, add, 0>;
 defm add_d : inst_xr<"add", unit_d, add, 1>;
 defm add_d : inst_xi<"add", (i32 sconst5:$imm), unit_d, add, 0>;
 
-let Constraints = "$src1 = $dst", AsmString = "addk\t$imm,\t$dst" in {
+let Constraints = "$src1 = $dst", AsmString = "addk\t$s\t$imm,\t$dst" in {
 def addk_p : pseudo_ri<"addk", (i32 sconst16:$imm), unit_s, add, 0>;
 defm addk : inst_ri<"addk", (i32 sconst16:$imm), unit_s, add, 0>;
 }
@@ -127,8 +127,8 @@ defm sub_d : inst_xr<"sub", unit_d, sub, 0>;
 // pseudo and real instructions, but also to eliminate the register operand.
 // We also don't want to pattern match anything, use explicit patterns for that
 
-let InOperandList = (ins i32imm:$imm, pred:$p), AsmString = "mvk\t$imm,\t$dst"
-									in {
+let InOperandList = (ins unit_operand:$s, i32imm:$imm, pred:$p),
+			AsmString = "mvk\t$s\t$imm,\t$dst" in {
 def mvk_p : pseudo_rr<"mvk", unit_s, add, 0> {
 	let Pattern = [];
 }
@@ -147,8 +147,8 @@ def : Pat<(i32 mvk_pred:$val), (mvk_p imm:$val)>;
 // Instead, don't let mvkl/mvkh match anything, and use a pattern to match
 // and set 32 bit constants
 
-let InOperandList = (ins i32imm:$imm, pred:$p), AsmString = "mvkl\t$imm,\t$dst"
-in {
+let InOperandList = (ins unit_operand:$s, i32imm:$imm, pred:$p),
+		AsmString = "mvkl\t$s\t$imm,\t$dst" in {
 def mvkl_p : pseudo_rr<"mvkl", unit_s, add, 0> {
 	let Pattern = [];
 }
@@ -156,15 +156,15 @@ defm mvkl_s : inst_rr<"mvkl", unit_s, add, 0>;
 }
 
 def mvkh_p : inst<(outs GPRegs:$dst), (ins i32imm:$imm, GPRegs:$src1),
-		"mvkh\t$imm,\t$dst", [], 0, unit_s> {
+		"mvkh\t$s\t$imm,\t$dst", [], 0, unit_s> {
 	let Constraints = "$src1 = $dst";
 }
 
 let Constraints = "$src1 = $dst" in {
 def mvkh_1 : inst<(outs ARegs:$dst), (ins i32imm:$imm, ARegs:$src1),
-		"mvkh\t$imm,\t$dst", [], 0, unit_s>;
+		"mvkh\t$s\t$imm,\t$dst", [], 0, unit_s>;
 def mvkh_2 : inst<(outs BRegs:$dst), (ins i32imm:$imm, BRegs:$src1),
-		"mvkh\t$imm,\t$dst", [], 1, unit_s>;
+		"mvkh\t$s\t$imm,\t$dst", [], 1, unit_s>;
 }
 
 def : Pat<(i32 mvk_all_pred:$val),
@@ -174,7 +174,8 @@ def : Pat<(i32 (Wrapper tglobaladdr:$val)),
 
 // FIXME: Work out what on earth to do with lea
 def lea_fail : inst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
-		"add\t${ptr:facebees},\t$dst", [(set GPRegs:$dst, idxaddr:$ptr)],
+		"add\t$s\t${ptr:facebees},\t$dst",
+		[(set GPRegs:$dst, idxaddr:$ptr)],
 		0, unit_l> {
 	let Pattern = sched_pattern;
 }
@@ -243,7 +244,8 @@ def branch_2 : inst<(outs), (ins brtarget:$block), "b\t$block",
 				[(br bb:$block)], 1, unit_s>;
 
 
-let InOperandList = (ins brtarget:$block, nodefault_pred:$bees) in {
+let InOperandList = (ins unit_operand:$s, brtarget:$block,
+						nodefault_pred:$bees) in {
 def brcond_p : inst<(outs), (ins), "b\t$block",
 		[(brcond_node bb:$block, predwrapper:$bees)], 0, unit_s> {
 	let Pattern = sched_pattern;
@@ -261,21 +263,21 @@ let isCall = 1,
 		A20, A21, A22, A23, A24, A25, A26, A27, A28, A29, A30, A31,
 		B0, B1, B2, B3, B4, B5, B6, B7, B8, B9, B16, B17, B18, B19,
 		B20, B21, B22, B23, B24, B25, B26, B27, B28, B29, B30, B31] in {
-def callp_p : inst<(outs), (ins calltarget:$dst),
-		"callp\t$dst", [(TMS320C64Xcall tglobaladdr:$dst)], 0, unit_s> {
+def callp_p : inst<(outs), (ins calltarget:$dst), "callp\t$s\t$dst",
+			[(TMS320C64Xcall tglobaladdr:$dst)], 0, unit_s> {
 	let Pattern = sched_pattern;
 }
-def callp_1 : inst<(outs), (ins calltarget:$dst),
-		"callp\t$dst", [(TMS320C64Xcall tglobaladdr:$dst)], 0, unit_s>;
-def callp_2 : inst<(outs), (ins calltarget:$dst),
-		"callp\t$dst", [(TMS320C64Xcall tglobaladdr:$dst)], 1, unit_s>;
+def callp_1 : inst<(outs), (ins calltarget:$dst), "callp\t$s\t$dst",
+		[(TMS320C64Xcall tglobaladdr:$dst)], 0, unit_s>;
+def callp_2 : inst<(outs), (ins calltarget:$dst), "callp\t$s\t$dst",
+		[(TMS320C64Xcall tglobaladdr:$dst)], 1, unit_s>;
 }
 
 // NB: branch-to-register can only work on unit S2
 // Epilogue code should juggle the return addr into B3.
 // We only define one instruction in this form, scheduling shouldn't
 // have any reason touching this anyway.
-def ret : inst<(outs), (ins), "bnop\tB3,\t5", [(retflag)], 1, unit_s> {
+def ret : inst<(outs), (ins), "bnop\t$s\tB3,\t5", [(retflag)], 1, unit_s> {
 	let isReturn = 1;
 	let isTerminator = 1;
 	let Pattern = sched_pattern;
