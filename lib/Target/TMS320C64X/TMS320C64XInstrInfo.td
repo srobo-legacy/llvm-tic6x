@@ -127,7 +127,7 @@ defm sub_d : inst_xr<"sub", unit_d, sub, 0>;
 // pseudo and real instructions, but also to eliminate the register operand.
 // We also don't want to pattern match anything, use explicit patterns for that
 
-let InOperandList = (ins unit_operand:$s, i32imm:$imm, pred:$p),
+let InOperandList = (ins i32imm:$imm, pred:$s),
 			AsmString = "mvk\t$s\t$imm,\t$dst" in {
 def mvk_p : pseudo_rr<"mvk", unit_s, add, 0> {
 	let Pattern = [];
@@ -147,7 +147,7 @@ def : Pat<(i32 mvk_pred:$val), (mvk_p imm:$val)>;
 // Instead, don't let mvkl/mvkh match anything, and use a pattern to match
 // and set 32 bit constants
 
-let InOperandList = (ins unit_operand:$s, i32imm:$imm, pred:$p),
+let InOperandList = (ins i32imm:$imm, pred:$s),
 		AsmString = "mvkl\t$s\t$imm,\t$dst" in {
 def mvkl_p : pseudo_rr<"mvkl", unit_s, add, 0> {
 	let Pattern = [];
@@ -244,10 +244,9 @@ def branch_2 : inst<(outs), (ins brtarget:$block), "b\t$s\t$block",
 				[(br bb:$block)], 1, unit_s>;
 
 
-let InOperandList = (ins unit_operand:$s, brtarget:$block,
-						nodefault_pred:$bees) in {
+let InOperandList = (ins brtarget:$block, nodefault_pred:$s) in {
 def brcond_p : inst<(outs), (ins), "b\t$s\t$block",
-		[(brcond_node bb:$block, predwrapper:$bees)], 0, unit_s> {
+		[(brcond_node bb:$block, predwrapper:$s)], 0, unit_s> {
 	let Pattern = sched_pattern;
 }
 def brcond_1 : inst<(outs), (ins), "b\t$s\t$block",
