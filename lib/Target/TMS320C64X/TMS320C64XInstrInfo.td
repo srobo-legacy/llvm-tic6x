@@ -234,25 +234,25 @@ defm cmpltu : inst_xi<"cmpltu", (i32 uconst4:$imm), unit_l, cmpltu_node, 1>;
 
 // Branch / call instructions
 
-def branch_p : inst<(outs), (ins brtarget:$block), "b\t$block",
+def branch_p : inst<(outs), (ins brtarget:$block), "b\t$s\t$block",
 				[(br bb:$block)], 0, unit_s> {
 	let Pattern = sched_pattern;
 }
-def branch_1 : inst<(outs), (ins brtarget:$block), "b\t$block",
+def branch_1 : inst<(outs), (ins brtarget:$block), "b\t$s\t$block",
 				[(br bb:$block)], 0, unit_s>;
-def branch_2 : inst<(outs), (ins brtarget:$block), "b\t$block",
+def branch_2 : inst<(outs), (ins brtarget:$block), "b\t$s\t$block",
 				[(br bb:$block)], 1, unit_s>;
 
 
 let InOperandList = (ins unit_operand:$s, brtarget:$block,
 						nodefault_pred:$bees) in {
-def brcond_p : inst<(outs), (ins), "b\t$block",
+def brcond_p : inst<(outs), (ins), "b\t$s\t$block",
 		[(brcond_node bb:$block, predwrapper:$bees)], 0, unit_s> {
 	let Pattern = sched_pattern;
 }
-def brcond_1 : inst<(outs), (ins), "b\t$block",
+def brcond_1 : inst<(outs), (ins), "b\t$s\t$block",
 		[(brcond_node bb:$block, predwrapper:$bees)], 0, unit_s>;
-def brcond_2 : inst<(outs), (ins), "b\t$block",
+def brcond_2 : inst<(outs), (ins), "b\t$s\t$block",
 		[(brcond_node bb:$block, predwrapper:$bees)], 1, unit_s>;
 }
 
