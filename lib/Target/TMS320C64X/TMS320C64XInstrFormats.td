@@ -53,16 +53,6 @@ def unit_s	: InstUnit<1>;
 def unit_l	: InstUnit<2>;
 def unit_m	: InstUnit<3>;
 
-// Blaargh. We need to have a way of printing the unit specifier after
-// the mnemonic, but before the rest of the operands - to do this we want
-// to have some operand that just sits there, has its print method called,
-// then we extrapolate the correct text. That means something with a default
-// operand value. OptionalDefOperand doesn't work (we don't def anything),
-// so use predicateoperand instead. Which means much beating elsewhere. Ugh.
-def unit_operand : PredicateOperand<OtherVT, (ops timm), (ops (i32 0))> {
-	let PrintMethod = "printUnitOperand";
-}
-
 def mem_operand	: Operand<i32> {
 	let PrintMethod = "printMemOperand";
 	let MIOperandInfo = (ops GPRegs, GPRegs);
@@ -153,11 +143,14 @@ def set_hi : PatLeaf<(imm), [{
 }]>;
 
 def pred : PredicateOperand<OtherVT, (ops timm, PredRegs),
-			(ops (i32 0), (i32 AlwaysExPred))>;
+			(ops (i32 0), (i32 AlwaysExPred))> {
+	let PrintMethod= "printUnitOperand";
+}
 
 def nodefault_pred : PredicateOperand<OtherVT, (ops timm, PredRegs),
-			(ops)>;
-
+			(ops)> {
+	let PrintMethod = "printUnitOperand";
+}
 
 // A note on how we're formatting instruction representation.
 //
@@ -224,7 +217,7 @@ class inst<dag outs, dag ins, string mnemonic, list<dag> pattern, bit side,
 
 	let Namespace = "TMS320C64X";
 	let OutOperandList = outs;
-	let InOperandList = !con(!con((ops unit_operand:$s), ins), (ops pred:$p));
+	let InOperandList = !con(ins, (ops pred:$s));
 	let AsmString = mnemonic;
 
 	// Match nothing; set sched_pattern for a future tablegen backend
