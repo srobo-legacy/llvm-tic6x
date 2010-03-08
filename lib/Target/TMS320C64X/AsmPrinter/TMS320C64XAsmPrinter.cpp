@@ -139,8 +139,9 @@ TMS320C64XAsmPrinter::print_predicate(const MachineInstr *MI)
 	const TargetRegisterInfo &RI = *TM.getRegisterInfo();
 
 	// Can't use first predicate operand any more, due to unit_operand hack
-	pred_idx = MI->getNumOperands() - 2;
-	if (!TM.getInstrInfo()->isPredicated(MI))
+	pred_idx = MI->findFirstPredOperandIdx();
+
+	if (!MI->getDesc().isPredicable())
 		return false;
 
 	if (pred_idx == -1) {
@@ -166,7 +167,7 @@ TMS320C64XAsmPrinter::print_predicate(const MachineInstr *MI)
 	if (!TargetRegisterInfo::isPhysicalRegister(reg))
 		llvm_unreachable("Nonphysical register used for predicate");
 
-	O << "\t[" << c << RI.get(reg).AsmName << "]\t";
+	O << "\t[" << c << RI.get(reg).AsmName << "]";
 	return true;
 }
 
