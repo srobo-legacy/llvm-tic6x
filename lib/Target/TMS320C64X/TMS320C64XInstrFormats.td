@@ -242,8 +242,8 @@ class pseudo_rr<string mnemonic, InstUnit u, SDNode op, int swap> :
 		inst<(outs ARegs:$dst), (ins ARegs:$src1, ARegs:$src2), "",
 		[(set ARegs:$dst, (op ARegs:$src1, ARegs:$src2))], 0, u> {
 			let AsmString = !if(swap,
-			!strconcat(mnemonic, "\t$src2,\t$src1,\t$dst"),
-			!strconcat(mnemonic, "\t$src1,\t$src2,\t$dst"));
+			!strconcat(mnemonic, "\t$s\t$src2,\t$src1,\t$dst"),
+			!strconcat(mnemonic, "\t$s\t$src1,\t$src2,\t$dst"));
 			let Pattern = sched_pattern;
 		}
 
@@ -251,26 +251,26 @@ class pseudo_ri<string mnemonic, dag imm, InstUnit u, SDNode op, int swap> :
 		inst<(outs ARegs:$dst), (ins ARegs:$src1, i32imm:$imm), "",
 		[(set ARegs:$dst, (op ARegs:$src1, imm))], 0, u> {
 			let AsmString = !if(swap,
-			!strconcat(mnemonic, "\t$imm,\t$src1,\t$dst"),
-			!strconcat(mnemonic, "\t$src1,\t$imm,\t$dst"));
+			!strconcat(mnemonic, "\t$s\t$imm,\t$src1,\t$dst"),
+			!strconcat(mnemonic, "\t$s\t$src1,\t$imm,\t$dst"));
 			let Pattern = sched_pattern;
 		}
 
 multiclass meminst_load<string mnemonic, PatFrag op, dag ptr> {
 	def _load_p : inst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
-		!strconcat("ld",!strconcat(mnemonic, "\t$ptr,\t$dst")),
+		!strconcat("ld",!strconcat(mnemonic, "\t$s\t$ptr,\t$dst")),
 		[(set GPRegs:$dst, (op ptr))], 0, unit_d> {
 			let Pattern = sched_pattern;
 			let delay_slots = 4;
 		}
 
 	def _load1 : inst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
-		!strconcat("ld",!strconcat(mnemonic, "\t$ptr,\t$dst")),
+		!strconcat("ld",!strconcat(mnemonic, "\t$s\t$ptr,\t$dst")),
 		[(set GPRegs:$dst, (op ptr))], 0, unit_d> {
 			let delay_slots = 4;
 		}
 	def _load2 : inst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
-		!strconcat("ld",!strconcat(mnemonic, "\t$ptr,\t$dst")),
+		!strconcat("ld",!strconcat(mnemonic, "\t$s\t$ptr,\t$dst")),
 		[(set GPRegs:$dst, (op ptr))], 1, unit_d> {
 			let delay_slots = 4;
 		}
@@ -278,16 +278,16 @@ multiclass meminst_load<string mnemonic, PatFrag op, dag ptr> {
 
 multiclass meminst_store<string mnemonic, PatFrag op, dag ptr> {
 	def _store_p : inst<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
-		!strconcat("st",!strconcat(mnemonic, "\t$reg,\t$ptr")),
+		!strconcat("st",!strconcat(mnemonic, "\t$s\t$reg,\t$ptr")),
 		[(op GPRegs:$reg, ptr)], 0, unit_d> {
 			let Pattern = sched_pattern;
 		}
 
 	def _store1 : inst<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
-		!strconcat("st",!strconcat(mnemonic, "\t$reg,\t$ptr")),
+		!strconcat("st",!strconcat(mnemonic, "\t$s\t$reg,\t$ptr")),
 		[(op GPRegs:$reg, ptr)], 0, unit_d>;
 	def _store2 : inst<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
-		!strconcat("st",!strconcat(mnemonic, "\t$reg,\t$ptr")),
+		!strconcat("st",!strconcat(mnemonic, "\t$s\t$reg,\t$ptr")),
 		[(op GPRegs:$reg, ptr)], 1, unit_d>;
 }
 
@@ -298,19 +298,18 @@ multiclass meminst<string mnemonic, PatFrag loadop, PatFrag storeop, dag addr> :
 // Plain double register operand
 multiclass inst_rr<string mnemonic, InstUnit u, SDNode op, int swap> {
 	def _rr1 : inst<(outs ARegs:$dst), (ins ARegs:$src1, ARegs:$src2), "",
-			[(set ARegs:$dst, (op ARegs:$src1, ARegs:$src2))],
+		[(set ARegs:$dst, (op ARegs:$src1, ARegs:$src2))],
 			0, u> {
-				let AsmString = !if(swap,
-				!strconcat(mnemonic, "\t$src2,\t$src1,\t$dst"),
-				!strconcat(mnemonic, "\t$src1,\t$src2,\t$dst"));
-			}
+			let AsmString = !if(swap,
+			!strconcat(mnemonic, "\t$s\t$src2,\t$src1,\t$dst"),
+			!strconcat(mnemonic, "\t$src1,\t$src2,\t$dst"));
+		}
 	def _rr2 : inst<(outs BRegs:$dst), (ins BRegs:$src1, BRegs:$src2), "",
-			[(set BRegs:$dst, (op BRegs:$src1, BRegs:$src2))],
-			1, u> {
-				let AsmString = !if(swap,
-				!strconcat(mnemonic, "\t$src2,\t$src1,\t$dst"),
-				!strconcat(mnemonic, "\t$src1,\t$src2,\t$dst"));
-			}
+		[(set BRegs:$dst, (op BRegs:$src1, BRegs:$src2))], 1, u> {
+			let AsmString = !if(swap,
+			!strconcat(mnemonic, "\t$s\t$src2,\t$src1,\t$dst"),
+			!strconcat(mnemonic, "\t$s\t$src1,\t$src2,\t$dst"));
+		}
 }
 
 // Double register, second is xpath
@@ -318,70 +317,62 @@ multiclass inst_rr<string mnemonic, InstUnit u, SDNode op, int swap> {
 // but it doesn't look like tablegen can stitch dags together at that level.
 multiclass inst_rx<string mnemonic, InstUnit u, SDNode op, int swap> {
 	def _rx1 : inst<(outs ARegs:$dst), (ins ARegs:$src1, GPRegs:$src2), "",
-			[(set ARegs:$dst, (op ARegs:$src1, GPRegs:$src2))],
-			 0, u> {
-				let AsmString = !if(swap,
-				!strconcat(mnemonic, "\t$src2,\t$src1,\t$dst"),
-				!strconcat(mnemonic, "\t$src1,\t$src2,\t$dst"));
-			}
+		[(set ARegs:$dst, (op ARegs:$src1, GPRegs:$src2))], 0, u> {
+			let AsmString = !if(swap,
+			!strconcat(mnemonic, "\t$s\t$src2,\t$src1,\t$dst"),
+			!strconcat(mnemonic, "\t$s\t$src1,\t$src2,\t$dst"));
+		}
 	def _rx2 : inst<(outs BRegs:$dst), (ins BRegs:$src1, GPRegs:$src2), "",
-			[(set BRegs:$dst, (op BRegs:$src1, GPRegs:$src2))],
-			1, u> {
-				let AsmString = !if(swap,
-				!strconcat(mnemonic, "\t$src2,\t$src1,\t$dst"),
-				!strconcat(mnemonic, "\t$src1,\t$src2,\t$dst"));
-			}
+		[(set BRegs:$dst, (op BRegs:$src1, GPRegs:$src2))], 1, u> {
+			let AsmString = !if(swap,
+			!strconcat(mnemonic, "\t$s\t$src2,\t$src1,\t$dst"),
+			!strconcat(mnemonic, "\t$s\t$src1,\t$src2,\t$dst"));
+		}
 }
 
 multiclass inst_xr<string mnemonic, InstUnit u, SDNode op, int swap> {
 	def _xr1 : inst<(outs ARegs:$dst), (ins GPRegs:$src1, ARegs:$src2), "",
-			[(set ARegs:$dst, (op GPRegs:$src1, ARegs:$src2))],
-			0, u> {
-				let AsmString = !if(swap,
-				!strconcat(mnemonic, "\t$src2,\t$src1,\t$dst"),
-				!strconcat(mnemonic, "\t$src1,\t$src2,\t$dst"));
-			}
+		[(set ARegs:$dst, (op GPRegs:$src1, ARegs:$src2))], 0, u> {
+			let AsmString = !if(swap,
+			!strconcat(mnemonic, "\t$s\t$src2,\t$src1,\t$dst"),
+			!strconcat(mnemonic, "\t$s\t$src1,\t$src2,\t$dst"));
+		}
 	def _xr2 : inst<(outs BRegs:$dst), (ins GPRegs:$src1, BRegs:$src2), "",
-			[(set BRegs:$dst, (op GPRegs:$src1, BRegs:$src2))],
-			1, u> {
-				let AsmString = !if(swap,
-				!strconcat(mnemonic, "\t$src2,\t$src1,\t$dst"),
-				!strconcat(mnemonic, "\t$src1,\t$src2,\t$dst"));
-			}
+		[(set BRegs:$dst, (op GPRegs:$src1, BRegs:$src2))], 1, u> {
+			let AsmString = !if(swap,
+			!strconcat(mnemonic, "\t$s\t$src2,\t$src1,\t$dst"),
+			!strconcat(mnemonic, "\t$s\t$src1,\t$src2,\t$dst"));
+		}
 }
 
 // One register, one immediate
 multiclass inst_ri<string mnemonic, dag imm, InstUnit u, SDNode op, int swap> {
 	def _ri1 : inst<(outs ARegs:$dst), (ins ARegs:$src1, i32imm:$imm), "",
-			[(set ARegs:$dst, (op ARegs:$src1, imm))],
-			0, u> {
-				let AsmString = !if(swap,
-				!strconcat(mnemonic, "\t$imm,\t$src1,\t$dst"),
-				!strconcat(mnemonic, "\t$src1,\t$imm,\t$dst"));
-			}
+		[(set ARegs:$dst, (op ARegs:$src1, imm))], 0, u> {
+			let AsmString = !if(swap,
+			!strconcat(mnemonic, "\t$s\t$imm,\t$src1,\t$dst"),
+			!strconcat(mnemonic, "\t$s\t$src1,\t$imm,\t$dst"));
+		}
 	def _ri2 : inst<(outs BRegs:$dst), (ins BRegs:$src1, i32imm:$imm), "",
-			[(set BRegs:$dst, (op BRegs:$src1, imm))],
-			1, u> {
-				let AsmString = !if(swap,
-				!strconcat(mnemonic, "\t$imm,\t$src1,\t$dst"),
-				!strconcat(mnemonic, "\t$src1,\t$imm,\t$dst"));
-			}
+		[(set BRegs:$dst, (op BRegs:$src1, imm))], 1, u> {
+			let AsmString = !if(swap,
+			!strconcat(mnemonic, "\t$s\t$imm,\t$src1,\t$dst"),
+			!strconcat(mnemonic, "\t$s\t$src1,\t$imm,\t$dst"));
+		}
 }
 
 // One xpath reg, one imm
 multiclass inst_xi<string mnemonic, dag imm, InstUnit u, SDNode op, int swap> {
 	def _xi1 : inst<(outs ARegs:$dst), (ins GPRegs:$src1, i32imm:$imm), "",
-			[(set ARegs:$dst, (op GPRegs:$src1, imm))],
-			0, u> {
-				let AsmString = !if(swap,
-				!strconcat(mnemonic, "\t$imm,\t$src1,\t$dst"),
-				!strconcat(mnemonic, "\t$src1,\t$imm,\t$dst"));
-			}
+		[(set ARegs:$dst, (op GPRegs:$src1, imm))], 0, u> {
+			let AsmString = !if(swap,
+			!strconcat(mnemonic, "\t$s\t$imm,\t$src1,\t$dst"),
+			!strconcat(mnemonic, "\t$s\t$src1,\t$imm,\t$dst"));
+		}
 	def _xi2 : inst<(outs BRegs:$dst), (ins GPRegs:$src1, i32imm:$imm), "",
-			[(set BRegs:$dst, (op GPRegs:$src1, imm))],
-			1, u> {
-				let AsmString = !if(swap,
-				!strconcat(mnemonic, "\t$imm,\t$src1,\t$dst"),
-				!strconcat(mnemonic, "\t$src1,\t$imm,\t$dst"));
-			}
+		[(set BRegs:$dst, (op GPRegs:$src1, imm))], 1, u> {
+			let AsmString = !if(swap,
+			!strconcat(mnemonic, "\t$s\t$imm,\t$src1,\t$dst"),
+			!strconcat(mnemonic, "\t$s\t$src1,\t$imm,\t$dst"));
+		}
 }
