@@ -280,5 +280,6 @@ def callp_2 : inst<(outs), (ins calltarget:$dst), "callp\t$s\t$dst",
 def ret : inst<(outs), (ins), "bnop\t$s\tB3,\t5", [(retflag)], 1, unit_s> {
 	let isReturn = 1;
 	let isTerminator = 1;
+	let isPredicable = 0;
 	let Pattern = sched_pattern;
 }
