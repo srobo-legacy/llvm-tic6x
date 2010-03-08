@@ -37,10 +37,10 @@ public:
 		return "TMS320C64X Assembly Printer";
 	}
 
-	void print_pre_instruction(const MachineInstr *MI);
 	bool print_predicate(const MachineInstr *MI);
 	void printInstruction(const MachineInstr *MI);
 	bool runOnMachineFunction(MachineFunction &F);
+	void printUnitOperand(const MachineInstr *MI, int op);
 	void PrintGlobalVariable(const GlobalVariable *GVar);
 	void printOperand(const MachineInstr *MI, int opNum);
 	void printMemOperand(const MachineInstr *MI, int opNum,
@@ -84,7 +84,7 @@ TMS320C64XAsmPrinter::runOnMachineFunction(MachineFunction &MF)
 
 		for (MachineBasicBlock::const_iterator II = I->begin(),
 				E = I->end(); II != E; ++II) {
-			print_pre_instruction(II);
+			print_predicate(II);
 			printInstruction(II);
 		}
 	}
@@ -93,15 +93,10 @@ TMS320C64XAsmPrinter::runOnMachineFunction(MachineFunction &MF)
 }
 
 void
-TMS320C64XAsmPrinter::print_pre_instruction(const MachineInstr *MI)
+TMS320C64XAsmPrinter::printUnitOperand(const MachineInstr *MI, int op_num)
 {
-	bool predicate;
 	char n, u;
 	const TargetInstrDesc desc = MI->getDesc();
-
-	// Print predicate first
-
-	predicate = print_predicate(MI);
 
 	// For /all/ instructions, print unit and side specifier - at some
 	// point I might beat the assembler into not caring, but until then,
@@ -129,9 +124,6 @@ TMS320C64XAsmPrinter::print_pre_instruction(const MachineInstr *MI)
 	else
 		n = '1';
 
-	if (!predicate)
-		O << "\t";
-
 	O << ".";
 	O << u;
 	O << n;
@@ -146,7 +138,10 @@ TMS320C64XAsmPrinter::print_predicate(const MachineInstr *MI)
 	char c;
 	const TargetRegisterInfo &RI = *TM.getRegisterInfo();
 
-	pred_idx = MI->findFirstPredOperandIdx();
+	// Can't use first predicate operand any more, due to unit_operand hack
+	pred_idx = MI->getNumOperands() - 2;
+	if (!TM.getInstrInfo()->isPredicated(MI))
+		return false;
 
 	if (pred_idx == -1) {
 		// No predicate here
