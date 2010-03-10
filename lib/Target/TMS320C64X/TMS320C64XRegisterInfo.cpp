@@ -131,12 +131,12 @@ TMS320C64XRegisterInfo::emitPrologue(MachineFunction &MF) const
 	// to decrement SP for us, but I don't know the infrastructure well
 	// enough to do that yet
 	addDefaultPred(BuildMI(MBB, MBBI, dl,
-		TII.get(TMS320C64X::word_idx_store_p))
+		TII.get(TMS320C64X::word_idx_store2))
 		.addReg(TMS320C64X::B15).addImm(0).addReg(TMS320C64X::B3));
 
 	// Store FP
 	addDefaultPred(BuildMI(MBB, MBBI, dl,
-		TII.get(TMS320C64X::word_idx_store_p))
+		TII.get(TMS320C64X::word_idx_store2))
 		.addReg(TMS320C64X::B15).addImm(-4).addReg(TMS320C64X::A15));
 
 	// Setup our own FP using the current SP
@@ -184,10 +184,10 @@ TMS320C64XRegisterInfo::emitEpilogue(MachineFunction &MF,
 		TII.get(TMS320C64X::mv))
 		.addReg(TMS320C64X::B15).addReg(TMS320C64X::A15));
 	addDefaultPred(BuildMI(MBB, MBBI, DL,
-		TII.get(TMS320C64X::word_idx_load_p))
+		TII.get(TMS320C64X::word_idx_load2))
 		.addReg(TMS320C64X::A15).addReg(TMS320C64X::B15).addImm(-4));
 	addDefaultPred(BuildMI(MBB, MBBI, DL,
-		TII.get(TMS320C64X::word_idx_load_p))
+		TII.get(TMS320C64X::word_idx_load2))
 		.addReg(TMS320C64X::B3).addReg(TMS320C64X::B15).addImm(0));
 }
 
