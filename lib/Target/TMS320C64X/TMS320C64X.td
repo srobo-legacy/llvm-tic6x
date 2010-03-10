@@ -40,8 +40,8 @@ include "TMS320C64XGenCallingConv.td"
 // Target:
 
 def TMS320C64XInstrInfo : InstrInfo {
-  let TSFlagsFields = ["unit_bits", "unit_no", "delay_slots"];
-  let TSFlagsShifts = [0, 2, 3];
+  let TSFlagsFields = ["unit_bits", "unit_no", "delay_slots", "mem_access", "mem_side"];
+  let TSFlagsShifts = [0, 2, 3, 6, 7];
   let isLittleEndianEncoding = 1;
 }
 

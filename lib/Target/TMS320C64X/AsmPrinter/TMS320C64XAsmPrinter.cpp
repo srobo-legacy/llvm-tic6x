@@ -95,7 +95,7 @@ TMS320C64XAsmPrinter::runOnMachineFunction(MachineFunction &MF)
 void
 TMS320C64XAsmPrinter::printUnitOperand(const MachineInstr *MI, int op_num)
 {
-	char n, u;
+	char n, u, t;
 	const TargetInstrDesc desc = MI->getDesc();
 
 	// For /all/ instructions, print unit and side specifier - at some
@@ -124,9 +124,22 @@ TMS320C64XAsmPrinter::printUnitOperand(const MachineInstr *MI, int op_num)
 	else
 		n = '1';
 
+	t = 0;
+	if (desc.TSFlags & TMS320C64XII::is_memaccess) {
+		if (desc.TSFlags & TMS320C64XII::is_mem_unit_2) {
+			t = '2';
+		} else {
+			t = '1';
+		}
+	}
+
 	O << ".";
 	O << u;
 	O << n;
+	if (t != 0) {
+		O << "T";
+		O << t;
+	}
 
 	return;
 }
