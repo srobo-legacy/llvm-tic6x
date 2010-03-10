@@ -301,7 +301,7 @@ multiclass meminst_store<string mnemonic, PatFrag op, dag ptr> {
 		[(op GPRegs:$reg, ptr)], 1, unit_d> {
 			let delay_slots = 4;
 			let mem_access = 1;
-			let mem_side = 0;
+			let mem_side = 1;
 		}
 }
 
