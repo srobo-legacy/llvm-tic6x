@@ -232,6 +232,7 @@ class inst<dag outs, dag ins, string mnemonic, list<dag> pattern, bit side,
 
 	// Used to indicate memory datapath specifier, if this is memory access
 	bit mem_access = 0;
+	bit mem_load_store = 0; // 0 for load, 1 for store
 }
 
 class pseudo_rr<string mnemonic, InstUnit u, SDNode op, int swap> :
@@ -282,6 +283,7 @@ multiclass meminst_store<string mnemonic, PatFrag op, dag ptr> {
 			let Pattern = sched_pattern;
 			let delay_slots = 4;
 			let mem_access = 1;
+			let mem_load_store = 1;
 		}
 
 	def _store1 : inst<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
@@ -289,12 +291,14 @@ multiclass meminst_store<string mnemonic, PatFrag op, dag ptr> {
 		[(op GPRegs:$reg, ptr)], 0, unit_d> {
 			let delay_slots = 4;
 			let mem_access = 1;
+			let mem_load_store = 1;
 		}
 	def _store2 : inst<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
 		!strconcat("st",!strconcat(mnemonic, "\t$s\t$reg,\t$ptr")),
 		[(op GPRegs:$reg, ptr)], 1, unit_d> {
 			let delay_slots = 4;
 			let mem_access = 1;
+			let mem_load_store = 1;
 		}
 }
 
