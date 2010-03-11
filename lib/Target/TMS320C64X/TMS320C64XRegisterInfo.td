@@ -14,6 +14,8 @@ class MainReg<bits<6> num, bit side, string n> : Register<n> {
 	let Namespace = "TMS320C64X";
 }
 
+def FakeReg :	MainReg<0, 0, "Fake-fail">;
+
 def A0	:	MainReg<0, 0, "A0">, DwarfRegNum<[0]>;
 def A1	:	MainReg<1, 0, "A1">, DwarfRegNum<[1]>;
 def A2	:	MainReg<2, 0, "A2">, DwarfRegNum<[2]>;
@@ -126,7 +128,7 @@ def GPRegs : RegisterClass<"TMS320C64X", [i32], 32,
 		B10, B11, B12, B13,
 		B16, B17, B18, B19, B20, B21, B22, B23,
 		B24, B25, B26, B27, B28, B29, B30, B31,
-		A15, B14, B15
+		A15, B14, B15, FakeReg
 	] >
 {
 let MethodProtos = [{
@@ -142,9 +144,9 @@ let MethodBodies = [{
 	GPRegsClass::iterator
 	GPRegsClass::allocation_order_end(const MachineFunction &MF)
 									const {
-		// Don't allocate SP/FP/DP
+		// Don't allocate SP/FP/DP/FakeReg
 		// Or in fact any of the B registers
-		return end()-33;
+		return end()-34;
 	}
 }];
 }

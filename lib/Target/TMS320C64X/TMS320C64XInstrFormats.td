@@ -143,7 +143,7 @@ def set_hi : PatLeaf<(imm), [{
 }]>;
 
 def pred : PredicateOperand<OtherVT, (ops timm, PredRegs),
-			(ops (i32 -1), (i32 0))> {
+			(ops (i32 -1), (i32 FakeReg))> {
 	// Predicate of -1 indicates that this is always-execute
 	let PrintMethod= "printUnitOperand";
 }

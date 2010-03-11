@@ -137,6 +137,13 @@ TMS320C64XLowering::LowerFormalArguments(SDValue Chain,
 	// being live in; return address does
 	MF.addLiveIn(TMS320C64X::B3, &TMS320C64X::GPRegsRegClass);
 
+	// We have to initialise default predicate with a register, but as
+	// well as this the register allocator will vomit all over a register
+	// that is never defined but used as an operand. So, the fake register
+	// we use for an operand to the default always-execute predicate has
+	// to be defined from the start
+	MF.addLiveIn(TMS320C64X::FakeReg, &TMS320C64X::GPRegsRegClass);
+
 	// Also arguments, which is what this is all about
 	for (i = 0; i < ArgLocs.size(); ++i) {
 		CCValAssign &VA = ArgLocs[i];
