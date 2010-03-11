@@ -14,8 +14,6 @@ class MainReg<bits<6> num, bit side, string n> : Register<n> {
 	let Namespace = "TMS320C64X";
 }
 
-def AlwaysExPred : MainReg<0, 0, "AlwaysEx">;
-
 def A0	:	MainReg<0, 0, "A0">, DwarfRegNum<[0]>;
 def A1	:	MainReg<1, 0, "A1">, DwarfRegNum<[1]>;
 def A2	:	MainReg<2, 0, "A2">, DwarfRegNum<[2]>;
@@ -83,11 +81,9 @@ def B31	:	MainReg<63, 1, "B31">, DwarfRegNum<[63]>;
 
 
 // Predicate registers: things that can be used for conditional execution
-// in instructions: A0-2, B0-2. Also contains AlwaysExPred, a symbolic register
-// to represent cases where we always execute. Must never be allocated for
-// general purpose
+// in instructions: A0-2, B0-2.
 def PredRegs : RegisterClass<"TMS320C64X", [i32], 32,
-	[ A0, A1, A2, B0, B1, B2, AlwaysExPred ]>
+	[ A0, A1, A2, B0, B1, B2 ]>
 {
 let MethodProtos = [{
 	iterator allocation_order_begin(const MachineFunction &MF) const;
@@ -102,8 +98,7 @@ let MethodBodies = [{
 	PredRegsClass::iterator
 	PredRegsClass::allocation_order_end(const MachineFunction &MF)
 									const {
-		/* Don't allow AlwaysExPred to be allocated */
-		return end()-1;
+		return end();
 	}
 }];
 }

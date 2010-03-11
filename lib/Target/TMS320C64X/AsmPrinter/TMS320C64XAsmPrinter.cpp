@@ -190,7 +190,8 @@ TMS320C64XAsmPrinter::print_predicate(const MachineInstr *MI)
 	nz = MI->getOperand(pred_idx).getImm();
 	reg = MI->getOperand(pred_idx+1).getReg();
 
-	if (reg == TMS320C64X::AlwaysExPred) {
+	if (nz == -1) {
+		// This isn't a predicate
 		O << "\t";
 		return false;
 	}

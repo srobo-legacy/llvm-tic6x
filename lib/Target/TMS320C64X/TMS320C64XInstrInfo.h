@@ -63,7 +63,7 @@ public:
 inline const MachineInstrBuilder &addDefaultPred(const MachineInstrBuilder &MIB)
 {
 
-        return MIB.addImm(0).addReg(TMS320C64X::AlwaysExPred);
+        return MIB.addImm(-1).addReg(TMS320C64X::NoRegister);
 }
 
 } // llvm
