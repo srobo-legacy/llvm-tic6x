@@ -10,6 +10,7 @@
 
 #include "TMS320C64X.h"
 #include "TMS320C64XInstrInfo.h"
+#include "TMS320C64XRegisterInfo.h"
 #include "TMS320C64XTargetMachine.h"
 #include "llvm/Constants.h"
 #include "llvm/DerivedTypes.h"
@@ -126,10 +127,32 @@ TMS320C64XAsmPrinter::printUnitOperand(const MachineInstr *MI, int op_num)
 
 	t = 0;
 	if (desc.TSFlags & TMS320C64XII::is_memaccess) {
-		if (desc.TSFlags & TMS320C64XII::is_mem_unit_2) {
+		unsigned reg;
+		if (desc.TSFlags & TMS320C64XII::is_store) {
+			const MachineOperand MO = MI->getOperand(2);
+			assert(MO.isReg() && "src/dst of memory access is not "
+						"a register");
+			reg = MO.getReg();
+		} else {
+			const MachineOperand MO = MI->getOperand(0);
+			assert(MO.isReg() && "src/dst of memory access is not "
+						"a register");
+			reg = MO.getReg();
+		}
+
+		TargetRegisterClass::iterator i =
+		TMS320C64X::ARegsRegisterClass->allocation_order_begin(*MF);
+		while(i != TMS320C64X::ARegsRegisterClass->allocation_order_end(*MF)) {
+			if ((*i) == reg)
+				break;
+			i++;
+		}
+
+		if (i == TMS320C64X::ARegsRegisterClass->allocation_order_end(*MF)) {
+			// We got to the end, it's not in A, must be B
 			t = '2';
 		} else {
-			t = '1';
+			t = 1;
 		}
 	}
 

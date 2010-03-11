@@ -30,7 +30,7 @@ namespace TMS320C64XII {
 		unit_1 = 0,
 		unit_2 = 4, // Flag bit
 		is_memaccess = 0x40,
-		is_mem_unit_2 = 0x80
+		is_store = 0x80
 	};
 #define GET_UNIT(x) ((x) & 3)
 #define GET_SIDE(x) ((x) & 4)
