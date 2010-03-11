@@ -300,6 +300,17 @@ TMS320C64XAsmPrinter::printMemOperand(const MachineInstr *MI, int op_num,
 					const char *Modifier)
 {
 
+	if (MI->getDesc().getOpcode() == TMS320C64X::lea_fail) {
+		// I can't find a reasonable way to bounce a memory addr
+		// calculation into normal operands (1 -> 2), so hack
+		// this instead
+		printOperand(MI, op_num);
+		O << ",";
+		O << '\t';
+		printOperand(MI, op_num+1);
+		return;
+	}
+
 	O << "*";
 	printOperand(MI, op_num);
 
