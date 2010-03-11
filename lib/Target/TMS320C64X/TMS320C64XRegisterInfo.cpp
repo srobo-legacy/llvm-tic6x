@@ -92,6 +92,13 @@ TMS320C64XRegisterInfo::hasFP(const MachineFunction &MF) const
 	llvm_unreachable_internal("Unimplemented function hasFP\n");
 }
 
+bool
+TMS320C64XRegisterInfo::requiresRegisterScavenging(const MachineFunction &MF) const
+{
+
+	return true;
+}
+
 void
 TMS320C64XRegisterInfo::eliminateFrameIndex(
 	MachineBasicBlock::iterator I, int SPAdj, RegScavenger *r) const

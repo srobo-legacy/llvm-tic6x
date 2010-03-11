@@ -37,6 +37,7 @@ public:
 	BitVector getReservedRegs(const MachineFunction &MF) const;
 	unsigned int getSubReg(unsigned int, unsigned int) const;
 	bool hasFP(const MachineFunction &MF) const;
+	bool requiresRegisterScavenging(const MachineFunction &MF) const;
 	void eliminateFrameIndex(MachineBasicBlock::iterator I, int SPAdj,
 					RegScavenger *r) const;
 	void emitPrologue(MachineFunction &MF) const;
