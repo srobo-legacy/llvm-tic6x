@@ -89,7 +89,15 @@ bool
 TMS320C64XRegisterInfo::hasFP(const MachineFunction &MF) const
 {
 
-	llvm_unreachable_internal("Unimplemented function hasFP\n");
+	// Guidelines say that we should only return true if the function
+	// has any variable sized arrays that get allocated on the stack,
+	// so that anything else can be calculated relative to the stack
+	// pointer. This is all fine, and would optimised a lot of things
+	// seeing how then we wouldn't need to load stack offsets to a register
+	// each time (they'd be positive).
+	// However this means extra work and testing, so it's room for expansion
+	// and optimisation in the future.
+	return true;
 }
 
 bool
