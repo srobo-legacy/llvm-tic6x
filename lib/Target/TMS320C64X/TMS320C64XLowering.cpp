@@ -133,6 +133,11 @@ TMS320C64XLowering::LowerFormalArguments(SDValue Chain,
 			*DAG.getContext());
 	CCInfo.AnalyzeFormalArguments(Ins, CC_TMS320C64X);
 
+	// FP and SP can't be allocated, so shouldn't need to be marked as
+	// being live in; return address does
+	MF.addLiveIn(TMS320C64X::B3, &TMS320C64X::GPRegsRegClass);
+
+	// Also arguments, which is what this is all about
 	for (i = 0; i < ArgLocs.size(); ++i) {
 		CCValAssign &VA = ArgLocs[i];
 		EVT ObjectVT = VA.getValVT();
