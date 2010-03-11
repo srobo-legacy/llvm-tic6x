@@ -96,7 +96,7 @@ TMS320C64XAsmPrinter::runOnMachineFunction(MachineFunction &MF)
 void
 TMS320C64XAsmPrinter::printUnitOperand(const MachineInstr *MI, int op_num)
 {
-	char n, u, t;
+	char n, u, t, j;
 	const TargetInstrDesc desc = MI->getDesc();
 
 	// For /all/ instructions, print unit and side specifier - at some
@@ -142,17 +142,18 @@ TMS320C64XAsmPrinter::printUnitOperand(const MachineInstr *MI, int op_num)
 
 		TargetRegisterClass::iterator i =
 		TMS320C64X::ARegsRegisterClass->allocation_order_begin(*MF);
-		while(i != TMS320C64X::ARegsRegisterClass->allocation_order_end(*MF)) {
-			if ((*i) == reg)
+		t = '2';
+		// Hackity: don't use allocation_order_end, because it won't
+		// match instructions that use reserved registers, and they'll
+		// incorrectly get marked as being on the other data path side.
+		// So instead, we know that there's 32 of them in the A reg
+		// class, just loop through all of them
+		for (j = 0; j < 32; j++) {
+			if ((*i) == reg) {
+				t = '1';
 				break;
+			}
 			i++;
-		}
-
-		if (i == TMS320C64X::ARegsRegisterClass->allocation_order_end(*MF)) {
-			// We got to the end, it's not in A, must be B
-			t = '2';
-		} else {
-			t = 1;
 		}
 	}
 
