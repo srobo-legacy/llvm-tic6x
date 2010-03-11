@@ -154,7 +154,7 @@ TMS320C64XRegisterInfo::emitPrologue(MachineFunction &MF) const
 		.addReg(TMS320C64X::A0, RegState::Define).addImm(-4));
 	addDefaultPred(BuildMI(MBB, MBBI, dl,
 		TII.get(TMS320C64X::word_idx_store2))
-		.addReg(TMS320C64X::B15).addReg(TMS320C64X::A0)
+		.addReg(TMS320C64X::B15).addReg(TMS320C64X::A0, RegState::Undef)
 		.addReg(TMS320C64X::A15));
 
 	// Setup our own FP using the current SP
@@ -176,12 +176,13 @@ TMS320C64XRegisterInfo::emitPrologue(MachineFunction &MF) const
 			.addImm(frame_size));
 		addDefaultPred(BuildMI(MBB, MBBI, dl,
 			TII.get(TMS320C64X::mvkh_p))
-			.addReg(TMS320C64X::A0, RegState::Define)
+			.addReg(TMS320C64X::A0)
 			.addImm(frame_size).addReg(TMS320C64X::A0));
 	}
 
 	addDefaultPred(BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::sub_p_rr),
-		TMS320C64X::B15).addReg(TMS320C64X::B15).addReg(TMS320C64X::A0));
+		TMS320C64X::B15).addReg(TMS320C64X::B15)
+		.addReg(TMS320C64X::A0, RegState::Undef));
 }
 
 void
@@ -208,7 +209,7 @@ TMS320C64XRegisterInfo::emitEpilogue(MachineFunction &MF,
 	addDefaultPred(BuildMI(MBB, MBBI, DL,
 		TII.get(TMS320C64X::word_idx_load2))
 		.addReg(TMS320C64X::A15).addReg(TMS320C64X::B15)
-		.addReg(TMS320C64X::A0));
+		.addReg(TMS320C64X::A0, RegState::Undef));
 	addDefaultPred(BuildMI(MBB, MBBI, DL,
 		TII.get(TMS320C64X::word_idx_load2))
 		.addReg(TMS320C64X::B3).addReg(TMS320C64X::B15).addImm(0));
