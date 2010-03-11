@@ -17,6 +17,7 @@
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
+#include "llvm/CodeGen/RegisterScavenging.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
 
@@ -109,12 +110,14 @@ TMS320C64XRegisterInfo::requiresRegisterScavenging(const MachineFunction &MF) co
 
 void
 TMS320C64XRegisterInfo::eliminateFrameIndex(
-	MachineBasicBlock::iterator I, int SPAdj, RegScavenger *r) const
+	MachineBasicBlock::iterator MBBI, int SPAdj, RegScavenger *r) const
 {
-	unsigned i, frame_index, offs;
+	unsigned i, frame_index, offs, reg;
 
-	MachineInstr &MI = *I;
+	MachineInstr &MI = *MBBI;
 	MachineFunction &MF = *MI.getParent()->getParent();
+	MachineBasicBlock &MBB = *MI.getParent();
+	DebugLoc dl = DebugLoc::getUnknownLoc();
 	i = 0;
 
 	while (!MI.getOperand(i).isFI())
@@ -124,7 +127,26 @@ TMS320C64XRegisterInfo::eliminateFrameIndex(
 	frame_index = MI.getOperand(i).getIndex();
 	offs = MF.getFrameInfo()->getObjectOffset(frame_index);
 
-	MI.getOperand(i).ChangeToImmediate(offs);
+	// Clarinet eye-strike: load and store instructions don't happen to
+	// allow for negative immediates / offsets. So, we need to load the
+	// offset itself into a register.
+
+	const TargetInstrDesc tid = MI.getDesc();
+	if (tid.TSFlags & TMS320C64XII::unit_2)
+		reg = r->FindUnusedReg(TMS320C64X::BRegsRegisterClass);
+	else
+		reg = r->FindUnusedReg(TMS320C64X::ARegsRegisterClass);
+
+	if (reg == 0) {
+		llvm_unreachable("bees");
+	}
+
+	// XXX - will explode when stack offset is > 2^15, but assembler will
+	// start complaining when that occurs
+	addDefaultPred(BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::mvk_p))
+		.addReg(reg, RegState::Define).addImm(offs));
+
+	MI.getOperand(i).ChangeToRegister(reg, false, false, true);
 }
 
 void
