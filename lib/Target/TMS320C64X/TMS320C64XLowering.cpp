@@ -142,7 +142,11 @@ TMS320C64XLowering::LowerFormalArguments(SDValue Chain,
 	// that is never defined but used as an operand. So, the fake register
 	// we use for an operand to the default always-execute predicate has
 	// to be defined from the start
-	MF.addLiveIn(TMS320C64X::FakeReg, &TMS320C64X::GPRegsRegClass);
+	// Better, that has to happen to all basic blocks (liveins don't live
+	// across basic blocks
+	for (MachineFunction::iterator I = MF.begin(); I != MF.end(); ++I) {
+		(*I).addLiveIn(TMS320C64X::FakeReg);
+	}
 
 	// Also arguments, which is what this is all about
 	for (i = 0; i < ArgLocs.size(); ++i) {
