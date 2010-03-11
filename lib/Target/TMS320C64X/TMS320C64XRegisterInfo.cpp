@@ -151,7 +151,7 @@ TMS320C64XRegisterInfo::emitPrologue(MachineFunction &MF) const
 
 	// Store FP
 	addDefaultPred(BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::mvk_p))
-		.addReg(TMS320C64X::A0).addImm(-4));
+		.addReg(TMS320C64X::A0, RegState::Define).addImm(-4));
 	addDefaultPred(BuildMI(MBB, MBBI, dl,
 		TII.get(TMS320C64X::word_idx_store2))
 		.addReg(TMS320C64X::B15).addReg(TMS320C64X::A0)
@@ -166,16 +166,18 @@ TMS320C64XRegisterInfo::emitPrologue(MachineFunction &MF) const
 	// constant into volatile register.  XXX - doesn't appear to be a way
 	// of generating a constant node from this position
 	if (frame_size < 0x8000) {
-		addDefaultPred(BuildMI(MBB, MBBI, dl,
-					TII.get(TMS320C64X::mvk_p),
-					TMS320C64X::A0) .addImm(frame_size));
+		addDefaultPred(BuildMI(MBB, MBBI, dl,TII.get(TMS320C64X::mvk_p))
+			.addReg(TMS320C64X::A0, RegState::Define)
+			.addImm(frame_size));
 	} else {
 		addDefaultPred(BuildMI(MBB, MBBI, dl,
-				TII.get(TMS320C64X::mvkl_p),
-				TMS320C64X::A0).addImm(frame_size));
+			TII.get(TMS320C64X::mvkl_p))
+			.addReg(TMS320C64X::A0, RegState::Define)
+			.addImm(frame_size));
 		addDefaultPred(BuildMI(MBB, MBBI, dl,
-				TII.get(TMS320C64X::mvkh_p), TMS320C64X::A0)
-				.addImm(frame_size).addReg(TMS320C64X::A0));
+			TII.get(TMS320C64X::mvkh_p))
+			.addReg(TMS320C64X::A0, RegState::Define)
+			.addImm(frame_size).addReg(TMS320C64X::A0));
 	}
 
 	addDefaultPred(BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::sub_p_rr),
@@ -202,7 +204,7 @@ TMS320C64XRegisterInfo::emitEpilogue(MachineFunction &MF,
 		TII.get(TMS320C64X::mv))
 		.addReg(TMS320C64X::B15).addReg(TMS320C64X::A15));
 	addDefaultPred(BuildMI(MBB, MBBI, DL, TII.get(TMS320C64X::mvk_p))
-		.addReg(TMS320C64X::A0).addImm(-4));
+		.addReg(TMS320C64X::A0, RegState::Define).addImm(-4));
 	addDefaultPred(BuildMI(MBB, MBBI, DL,
 		TII.get(TMS320C64X::word_idx_load2))
 		.addReg(TMS320C64X::A15).addReg(TMS320C64X::B15)
