@@ -72,32 +72,28 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 
 	if (N.getOperand(0).getOpcode() == ISD::Register &&
 		N.getOperand(1).getOpcode() == ISD::Constant) {
-		if ((N.getOpcode() == ISD::ADD || N.getOpcode() == ISD::SUB)) {
-			if ((Predicate_sconst5(N.getOperand(1).getNode()) &&
-				Predicate_sconst5(N.getOperand(1).getNode())) ||
-			(Predicate_uconst15(N.getOperand(1).getNode()) &&
-				Predicate_uconst15(N.getOperand(1).getNode()))) {
+		if (N.getOpcode() == ISD::ADD &&
+				(Predicate_uconst5(N.getOperand(1).getNode()) ||
+				Predicate_uconst15(N.getOperand(1).getNode()))){
+			// This is valid, we can just print it
+			base = N.getOperand(0);
+			offs = N.getOperand(1);
+			return true;
+		} else if (N.getOpcode() == ISD::ADD ||
+						N.getOpcode() == ISD::SUB) {
+			// Too big - load into register
+			base = N.getOperand(0);
 
-				base = N.getOperand(0);
-				offs = N.getOperand(1);
-				return true;
-			} else {
-				// Too big - load into register
-				// XXX - how to do that?
-				base = N.getOperand(0);
-
-				DebugLoc dl = DebugLoc::getUnknownLoc();
-				MachineFunction &MF =
-						CurDAG->getMachineFunction();
-				MachineRegisterInfo &MR = MF.getRegInfo();
-				unsigned reg = MR.createVirtualRegister(
-						&TMS320C64X::GPRegsRegClass);
-				// XXX - damned if I know what chain is supposed
-				// to be in this situation
-				offs = CurDAG->getCopyToReg(N.getOperand(1),
-						dl, reg, N.getOperand(1));
-				return true;
-			}
+			DebugLoc dl = DebugLoc::getUnknownLoc();
+			MachineFunction &MF = CurDAG->getMachineFunction();
+			MachineRegisterInfo &MR = MF.getRegInfo();
+			unsigned reg = MR.createVirtualRegister(
+					&TMS320C64X::GPRegsRegClass);
+			// XXX - damned if I know what chain is supposed
+			// to be in this situation
+			offs = CurDAG->getCopyToReg(N.getOperand(1),
+					dl, reg, N.getOperand(1));
+			return true;
 		} else {
 			return false;
 		}
