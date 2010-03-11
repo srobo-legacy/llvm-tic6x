@@ -132,13 +132,19 @@ TMS320C64XRegisterInfo::eliminateFrameIndex(
 	// offset itself into a register.
 
 	const TargetInstrDesc tid = MI.getDesc();
+	const TargetRegisterClass *c;
 	if (tid.TSFlags & TMS320C64XII::unit_2)
-		reg = r->FindUnusedReg(TMS320C64X::BRegsRegisterClass);
+		c = TMS320C64X::BRegsRegisterClass;
 	else
-		reg = r->FindUnusedReg(TMS320C64X::ARegsRegisterClass);
+		c = TMS320C64X::ARegsRegisterClass;
+
+	reg = r->FindUnusedReg(c);
 
 	if (reg == 0) {
-		llvm_unreachable("bees");
+		// XXX - this kicks a register out and lets us use it but...
+		// that'll lead to a store, to a stack slot, which will mean
+		// this method is called again. Explosions?
+		reg = r->scavengeRegister(c, MBBI, 0);
 	}
 
 	// XXX - will explode when stack offset is > 2^15, but assembler will
