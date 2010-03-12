@@ -133,10 +133,6 @@ TMS320C64XLowering::LowerFormalArguments(SDValue Chain,
 			*DAG.getContext());
 	CCInfo.AnalyzeFormalArguments(Ins, CC_TMS320C64X);
 
-	// FP and SP can't be allocated, so shouldn't need to be marked as
-	// being live in; return address does
-	MF.addLiveIn(TMS320C64X::B3, &TMS320C64X::GPRegsRegClass);
-
 	// We have to initialise default predicate with a register, but as
 	// well as this the register allocator will vomit all over a register
 	// that is never defined but used as an operand. So, the fake register
