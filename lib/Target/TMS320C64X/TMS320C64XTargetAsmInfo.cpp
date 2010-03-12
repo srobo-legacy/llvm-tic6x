@@ -18,4 +18,6 @@ TMS320C64XTargetAsmInfo::TMS320C64XTargetAsmInfo(const Target &T,
 	Data64bitsDirective = "\t.bees\t";
 	ZeroDirective = "\t.zero\t";
 	CommentString = ";";
+
+	AlignmentIsInBytes = false;
 }
