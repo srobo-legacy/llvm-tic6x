@@ -46,8 +46,8 @@ TMS320C64XInstrInfo::copyRegToReg(MachineBasicBlock &MBB,
 		insn = TMS320C64X::mv1;
 
 
-	addDefaultPred(BuildMI(MBB, I, DL, get(insn), dst_reg)
-						.addReg(src_reg));
+	addDefaultPred(BuildMI(MBB, I, DL, get(insn))
+			.addReg(dst_reg, RegState::Define).addReg(src_reg));
 	return true;
 }
 
