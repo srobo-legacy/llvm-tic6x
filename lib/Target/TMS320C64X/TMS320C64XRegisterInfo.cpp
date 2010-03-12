@@ -175,7 +175,8 @@ TMS320C64XRegisterInfo::emitPrologue(MachineFunction &MF) const
 	// enough to do that yet
 	addDefaultPred(BuildMI(MBB, MBBI, dl,
 		TII.get(TMS320C64X::word_idx_store2))
-		.addReg(TMS320C64X::B15).addImm(0).addReg(TMS320C64X::B3));
+		.addReg(TMS320C64X::B15).addImm(0)
+		.addReg(TMS320C64X::B3, RegState::Kill));
 
 	// Store FP
 	addDefaultPred(BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::mvk_p))
