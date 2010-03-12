@@ -66,6 +66,32 @@ inline const MachineInstrBuilder &addDefaultPred(const MachineInstrBuilder &MIB)
         return MIB.addImm(-1).addReg(TMS320C64X::NoRegister);
 }
 
+inline const TargetRegisterClass *
+findRegisterSide(unsigned reg, const MachineFunction *MF)
+{       
+        int j;
+        TargetRegisterClass *c;
+
+        TargetRegisterClass::iterator i =
+                TMS320C64X::ARegsRegisterClass->allocation_order_begin(*MF);
+        c = TMS320C64X::BRegsRegisterClass;
+        // Hackity: don't use allocation_order_end, because it won't
+        // match instructions that use reserved registers, and they'll
+        // incorrectly get marked as being on the other data path side.
+        // So instead, we know that there's 32 of them in the A reg
+        // class, just loop through all of them
+        for (j = 0; j < 32; j++) {
+                if ((*i) == reg) {
+                        c = TMS320C64X::ARegsRegisterClass;
+                        break;
+                }
+                i++;
+        }
+
+        return c;
+}
+
+
 } // llvm
 
 #endif // LLVM_TARGET_TMS320C64X_INSTRINFO_H
