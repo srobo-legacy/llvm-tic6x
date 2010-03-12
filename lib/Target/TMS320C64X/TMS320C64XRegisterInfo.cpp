@@ -166,6 +166,12 @@ TMS320C64XRegisterInfo::emitPrologue(MachineFunction &MF) const
 	DebugLoc dl = (MBBI != MBB.end() ? MBBI->getDebugLoc()
 				: DebugLoc::getUnknownLoc());
 
+	// Mark return address as being a live in - don't mark it as such for
+	// the whole function, because we want to save it manually. Otherwise
+	// extra code will be generated to store it elsewhere.
+	// Ideally we don't need to save manually, but I call this easier
+	// to debug.
+	MBB.addLiveIn(TMS320C64X::B3);
 	frame_size = MFI->getStackSize();
 	frame_size += 8;
 
