@@ -13,9 +13,9 @@ using namespace llvm;
 
 TMS320C64XTargetAsmInfo::TMS320C64XTargetAsmInfo(const Target &T,
 						const StringRef &TT) {
-  Data16bitsDirective = "\t.hword\t";
-  Data32bitsDirective = "\t.word\t";
-  Data64bitsDirective = "\t.bees\t"; //There's a 64 bit directive, dunno what
-  ZeroDirective = "\t.zero\t";
-  CommentString = ";";
+	Data16bitsDirective = "\t.hword\t";
+	Data32bitsDirective = "\t.word\t";
+	Data64bitsDirective = "\t.bees\t";
+	ZeroDirective = "\t.zero\t";
+	CommentString = ";";
 }
