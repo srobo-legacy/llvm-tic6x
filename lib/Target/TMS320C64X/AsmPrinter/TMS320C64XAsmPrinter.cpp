@@ -26,6 +26,7 @@
 #include "llvm/Target/TargetRegistry.h"
 #include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/Mangler.h"
+#include "llvm/Support/MathExtras.h"
 using namespace llvm;
 
 namespace llvm {
@@ -265,6 +266,10 @@ TMS320C64XAsmPrinter::PrintGlobalVariable(const GlobalVariable *GVar)
 	}
 
 	// Insert here - linkage foo. Requires: understanding linkage foo.
+
+	// Alignment gets generated in byte form, however we need to emit it
+	// in gas' bit form.
+	align = Log2_32(align);
 
 	EmitAlignment(align, GVar);
 
