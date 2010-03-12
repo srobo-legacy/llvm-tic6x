@@ -187,7 +187,7 @@ TMS320C64XRegisterInfo::emitPrologue(MachineFunction &MF) const
 
 	// Setup our own FP using the current SP
 	addDefaultPred(BuildMI(MBB, MBBI, dl,
-		TII.get(TMS320C64X::mv))
+		TII.get(TMS320C64X::mv1))
 		.addReg(TMS320C64X::A15).addReg(TMS320C64X::B15));
 
 	// On the assumption the stack size will be sizeable, load
@@ -230,7 +230,7 @@ TMS320C64XRegisterInfo::emitEpilogue(MachineFunction &MF,
 	// To finish, nuke stack frame, restore FP, ret addr
 
 	addDefaultPred(BuildMI(MBB, MBBI, DL,
-		TII.get(TMS320C64X::mv))
+		TII.get(TMS320C64X::mv2))
 		.addReg(TMS320C64X::B15).addReg(TMS320C64X::A15));
 	addDefaultPred(BuildMI(MBB, MBBI, DL, TII.get(TMS320C64X::mvk_p))
 		.addReg(TMS320C64X::A0, RegState::Define).addImm(-4));
