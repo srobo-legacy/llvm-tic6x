@@ -35,18 +35,10 @@ TMS320C64XInstrInfo::copyRegToReg(MachineBasicBlock &MBB,
 				const TargetRegisterClass *dst_class,
 				const TargetRegisterClass *src_class) const
 {
-	int insn;
 
 	DebugLoc DL = DebugLoc::getUnknownLoc();
 
-	if (findRegisterSide(dst_reg, MBB.getParent())
-					== TMS320C64X::BRegsRegisterClass)
-		insn = TMS320C64X::mv2;
-	else
-		insn = TMS320C64X::mv1;
-
-
-	addDefaultPred(BuildMI(MBB, I, DL, get(insn))
+	addDefaultPred(BuildMI(MBB, I, DL, get(TMS320C64X::mv))
 			.addReg(dst_reg, RegState::Define).addReg(src_reg));
 	return true;
 }
