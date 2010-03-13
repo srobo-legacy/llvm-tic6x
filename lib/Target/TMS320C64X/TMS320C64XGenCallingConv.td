@@ -10,7 +10,9 @@
 def RetCC_TMS320C64X : CallingConv<[
 	// XXX - returning structs is a black arg
 	CCIfType<[i8,i16], CCPromoteToType<i32>>,
-	CCIfType<[i32], CCAssignToReg<[A4]>>
+	// XXX - for 64 bit returns I assume we use the A4/A5 pair.. uh..
+	// need to actually check this in spec though
+	CCIfType<[i32], CCAssignToReg<[A4,A5]>>
 ]>;
 
 def CC_TMS320C64X : CallingConv<[
