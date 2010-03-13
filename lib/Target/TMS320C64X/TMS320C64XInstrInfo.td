@@ -127,6 +127,21 @@ defm sub_d : inst_rr<"sub", unit_d, sub, 0>;
 defm sub_d : inst_ri<"sub", (i32 uconst5:$imm), unit_d, sub, 0>;
 defm sub_d : inst_xr<"sub", unit_d, sub, 0>;
 
+
+// Multiplies - there are a million and one of them, so we'll just be using
+// mpy32. It might be possible to apply various constraints to the size of
+// operands so that we can use 16 bit multiplies, but there's no chance of
+// being able to account for different positions in registers.
+
+// NB: mpy32 is c64x+ only
+
+def mpy32_p : pseudo_rr<"mpy32", unit_m, mul, 0>;
+
+defm mpy32 : inst_rr<"mpy32", unit_m, mul, 0>;
+defm mpy32 : inst_rx<"mpy32", unit_m, mul, 0>;
+defm mpy32 : inst_xr<"mpy32", unit_m, mul, 0>;
+
+
 // Loading consts: almost always as halfwords. Put our own bodges on top
 // of these instruction definitions - we want the simple specifications for
 // pseudo and real instructions, but also to eliminate the register operand.
