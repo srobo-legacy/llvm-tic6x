@@ -275,6 +275,15 @@ def callp_1 : inst<(outs), (ins calltarget:$dst), "callp\t$s\t$dst",
 		[(TMS320C64Xcall tglobaladdr:$dst)], 0, unit_s>;
 def callp_2 : inst<(outs), (ins calltarget:$dst), "callp\t$s\t$dst",
 		[(TMS320C64Xcall tglobaladdr:$dst)], 1, unit_s>;
+
+def callp_e_p : inst<(outs), (ins calltarget:$dst), "callp\t$s\t$dst",
+			[(TMS320C64Xcall texternalsym:$dst)], 0, unit_s> {
+	let Pattern = sched_pattern;
+}
+def callp_e_1 : inst<(outs), (ins calltarget:$dst), "callp\t$s\t$dst",
+		[(TMS320C64Xcall texternalsym:$dst)], 0, unit_s>;
+def callp_e_2 : inst<(outs), (ins calltarget:$dst), "callp\t$s\t$dst",
+		[(TMS320C64Xcall texternalsym:$dst)], 1, unit_s>;
 }
 
 // NB: branch-to-register can only work on unit S2
