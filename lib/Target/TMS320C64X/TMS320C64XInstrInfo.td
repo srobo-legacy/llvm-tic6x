@@ -254,6 +254,7 @@ defm cmpltu : inst_xi<"cmpltu", (i32 uconst4:$imm), unit_l, cmpltu_node, 1>;
 
 // Branch / call instructions
 
+let isBranch = 1 in {
 def branch_p : inst<(outs), (ins brtarget:$block), "b\t$s\t$block",
 				[(br bb:$block)], 0, unit_s> {
 	let Pattern = sched_pattern;
@@ -274,6 +275,8 @@ def brcond_1 : inst<(outs), (ins), "b\t$s\t$block",
 def brcond_2 : inst<(outs), (ins), "b\t$s\t$block",
 		[(brcond_node bb:$block, predwrapper:$bees)], 1, unit_s>;
 }
+
+} // isBranch
 
 // XXX XXX XXX: callp is a c64x+ instruction, which the assembler is unlikely
 // to swallow right now. How does TI do branches-with-return-addr on c64x?
