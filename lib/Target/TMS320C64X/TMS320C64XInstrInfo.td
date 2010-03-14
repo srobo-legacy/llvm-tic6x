@@ -60,6 +60,8 @@ def mv1 : inst<(outs GPRegs:$out), (ins GPRegs:$in), "mv\t$s\t$in,\t$out", [],
 def mv2 : inst<(outs GPRegs:$out), (ins GPRegs:$in), "mv\t$s\t$in,\t$out", [],
 							1, unit_s>;
 
+def noop : inst<(outs), (ins i32imm:$cycles), "nop\t$s\t$cycles", [], 0,unit_s>;
+
 
 // Shifts and rotates
 
