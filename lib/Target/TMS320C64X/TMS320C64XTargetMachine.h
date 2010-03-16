@@ -48,6 +48,9 @@ public:
 		const { return const_cast<TMS320C64XLowering*>(&TLInfo); }
 	virtual bool addInstSelector(PassManagerBase &PM,
 					CodeGenOpt::Level OptLevel);
+
+	virtual bool getEnableTailMergeDefault() const { return false; }
+		// Don't wish to overcomplicate things right now
 };
 
 } // namespace llvm
