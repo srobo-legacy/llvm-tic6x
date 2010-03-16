@@ -71,11 +71,12 @@ TMS320C64XInstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
 		MachineBasicBlock *&TBB, MachineBasicBlock *&FBB,
 		SmallVectorImpl<MachineOperand> &Cond, bool AllowModify) const
 {
-	bool predicated, found_cond_branch;
+	bool predicated, found_cond_branch, saw_uncond_branch;
 	int pred_idx, opcode;
 	MachineBasicBlock::iterator I = MBB.end();
 
 	found_cond_branch = false;
+	saw_uncond_branch = false;
 
 	while (I != MBB.begin()) {
 		--I;
@@ -105,6 +106,7 @@ TMS320C64XInstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
 				return 1;
 			}
 
+			saw_uncond_branch = true;
 			TBB = I->getOperand(0).getMBB();
 
 			if (!AllowModify)
@@ -174,7 +176,12 @@ TMS320C64XInstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
 		if (opcode == TMS320C64X::noop)
 			continue;
 
-		return true; // Something we don't understand
+		if (saw_uncond_branch)
+			// We already saw an unconditional branch, then
+			// something we didn't quite understand
+			return false;
+
+		return true; // Something we don't understand at all
 	}
 
 	if (found_cond_branch)
