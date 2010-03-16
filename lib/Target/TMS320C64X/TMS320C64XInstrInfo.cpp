@@ -65,3 +65,121 @@ TMS320C64XInstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
 		.addReg(dst_reg, RegState::Define)
 		.addReg(TMS320C64X::A15).addFrameIndex(frame_idx));
 }
+
+bool
+TMS320C64XInstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
+		MachineBasicBlock *&TBB, MachineBasicBlock *&FBB,
+		SmallVectorImpl<MachineOperand> &Cond, bool AllowModify) const
+{
+	bool predicated, found_cond_branch;
+	int pred_idx, opcode;
+	MachineBasicBlock::iterator I = MBB.end();
+
+	found_cond_branch = false;
+
+	while (I != MBB.begin()) {
+		--I;
+
+		pred_idx = I->findFirstPredOperandIdx();
+		if (pred_idx == -1) {
+			predicated = false;
+		} else if (I->getOperand(pred_idx).getImm() != -1) {
+			predicated = true;
+		} else {
+			predicated = false;
+		}
+
+		opcode = I->getOpcode();
+
+		if (!predicated && (opcode == TMS320C64X::branch_p ||
+					opcode == TMS320C64X::branch_1 ||
+					opcode == TMS320C64X::branch_2)) {
+			// We're an unconditional branch. The analysis rules
+			// say that we should carry on looking, in case there's
+			// a conditional branch beforehand.
+
+			// If there was already a conditional branch, freak out
+			if (found_cond_branch) {
+				TBB = NULL;
+				FBB = NULL;
+				return 1;
+			}
+
+			TBB = I->getOperand(0).getMBB();
+
+			if (!AllowModify)
+				// Nothing to be done
+				continue;
+
+			// According to what X86 does, we can delete branches
+			// if they branch to the immediately following BB
+
+			if (MBB.isLayoutSuccessor(I->getOperand(0).getMBB())) {
+				TBB = NULL;
+				// FIXME - and what about trailing noops?
+				I->eraseFromParent();
+				I = MBB.end();
+				continue;
+			}
+
+			continue;
+		}
+
+		// If we're a predicated instruction and terminate the BB,
+		// we can be pretty sure we're a conditional branch
+		if (predicated && (opcode == TMS320C64X::brcond_p ||
+					opcode == TMS320C64X::brcond_1 ||
+					opcode == TMS320C64X::brcond_2)) {
+			// Two different conditions to consider - this is the
+			// only branch, in which case we fall through to the
+			// next, or it's a conditional before unconditional.
+
+			if (TBB != NULL) { // unconditional was seen
+				FBB = I->getOperand(0).getMBB();
+			} else {
+				TBB = I->getOperand(0).getMBB();
+			}
+
+			// Only other thing we need to do is work out the
+			// conditional situation - go looking for condition
+			// instructions.
+			found_cond_branch = true;
+			continue;	
+		}
+
+		if (found_cond_branch) {
+			// Look for condition instruction... there are a _lot_
+			// of them, so we shall revert to something unpleasent
+			if (!strncmp(I->getDesc().getName(), "cmp", 3)) {
+				// It appears the stuff we put in the Cond
+				// list is pretty ad-hoc and machdep - so
+				// I'm just going to bung the instruction
+				// opcode and its operands in
+
+				Cond.push_back(
+					MachineOperand::CreateImm(opcode));
+				// FIXME - need to duplicate operands?
+				Cond.push_back(I->getOperand(1));
+				Cond.push_back(I->getOperand(2));
+				found_cond_branch = false;
+				break;
+			} else {
+				continue;
+			}
+		}
+
+		// Out of branches and conditional branches, only other thing
+		// we expect to see is a trailing noop
+
+		if (opcode == TMS320C64X::noop)
+			continue;
+
+		return true; // Something we don't understand
+	}
+
+	if (found_cond_branch)
+		// We must have got lost looking for it
+		return true;
+
+	return false;
+}
