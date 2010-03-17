@@ -212,5 +212,10 @@ def CompilationGraph : CompilationGraph<[
                          (input_languages_contain "objective-c++")),
                      (inc_weight),
                      (or (parameter_equals "linker", "g++"),
-                         (parameter_equals "linker", "c++")), (inc_weight))>
+                         (parameter_equals "linker", "c++")), (inc_weight))>,
+
+    OptionalEdge<"llc", "llvm_host_assembler",
+		(case (switch_on "hosttools"), (inc_weight))>,
+    Edge<"llvm_host_assembler", "llvm_host_linker">,
+    Edge<"root", "llvm_host_linker">
     ]>;
