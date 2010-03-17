@@ -30,6 +30,8 @@ def OptList : OptionList<[
     (help "Compile and assemble, but do not link")),
  (switch_option "pthread",
     (help "Enable threads")),
+ (switch_option "hosttools",
+    (help "Use host assembler and linker, prefixed with $CROSS_COMPILE")),
  (parameter_option "linker",
     (help "Choose linker (possible values: gcc, g++)")),
  (parameter_list_option "include",
