@@ -140,6 +140,18 @@ def llvm_gcc_linker : llvm_gcc_based_linker<"@LLVMGCCCOMMAND@">;
 // Alternative linker for C++
 def llvm_gcc_cpp_linker : llvm_gcc_based_linker<"@LLVMGXXCOMMAND@">;
 
+def llvm_host_assembler : Tool<
+[(in_language "assembler"),
+ (out_language "object-code"),
+ (output_suffix "o"),
+ (cmd_line "$ENV(CROSS_COMPILE)as $INFILE -o $OUTFILE"),
+ (actions (case
+          (switch_on "c"), (stop_compilation),
+          (not_empty "Wa,"), (unpack_values "Wa,")))
+]>;
+
+def llvm_host_linker : llvm_gcc_based_linker<"$ENV(CROSS_COMPILE)ld">;
+
 // Language map
 
 def LanguageMap : LanguageMap<
