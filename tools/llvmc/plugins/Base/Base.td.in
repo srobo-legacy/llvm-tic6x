@@ -38,6 +38,8 @@ def OptList : OptionList<[
     (help "Include the named file prior to preprocessing")),
  (prefix_list_option "I",
     (help "Add a directory to include path")),
+ (prefix_list_option "isystem",
+    (help "Add a directory to include path")),
  (prefix_list_option "Wa,",
     (help "Pass options to assembler")),
  (prefix_list_option "Wllc,",
@@ -78,7 +80,8 @@ class llvm_gcc_based <string cmd_prefix, string in_lang, string E_ext> : Tool<
          (and (switch_on "emit-llvm"), (switch_on "c")), (stop_compilation),
          (switch_on "fsyntax-only"), (stop_compilation),
          (not_empty "include"), (forward "include"),
-         (not_empty "I"), (forward "I"))),
+         (not_empty "I"), (forward "I"),
+	 (not_empty "isystem"), (forward "isystem"))),
  (sink)
 ]>;
 
