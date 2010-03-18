@@ -5,7 +5,6 @@
 // This file Copyright Jeremy Morse (jmorse+llvm@studentrobotics.org), pending
 // what student robotics decides to do with this code
 //
-//
 //===----------------------------------------------------------------------===//
 
 #include "TMS320C64X.h"
