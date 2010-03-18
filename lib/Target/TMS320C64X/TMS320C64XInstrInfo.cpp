@@ -51,7 +51,8 @@ TMS320C64XInstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
 	DebugLoc DL = DebugLoc::getUnknownLoc();
 
 	addDefaultPred(BuildMI(MBB, I, DL, get(TMS320C64X::word_idx_store_p))
-		.addReg(TMS320C64X::A15).addFrameIndex(FI).addReg(src_reg));
+		.addReg(TMS320C64X::A15).addFrameIndex(FI)
+		.addReg(src_reg, getKillRegState(is_kill)));
 }
 
 void
