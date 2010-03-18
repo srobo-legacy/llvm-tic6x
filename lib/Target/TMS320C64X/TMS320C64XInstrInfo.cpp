@@ -214,3 +214,31 @@ TMS320C64XInstrInfo::InsertBranch(MachineBasicBlock &MBB,
 				"on tms320c64x");
 	}
 }
+
+unsigned
+TMS320C64XInstrInfo::RemoveBranch(MachineBasicBlock &MBB) const
+{
+	MachineBasicBlock::iterator I = MBB.end();
+	unsigned count;
+
+	count = 0;
+
+	while (I != MBB.begin()) {
+		--I;
+		if (I->getOpcode() != TMS320C64X::branch_p &&
+				I->getOpcode() != TMS320C64X::branch_1 &&
+				I->getOpcode() != TMS320C64X::branch_2 &&
+				I->getOpcode() != TMS320C64X::brcond_p &&
+				I->getOpcode() != TMS320C64X::brcond_1 &&
+				I->getOpcode() != TMS320C64X::brcond_2 &&
+				I->getOpcode() != TMS320C64X::noop)
+			break;
+
+		// Remove branch
+		I->eraseFromParent();
+		I = MBB.end();
+		++count;
+	}
+
+	return count;
+}

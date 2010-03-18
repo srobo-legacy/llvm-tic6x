@@ -68,6 +68,7 @@ public:
 				MachineBasicBlock *FBB,
 				const SmallVectorImpl<MachineOperand> &Cond)
 				const;
+	virtual unsigned RemoveBranch(MachineBasicBlock &MBB) const;
 };
 
 inline const MachineInstrBuilder &addDefaultPred(const MachineInstrBuilder &MIB)
