@@ -125,6 +125,16 @@ defm or_l : inst_xi<"or", (i32 sconst5:$imm), unit_l, or, 1>;
 defm or_s : inst_rx<"or", unit_s, or, 0>;
 defm or_s : inst_xi<"or", (i32 sconst5:$imm), unit_s, or, 1>;
 
+def xor_p_rr : pseudo_rr<"xor", unit_d, xor, 0>;
+def xor_p_ri : pseudo_ri<"xor", (i32 sconst5:$imm), unit_d, xor, 0>;
+
+defm xor_d : inst_rx<"xor", unit_d, xor, 0>;
+defm xor_d : inst_xi<"xor", (i32 sconst5:$imm), unit_d, xor, 1>;
+defm xor_l : inst_rx<"xor", unit_l, xor, 0>;
+defm xor_l : inst_xi<"xor", (i32 sconst5:$imm), unit_l, xor, 1>;
+defm xor_s : inst_rx<"xor", unit_s, xor, 0>;
+defm xor_s : inst_xi<"xor", (i32 sconst5:$imm), unit_s, xor, 1>;
+
 def sub_p_rr : pseudo_rr<"sub", unit_l, sub, 0>;
 def sub_p_ri : pseudo_ri<"sub", (i32 uconst5:$imm), unit_d, sub, 0>;
 
