@@ -71,11 +71,10 @@ TMS320C64XInstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
 		MachineBasicBlock *&TBB, MachineBasicBlock *&FBB,
 		SmallVectorImpl<MachineOperand> &Cond, bool AllowModify) const
 {
-	bool predicated, found_cond_branch, saw_uncond_branch;
+	bool predicated, saw_uncond_branch;
 	int pred_idx, opcode;
 	MachineBasicBlock::iterator I = MBB.end();
 
-	found_cond_branch = false;
 	saw_uncond_branch = false;
 
 	while (I != MBB.begin()) {
@@ -98,13 +97,6 @@ TMS320C64XInstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
 			// We're an unconditional branch. The analysis rules
 			// say that we should carry on looking, in case there's
 			// a conditional branch beforehand.
-
-			// If there was already a conditional branch, freak out
-			if (found_cond_branch) {
-				TBB = NULL;
-				FBB = NULL;
-				return 1;
-			}
 
 			saw_uncond_branch = true;
 			TBB = I->getOperand(0).getMBB();
@@ -142,32 +134,10 @@ TMS320C64XInstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
 				TBB = I->getOperand(0).getMBB();
 			}
 
-			// Only other thing we need to do is work out the
-			// conditional situation - go looking for condition
-			// instructions.
-			found_cond_branch = true;
-			continue;	
-		}
-
-		if (found_cond_branch) {
-			// Look for condition instruction... there are a _lot_
-			// of them, so we shall revert to something unpleasent
-			if (!strncmp(I->getDesc().getName(), "cmp", 3)) {
-				// It appears the stuff we put in the Cond
-				// list is pretty ad-hoc and machdep - so
-				// I'm just going to bung the instruction
-				// opcode and its operands in
-
-				Cond.push_back(
-					MachineOperand::CreateImm(opcode));
-				// FIXME - need to duplicate operands?
-				Cond.push_back(I->getOperand(1));
-				Cond.push_back(I->getOperand(2));
-				found_cond_branch = false;
-				break;
-			} else {
-				continue;
-			}
+			// Grab the condition
+			Cond.push_back(I->getOperand(1)); // Zero/NZ
+			Cond.push_back(I->getOperand(2)); // Reg
+			return false;
 		}
 
 		// Out of branches and conditional branches, only other thing
@@ -183,10 +153,6 @@ TMS320C64XInstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
 
 		return true; // Something we don't understand at all
 	}
-
-	if (found_cond_branch)
-		// We must have got lost looking for it
-		return true;
 
 	return false;
 }
