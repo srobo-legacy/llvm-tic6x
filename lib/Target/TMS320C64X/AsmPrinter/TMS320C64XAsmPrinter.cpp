@@ -69,6 +69,7 @@ bool
 TMS320C64XAsmPrinter::runOnMachineFunction(MachineFunction &MF)
 {
 	Function *F = MF.getFunction();
+	this->MF = &MF;
 
 	SetupMachineFunction(MF);
 	EmitConstantPool(MF.getConstantPool());
