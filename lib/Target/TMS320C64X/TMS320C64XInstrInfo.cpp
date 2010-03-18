@@ -128,8 +128,12 @@ TMS320C64XInstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
 			// only branch, in which case we fall through to the
 			// next, or it's a conditional before unconditional.
 
-			if (TBB != NULL) { // unconditional was seen
-				FBB = I->getOperand(0).getMBB();
+			if (TBB != NULL) {
+				// True condition branches to operand of
+				// this conditional branch; false condition is
+				// where the following unconditional goes.
+				FBB = TBB;
+				TBB = I->getOperand(0).getMBB();
 			} else {
 				TBB = I->getOperand(0).getMBB();
 			}
