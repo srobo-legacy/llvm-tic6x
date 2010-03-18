@@ -147,11 +147,13 @@ defm sub_d : inst_xr<"sub", unit_d, sub, 0>;
 
 // NB: mpy32 is c64x+ only
 
+let delay_slots = 3 in {
 def mpy32_p : pseudo_rr<"mpy32", unit_m, mul, 0>;
 
 defm mpy32 : inst_rr<"mpy32", unit_m, mul, 0>;
 defm mpy32 : inst_rx<"mpy32", unit_m, mul, 0>;
 defm mpy32 : inst_xr<"mpy32", unit_m, mul, 0>;
+}
 
 
 // Loading consts: almost always as halfwords. Put our own bodges on top
