@@ -169,7 +169,7 @@ TMS320C64XInstrInfo::InsertBranch(MachineBasicBlock &MBB,
 	DebugLoc dl = DebugLoc::getUnknownLoc();
 
 	assert(TBB && "InsertBranch can't insert fallthroughs");
-	assert((Cond.size() == 3 || Cond.size() == 0) &&
+	assert((Cond.size() == 2 || Cond.size() == 0) &&
 			"Invalid condition to InsertBranch");
 
 	if (Cond.empty()) {
@@ -177,11 +177,14 @@ TMS320C64XInstrInfo::InsertBranch(MachineBasicBlock &MBB,
 		assert(!FBB && "Unconditional branch with multiple successors");
 		addDefaultPred(BuildMI(&MBB, dl, get(TMS320C64X::branch_p))
 								.addMBB(TBB));
-		return 1;
 	} else {
-		llvm_unreachable("Can't insert conditional branches yet "
-				"on tms320c64x");
+		// Insert conditional branch with operands sent to us by
+		// analyze branch
+		BuildMI(&MBB, dl, get(TMS320C64X::brcond_p)).addMBB(TBB)
+			.addImm(Cond[0].getImm()).addReg(Cond[1].getReg());
 	}
+
+	return 1;
 }
 
 unsigned
