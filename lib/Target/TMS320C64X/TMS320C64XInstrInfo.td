@@ -68,11 +68,15 @@ def srl_p_rr : pseudo_rr<"shr", unit_s, srl, 0>;
 def srl_p_ri : pseudo_ri<"shr", (i32 uconst5:$imm), unit_s, srl, 0>;
 def shl_p_rr : pseudo_rr<"shl", unit_s, shl, 0>;
 def shl_p_ri : pseudo_ri<"shl", (i32 uconst5:$imm), unit_s, shl, 0>;
+def shr_p_rr : pseudo_rr<"shr", unit_s, sra, 0>;
+def shr_p_ri : pseudo_ri<"shr", (i32 uconst5:$imm), unit_s, sra, 0>;
 
 defm srl : inst_xr<"shr", unit_s, srl, 0>;
 defm srl : inst_xi<"shr", (i32 uconst5:$imm), unit_s, srl, 0>;
 defm shl : inst_xr<"shl", unit_s, shl, 0>;
 defm shl : inst_xi<"shl", (i32 uconst5:$imm), unit_s, shl, 0>;
+defm shr : inst_xr<"shr", unit_s, sra, 0>;
+defm shr : inst_xi<"shr", (i32 uconst5:$imm), unit_s, sra, 0>;
 
 
 //Some arithmatic and logic
