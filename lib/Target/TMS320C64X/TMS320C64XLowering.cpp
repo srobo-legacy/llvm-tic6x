@@ -22,6 +22,7 @@
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
+#include "llvm/CodeGen/MachineModuleInfo.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/PseudoSourceValue.h"
 #include "llvm/CodeGen/SelectionDAG.h"
@@ -236,13 +237,14 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 // XXX XXX XXX - TI Calling convention dictates that the last argument before
 // a series of vararg values on the stack must also be on the stack.
 
-	unsigned int bytes, i;
+	unsigned int bytes, i, retaddr;
 	SmallVector<CCValAssign, 16> ArgLocs;
 	CCState CCInfo(CallConv, isVarArg, getTargetMachine(), ArgLocs,
 							*DAG.getContext());
 
 	CCInfo.AnalyzeCallOperands(Outs, CC_TMS320C64X);
 	bytes = CCInfo.getNextStackOffset();
+	retaddr = 0;
 
 	Chain = DAG.getCALLSEQ_START(Chain, DAG.getConstant(bytes,
 						getPointerTy(), true));
@@ -329,10 +331,33 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 	if (in_flag.getNode())
 		ops.push_back(in_flag);
 
+	if(Callee.getOpcode() == ISD::LOAD) {
+		// This an indirect call.
+		// Unfortunately there's no direct call instruction for this...
+		// we have to emulate it. That involves sticking a label
+		// directly after the call/branch, and loading its address into
+		// b3 directly beforehand. Ugh.
+
+		// Generate a return address
+		MachineModuleInfo *MMI = DAG.getMachineModuleInfo();
+		retaddr = MMI->NextLabelID();
+		Chain = DAG.getCopyToReg(Chain, dl, TMS320C64X::B3,
+				DAG.getLabel(ISD::EH_LABEL, dl, Chain, retaddr),
+				in_flag);
+		in_flag = Chain.getValue(1);
+	}
+		
 	SDVTList node_types = DAG.getVTList(MVT::Other, MVT::Flag);
-	Chain = DAG.getNode(TMSISD::CALL, dl, node_types, &ops[0],
-							ops.size());
+	Chain = DAG.getNode(TMSISD::CALL, dl, node_types, &ops[0], ops.size());
 	in_flag = Chain.getValue(1);
+
+	if(Callee.getOpcode() == ISD::LOAD) {
+		// pump in a label directly after that call insn
+		Chain = DAG.getNode(TMSISD::CALL_RET_LABEL, dl, MVT::Other,
+				Chain, DAG.getConstant(retaddr, MVT::i32),					in_flag);
+		in_flag = Chain.getValue(0);
+// FIXME - flag?
+	}
 
 	Chain = DAG.getCALLSEQ_END(Chain,
 			DAG.getConstant(bytes, getPointerTy(), true),
