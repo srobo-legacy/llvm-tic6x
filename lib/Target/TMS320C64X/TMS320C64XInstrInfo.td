@@ -14,6 +14,7 @@ def SDT_brcond : SDTypeProfile<0, 2, [SDTCisVT<0, OtherVT>]>;
 def SDT_call : SDTypeProfile<0, -1, [SDTCisVT<0, iPTR>]>;
 def SDT_call_seq_start : SDCallSeqStart<[SDTCisVT<0, i32>]>;
 def SDT_call_seq_end : SDCallSeqEnd<[SDTCisVT<0, i32>, SDTCisVT<1, i32>]>;
+def SDT_call_ret_label : SDTypeProfile<0, 1, [SDTCisVT<0, i32>]>;
 
 // This just copies the last two operands to the node being operated upon into
 // the output operands: this makes tablegen happy. Note that this will probably
@@ -26,6 +27,8 @@ def callseq_start : SDNode<"ISD::CALLSEQ_START", SDT_call_seq_start,
 				[SDNPHasChain, SDNPOutFlag]>;
 def callseq_end : SDNode<"ISD::CALLSEQ_END", SDT_call_seq_end,
 				[SDNPHasChain, SDNPOptInFlag, SDNPOutFlag]>;
+def call_ret_label : SDNode<"TMSISD::CALL_RET_LABEL", SDT_call_ret_label,
+				[SDNPHasChain, SDNPOutFlag, SDNPInFlag]>;
 def cmpeq_node : SDNode<"TMSISD::CMPEQ", SDTIntBinOp,
 				[SDNPOutFlag, SDNPCommutative]>;
 def cmpgt_node : SDNode<"TMSISD::CMPGT", SDTIntBinOp, [SDNPOutFlag]>;
@@ -351,6 +354,14 @@ def call_indirect_2 : inst<(outs), (ins GPRegs:$reg), "b\t$s\t$reg",
 				[(TMS320C64Xcall GPRegs:$reg)], 1, unit_s>;
 }
 
+// Hacks: the processor doesn't _actually_ have a real call instruction, callp
+// was introduced by c64x+, and there's no support at all for indirect calls.
+// So we have to work by loading the return address into B3 manually before
+// branching to the target. Which means injecting a label immediately after the
+// branch instruction itself. Which is what this is.
+def return_label : inst<(outs), (ins i32imm:$imm), "ponylabel_$imm:",
+				[(call_ret_label imm:$imm)], 0, unit_m> {
+	let Pattern = sched_pattern;
 }
 
 // NB: branch-to-register can only work on unit S2
