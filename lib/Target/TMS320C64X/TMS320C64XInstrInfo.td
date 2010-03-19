@@ -303,6 +303,16 @@ def brcond_2 : inst<(outs), (ins), "b\t$s\t$block",
 		[(brcond_node bb:$block, predwrapper:$bees)], 1, unit_s>;
 }
 
+def bindirect_p : inst<(outs), (ins GPRegs:$reg), "b\t$s\t$reg",
+				[(brind GPRegs:$reg)], 0, unit_s> {
+	let Pattern = sched_pattern;
+}
+
+def bindirect_1 : inst<(outs), (ins GPRegs:$reg), "b\t$s\t$reg",
+				[(brind GPRegs:$reg)], 0, unit_s>;
+def bindirect_2 : inst<(outs), (ins GPRegs:$reg), "b\t$s\t$reg",
+				[(brind GPRegs:$reg)], 1, unit_s>;
+
 } // isBranch
 
 // XXX XXX XXX: callp is a c64x+ instruction, which the assembler is unlikely
