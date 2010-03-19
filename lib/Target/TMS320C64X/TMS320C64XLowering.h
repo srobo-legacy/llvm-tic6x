@@ -21,12 +21,13 @@ namespace TMSISD {
 	enum {
 		FIRST_NUMBER = ISD::BUILTIN_OP_END,
 		BRCOND,
+		CALL,
+		CALL_RET_LABEL,
 		CMPEQ,
 		CMPGT,
 		CMPGTU,
 		CMPLT,
 		CMPLTU,
-		CALL,
 		RET_FLAG,
 		WRAPPER
 	};
