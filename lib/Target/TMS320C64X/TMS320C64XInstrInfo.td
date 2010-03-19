@@ -281,7 +281,7 @@ defm cmpltu : inst_xi<"cmpltu", (i32 uconst4:$imm), unit_l, cmpltu_node, 1>;
 
 // Branch / call instructions
 
-let isBranch = 1 in {
+let isBranch = 1, delay_slots = 4 in {
 def branch_p : inst<(outs), (ins brtarget:$block), "b\t$s\t$block",
 				[(br bb:$block)], 0, unit_s> {
 	let Pattern = sched_pattern;
