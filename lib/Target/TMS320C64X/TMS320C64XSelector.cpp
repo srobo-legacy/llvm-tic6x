@@ -28,7 +28,6 @@ public:
 	bool select_addr(SDValue op, SDValue N, SDValue &R1, SDValue &R2);
 	bool select_idxaddr(SDValue op, SDValue N, SDValue &R1, SDValue &R2);
 	bool bounce_predicate(SDValue op, SDValue N, SDValue &R1, SDValue &R2);
-	bool select_icall(SDValue op, SDValue N, SDValue &R1);
 	const char *getPassName() const {
 		return "TMS320C64X Instruction Selection";
 	}
