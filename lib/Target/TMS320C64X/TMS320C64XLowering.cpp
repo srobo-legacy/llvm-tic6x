@@ -329,9 +329,6 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 				reg_args[i].second.getValueType()));
 	}
 
-	if (in_flag.getNode())
-		ops.push_back(in_flag);
-
 	if(Callee.getOpcode() != ISD::TargetGlobalAddress &&
 			Callee.getOpcode() != ISD::GlobalAddress &&
 			Callee.getOpcode() != ISD::TargetExternalSymbol &&
@@ -353,7 +350,10 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 		in_flag = Chain.getValue(1);
 		is_icall = true;
 	}
-		
+
+	if (in_flag.getNode())
+		ops.push_back(in_flag);
+
 	SDVTList node_types = DAG.getVTList(MVT::Other, MVT::Flag);
 	Chain = DAG.getNode(TMSISD::CALL, dl, node_types, &ops[0], ops.size());
 	in_flag = Chain.getValue(1);
