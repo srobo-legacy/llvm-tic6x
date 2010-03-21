@@ -14,7 +14,7 @@ TMS320C64XTargetAsmInfo::TMS320C64XTargetAsmInfo(const Target &T,
 						const StringRef &TT) {
 	Data16bitsDirective = "\t.hword\t";
 	Data32bitsDirective = "\t.word\t";
-	Data64bitsDirective = "\t.bees\t";
+	Data64bitsDirective = "\t.dword\t";
 	ZeroDirective = "\t.zero\t";
 	CommentString = ";";
 
