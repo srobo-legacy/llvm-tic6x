@@ -343,13 +343,14 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 		MachineModuleInfo *MMI = DAG.getMachineModuleInfo();
 		retaddr = MMI->NextLabelID();
 		in_flag = Chain.getValue(0);
-		SDVTList NodeTys = DAG.getVTList(MVT::i32, MVT::Flag);
-		SDValue l = DAG.getNode(TMSISD::CALL_RET_LABEL_OPERAND, dl,
-				NodeTys, Chain,
-				DAG.getConstant(retaddr, MVT::i32), in_flag);
-		in_flag = Chain.getValue(1);
 
-		Chain = DAG.getCopyToReg(Chain, dl, TMS320C64X::B3, l, in_flag);
+		SDVTList NodeTys = DAG.getVTList(MVT::i32, MVT::Flag);
+		Chain = DAG.getNode(TMSISD::CALL_RET_LABEL_OPERAND, dl, NodeTys,
+				Chain, DAG.getConstant(retaddr, MVT::i32),
+				in_flag);
+		in_flag = Chain.getValue(1);
+		Chain = DAG.getCopyToReg(Chain, dl, TMS320C64X::B3,
+							Chain, in_flag);
 		in_flag = Chain.getValue(1);
 
 		is_icall = true;
@@ -366,7 +367,8 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 		// pump in a label directly after that call insn
 		SDVTList NodeTys = DAG.getVTList(MVT::Other, MVT::Flag);
 		Chain = DAG.getNode(TMSISD::CALL_RET_LABEL, dl, NodeTys,
-				Chain, DAG.getConstant(retaddr, MVT::i32),					in_flag);
+				Chain, DAG.getConstant(retaddr, MVT::i32),
+				in_flag);
 		in_flag = Chain.getValue(1);
 	}
 
