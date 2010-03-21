@@ -228,8 +228,23 @@ def : Pat<(i32 mvk_all_pred:$val),
 	(mvkh_p mvk_all_pred:$val, (mvkl_p mvk_all_pred:$val))>;
 def : Pat<(i32 (Wrapper tglobaladdr:$val)),
 	(mvkh_p tglobaladdr:$val, (mvkl_p tglobaladdr:$val))>;
-def : Pat<(i32 call_ret_label_operand:$label),
-	(mvkh_p mvk_all_pred:$label, (mvkl_p mvk_all_pred:$label))>;
+
+
+
+let InOperandList = (ins call_ret_label_operand_operand:$imm, pred:$s),
+		AsmString = "mvkl\t$s\t$imm,\t$dst" in {
+def mvkl_label : pseudo_rr<"mvkl", unit_s, add, 0> {
+	let Pattern = [];
+}
+}
+
+def mvkh_label : inst<(outs GPRegs:$dst), (ins call_ret_label_operand_operand:$imm, GPRegs:$src1),
+		"mvkh\t$s\t$imm,\t$dst", [], 0, unit_s> {
+	let Constraints = "$src1 = $dst";
+}
+
+def : Pat<(call_ret_label_operand mvk_all_pred:$label),
+	(mvkh_label mvk_all_pred:$label, (mvkl_label mvk_all_pred:$label))>;
 
 // FIXME: Work out what on earth to do with lea
 def lea_fail : inst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
