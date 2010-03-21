@@ -364,7 +364,6 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 		Chain = DAG.getNode(TMSISD::CALL_RET_LABEL, dl, NodeTys,
 				Chain, DAG.getConstant(retaddr, MVT::i32),					in_flag);
 		in_flag = Chain.getValue(1);
-// FIXME - flag?
 	}
 
 	Chain = DAG.getCALLSEQ_END(Chain,
