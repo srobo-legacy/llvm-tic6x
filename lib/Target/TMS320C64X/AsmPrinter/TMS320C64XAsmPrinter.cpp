@@ -46,6 +46,7 @@ public:
 	void printOperand(const MachineInstr *MI, int opNum);
 	void printMemOperand(const MachineInstr *MI, int opNum,
 					const char *Modifier = 0);
+	void printRetLabel(const MachineInstr *MI, int opNum);
 	void printCCOperand(const MachineInstr *MI, int opNum);
 
 	bool PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
@@ -310,6 +311,15 @@ TMS320C64XAsmPrinter::printOperand(const MachineInstr *MI, int op_num)
 	default:
 		llvm_unreachable("Unknown operand type");
 	}
+}
+
+void
+TMS320C64XAsmPrinter::printRetLabel(const MachineInstr *MI, int op_num)
+{
+
+	O << ".ponylabel_";
+	O << (int)MI->getOperand(op_num).getImm();
+	return;
 }
 
 void
