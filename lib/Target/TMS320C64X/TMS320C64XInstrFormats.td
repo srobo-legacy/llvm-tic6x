@@ -59,6 +59,9 @@ def mem_operand	: Operand<i32> {
 
 def calltarget : Operand<i32>;
 def brtarget : Operand<OtherVT>;
+def call_ret_label_operand_operand : Operand<i32> {
+	let PrintMethod = "printRetLabel";
+}
 
 def i8index : PatLeaf<(imm), [{
 	return ((int)N->getSExtValue() >= 0 && (int)N->getSExtValue() < 32);
