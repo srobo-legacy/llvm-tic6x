@@ -237,6 +237,7 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 // XXX XXX XXX - TI Calling convention dictates that the last argument before
 // a series of vararg values on the stack must also be on the stack.
 
+	bool is_icall = false;;
 	unsigned int bytes, i, retaddr;
 	SmallVector<CCValAssign, 16> ArgLocs;
 	CCState CCInfo(CallConv, isVarArg, getTargetMachine(), ArgLocs,
@@ -331,7 +332,10 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 	if (in_flag.getNode())
 		ops.push_back(in_flag);
 
-	if(Callee.getOpcode() == ISD::LOAD) {
+	if(Callee.getOpcode() != ISD::TargetGlobalAddress &&
+			Callee.getOpcode() != ISD::GlobalAddress &&
+			Callee.getOpcode() != ISD::TargetExternalSymbol &&
+			Callee.getOpcode() != ISD::ExternalSymbol) {
 		// This an indirect call.
 		// Unfortunately there's no direct call instruction for this...
 		// we have to emulate it. That involves sticking a label
@@ -341,21 +345,25 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 		// Generate a return address
 		MachineModuleInfo *MMI = DAG.getMachineModuleInfo();
 		retaddr = MMI->NextLabelID();
-		Chain = DAG.getCopyToReg(Chain, dl, TMS320C64X::B3,
-				DAG.getLabel(ISD::EH_LABEL, dl, Chain, retaddr),
+		in_flag = Chain.getValue(0);
+		SDVTList NodeTys = DAG.getVTList(MVT::Other, MVT::Flag);
+		Chain = DAG.getNode(TMSISD::CALL_RET_LABEL, dl, NodeTys,
+				Chain, DAG.getConstant(retaddr, MVT::i32),
 				in_flag);
 		in_flag = Chain.getValue(1);
+		is_icall = true;
 	}
 		
 	SDVTList node_types = DAG.getVTList(MVT::Other, MVT::Flag);
 	Chain = DAG.getNode(TMSISD::CALL, dl, node_types, &ops[0], ops.size());
 	in_flag = Chain.getValue(1);
 
-	if(Callee.getOpcode() == ISD::LOAD) {
+	if (is_icall) {
 		// pump in a label directly after that call insn
-		Chain = DAG.getNode(TMSISD::CALL_RET_LABEL, dl, MVT::Other,
+		SDVTList NodeTys = DAG.getVTList(MVT::Other, MVT::Flag);
+		Chain = DAG.getNode(TMSISD::CALL_RET_LABEL, dl, NodeTys,
 				Chain, DAG.getConstant(retaddr, MVT::i32),					in_flag);
-		in_flag = Chain.getValue(0);
+		in_flag = Chain.getValue(1);
 // FIXME - flag?
 	}
 
