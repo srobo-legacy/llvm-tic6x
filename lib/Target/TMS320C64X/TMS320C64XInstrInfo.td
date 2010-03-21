@@ -30,6 +30,8 @@ def callseq_end : SDNode<"ISD::CALLSEQ_END", SDT_call_seq_end,
 def call_ret_label : SDNode<"TMSISD::CALL_RET_LABEL", SDT_call_ret_label,
 				[SDNPHasChain, SDNPOptInFlag, SDNPOutFlag,
 					SDNPSideEffect]>;
+def call_ret_label_operand : SDNode<"TMSISD::CALL_RET_LABEL_OPERAND",
+				SDTPtrLeaf, []>;
 def cmpeq_node : SDNode<"TMSISD::CMPEQ", SDTIntBinOp,
 				[SDNPOutFlag, SDNPCommutative]>;
 def cmpgt_node : SDNode<"TMSISD::CMPGT", SDTIntBinOp, [SDNPOutFlag]>;
@@ -222,6 +224,8 @@ def : Pat<(i32 mvk_all_pred:$val),
 	(mvkh_p mvk_all_pred:$val, (mvkl_p mvk_all_pred:$val))>;
 def : Pat<(i32 (Wrapper tglobaladdr:$val)),
 	(mvkh_p tglobaladdr:$val, (mvkl_p tglobaladdr:$val))>;
+def : Pat<(i32 call_ret_label_operand:$label),
+	(mvkh_p mvk_all_pred:$label, (mvkl_p mvk_all_pred:$label))>;
 
 // FIXME: Work out what on earth to do with lea
 def lea_fail : inst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
