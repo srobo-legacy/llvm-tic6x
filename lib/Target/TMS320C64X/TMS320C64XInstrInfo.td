@@ -361,8 +361,8 @@ def callp_e_1 : inst<(outs), (ins calltarget:$dst), "callp\t$s\t$dst",
 def callp_e_2 : inst<(outs), (ins calltarget:$dst), "callp\t$s\t$dst",
 		[(TMS320C64Xcall texternalsym:$dst)], 1, unit_s>;
 
-def call_indirect_2 : inst<(outs), (ins GPRegs:$reg), "b\t$s\t$reg",
-				[(TMS320C64Xcall GPRegs:$reg)], 1, unit_s> {
+def call_indirect_2 : inst<(outs), (ins BRegs:$reg), "b\t$s\t$reg",
+				[(TMS320C64Xcall BRegs:$reg)], 1, unit_s> {
 	let Pattern = sched_pattern;
 }
 }
