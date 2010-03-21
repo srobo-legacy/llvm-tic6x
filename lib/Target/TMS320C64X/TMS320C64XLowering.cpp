@@ -141,6 +141,8 @@ TMS320C64XLowering::LowerFormalArguments(SDValue Chain,
 	// Better, that has to happen to all basic blocks (liveins don't live
 	// across basic blocks
 	for (MachineFunction::iterator I = MF.begin(); I != MF.end(); ++I) {
+		if ((*I).size() == 0)
+			continue;
 		(*I).addLiveIn(TMS320C64X::FakeReg);
 	}
 
