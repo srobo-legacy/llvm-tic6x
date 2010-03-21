@@ -15,6 +15,8 @@ def SDT_call : SDTypeProfile<0, -1, [SDTCisVT<0, iPTR>]>;
 def SDT_call_seq_start : SDCallSeqStart<[SDTCisVT<0, i32>]>;
 def SDT_call_seq_end : SDCallSeqEnd<[SDTCisVT<0, i32>, SDTCisVT<1, i32>]>;
 def SDT_call_ret_label : SDTypeProfile<0, 1, [SDTCisVT<0, i32>]>;
+def SDT_call_ret_label_operand : SDTypeProfile<1, 1, [SDTCisVT<0, i32>,
+							SDTCisVT<1, i32>]>;
 
 // This just copies the last two operands to the node being operated upon into
 // the output operands: this makes tablegen happy. Note that this will probably
@@ -31,7 +33,9 @@ def call_ret_label : SDNode<"TMSISD::CALL_RET_LABEL", SDT_call_ret_label,
 				[SDNPHasChain, SDNPOptInFlag, SDNPOutFlag,
 					SDNPSideEffect]>;
 def call_ret_label_operand : SDNode<"TMSISD::CALL_RET_LABEL_OPERAND",
-				SDTPtrLeaf, []>;
+				SDT_call_ret_label_operand,
+				[SDNPHasChain, SDNPOptInFlag, SDNPOutFlag,
+					SDNPSideEffect]>;
 def cmpeq_node : SDNode<"TMSISD::CMPEQ", SDTIntBinOp,
 				[SDNPOutFlag, SDNPCommutative]>;
 def cmpgt_node : SDNode<"TMSISD::CMPGT", SDTIntBinOp, [SDNPOutFlag]>;
