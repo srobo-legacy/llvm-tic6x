@@ -364,6 +364,7 @@ def callp_e_2 : inst<(outs), (ins calltarget:$dst), "callp\t$s\t$dst",
 def call_indirect_2 : inst<(outs), (ins BRegs:$reg), "b\t$s\t$reg",
 				[(TMS320C64Xcall BRegs:$reg)], 1, unit_s> {
 	let Pattern = sched_pattern;
+	let Uses = [B3];
 }
 }
 
