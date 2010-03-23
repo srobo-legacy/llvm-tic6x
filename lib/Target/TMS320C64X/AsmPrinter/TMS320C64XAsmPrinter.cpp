@@ -254,8 +254,13 @@ TMS320C64XAsmPrinter::PrintGlobalVariable(const GlobalVariable *GVar)
 			if (sz == 0)
 				sz = 1;
 
+// XXX - .local is only for ELF targets, we're using coff.
+// Best case commenting this out changes nothing; worst case it polutes
+// the global namespace and causes linking errors later on. Curses.
+#if 0
 			if (GVar->hasLocalLinkage())
 				O << "\t.local " << name << "\n";
+#endif
 
 			O << TAI->getCOMMDirective() << name << "," << sz;
 			if (TAI->getCOMMDirectiveTakesAlignment())
