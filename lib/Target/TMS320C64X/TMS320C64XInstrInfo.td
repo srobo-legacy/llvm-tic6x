@@ -17,6 +17,9 @@ def SDT_call_seq_end : SDCallSeqEnd<[SDTCisVT<0, i32>, SDTCisVT<1, i32>]>;
 def SDT_call_ret_label : SDTypeProfile<0, 1, [SDTCisVT<0, i32>]>;
 def SDT_call_ret_label_operand : SDTypeProfile<1, 1, [SDTCisVT<0, i32>,
 							SDTCisVT<1, i32>]>;
+def SDT_tmsselect : SDTypeProfile<1, 4, [SDTCisVT<0, i32>, SDTCisVT<1, i32>,
+					SDTCisVT<2, i32>, SDTCisVT<3, OtherVT>,
+					SDTCisVT<4, OtherVT>]>;
 
 // This just copies the last two operands to the node being operated upon into
 // the output operands: this makes tablegen happy. Note that this will probably
@@ -44,6 +47,7 @@ def cmpgt_node : SDNode<"TMSISD::CMPGT", SDTIntBinOp, [SDNPOutFlag]>;
 def cmpgtu_node : SDNode<"TMSISD::CMPGTU", SDTIntBinOp, [SDNPOutFlag]>;
 def cmplt_node : SDNode<"TMSISD::CMPLT", SDTIntBinOp, [SDNPOutFlag]>;
 def cmpltu_node : SDNode<"TMSISD::CMPLTU", SDTIntBinOp, [SDNPOutFlag]>;
+def tmsselect : SDNode<"TMSISD::SELECT", SDT_tmsselect>;
 def Wrapper : SDNode<"TMSISD::WRAPPER", SDT_Wrapper>;
 
 // XXX These should probably be marked as for codegen modelling only.
@@ -312,6 +316,28 @@ def cmpltu_p_ri : pseudo_ri<"cmpltu", (i32 uconst4:$imm), unit_l, cmpltu_node,
 defm cmpltu : inst_rx<"cmpltu", unit_l, cmpltu_node, 0>;
 defm cmpltu : inst_xr<"cmpltu", unit_l, cmpltu_node, 1>;
 defm cmpltu : inst_xi<"cmpltu", (i32 uconst4:$imm), unit_l, cmpltu_node, 1>;
+
+// To support select, we need two conditional instructions with the same
+// destination - copy what i32 loading does.
+
+
+def mvselect_a : inst<(outs GPRegs:$dst), (ins GPRegs:$reg, nodefault_pred:$s),
+			"mv\t$s\t$reg,\t$dst", [], 0, unit_s> {
+	let InOperandList = (ins GPRegs:$reg, nodefault_pred:$s);
+}
+
+def mvselect_b : inst<(outs GPRegs:$dst), (ins GPRegs:$reg, GPRegs:$src1, nodefault_pred:$s),
+		"mv\t$s\t$reg,\t$dst", [], 0, unit_s> {
+	let Constraints = "$src1 = $dst";
+	let InOperandList = (ins GPRegs:$reg, GPRegs:$src1, nodefault_pred:$s);
+}
+
+def : Pat<(tmsselect GPRegs:$true, GPRegs:$false, predwrapper:$truepred,
+						predwrapper:$falsepred),
+		(mvselect_b GPRegs:$false, (mvselect_a GPRegs:$true, predwrapper:$truepred), predwrapper:$falsepred)>;
+
+def : Pat<(i32 mvk_all_pred:$val),
+	(mvkh_p mvk_all_pred:$val, (mvkl_p mvk_all_pred:$val))>;
 
 // Branch / call instructions
 
