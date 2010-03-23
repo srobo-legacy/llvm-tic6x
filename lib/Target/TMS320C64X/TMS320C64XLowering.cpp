@@ -71,7 +71,7 @@ TMS320C64XLowering::TMS320C64XLowering(TMS320C64XTargetMachine &tm) :
 	/* Curious that llvm has a select; tms320c64x doesn't though, expanding
 	 * apparently leads to SELECT_CC insns */
 	setOperationAction(ISD::SELECT, MVT::i32, Expand);
-	setOperationAction(ISD::SELECT, MVT::i32, Custom);
+	setOperationAction(ISD::SELECT_CC, MVT::i32, Custom);
 	/* Manually beat condition code setting into cmps */
 	setOperationAction(ISD::SETCC, MVT::i32, Custom);
 	/* We can emulate br_cc, maybe not brcond, do what works */
