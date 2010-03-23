@@ -106,12 +106,16 @@ TMS320C64XLowering::getTargetNodeName(unsigned op) const
 	switch (op) {
 	default: return NULL;
 	case TMSISD::BRCOND:		return "TMSISD::BRCOND";
+	case TMSISD::CALL:		return "TMSISD::CALL";
+	case TMSISD::CALL_RET_LABEL:	return "TMSISD::CALL_RET_LABEL";
+	case TMSISD::CALL_RET_LABEL_OPERAND:
+					return "TMSISD::CALL_RET_LABEL_OPERAND";
 	case TMSISD::CMPEQ:		return "TMSISD::CMPEQ";
+	case TMSISD::CMPNE:		return "TMSISD::CMPNE";
 	case TMSISD::CMPGT:		return "TMSISD::CMPGT";
 	case TMSISD::CMPGTU:		return "TMSISD::CMPGTU";
 	case TMSISD::CMPLT:		return "TMSISD::CMPLT";
 	case TMSISD::CMPLTU:		return "TMSISD::CMPLTU";
-	case TMSISD::CALL:		return "TMSISD::CALL";
 	case TMSISD::RET_FLAG:		return "TMSISD::RET_FLAG";
 	case TMSISD::WRAPPER:		return "TMSISD::WRAPPER";
 	}
