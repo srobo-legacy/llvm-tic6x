@@ -266,8 +266,8 @@ defm ubyte_idx : meminst_load<"bu", zextloadi8, (i32 idxaddr:$ptr)>;
 
 defm hword_addr : meminst<"h", sextloadi16, truncstorei16, (i32 addr:$ptr)>;
 defm hword_idx : meminst<"h", sextloadi16, truncstorei16, (i32 idxaddr:$ptr)>;
-defm uhword_addr : meminst_load<"hu", zextloadi8, (i32 addr:$ptr)>;
-defm uhword_idx : meminst_load<"hu", zextloadi8, (i32 idxaddr:$ptr)>;
+defm uhword_addr : meminst_load<"hu", zextloadi16, (i32 addr:$ptr)>;
+defm uhword_idx : meminst_load<"hu", zextloadi16, (i32 idxaddr:$ptr)>;
 
 defm word_addr : meminst<"w", load, store, (i32 addr:$ptr)>;
 defm word_idx : meminst<"w", load, store, (i32 idxaddr:$ptr)>;
