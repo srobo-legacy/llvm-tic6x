@@ -45,6 +45,10 @@ TMS320C64XLowering::TMS320C64XLowering(TMS320C64XTargetMachine &tm) :
 	addRegisterClass(MVT::i32, TMS320C64X::GPRegsRegisterClass);
 
 	setLoadExtAction(ISD::SEXTLOAD, MVT::i1, Promote);
+	setLoadExtAction(ISD::EXTLOAD, MVT::i1, Custom);
+	setLoadExtAction(ISD::EXTLOAD, MVT::i8, Custom);
+	setLoadExtAction(ISD::EXTLOAD, MVT::i16, Custom);
+	setLoadExtAction(ISD::EXTLOAD, MVT::i32, Custom);
 	/* All other loads have sx and zx support */
 
 	/* No 32 bit load insn */
@@ -405,6 +409,8 @@ TMS320C64XLowering::LowerOperation(SDValue op,  SelectionDAG &DAG)
 	case ISD::RETURNADDR:		return LowerReturnAddr(op, DAG);
 	case ISD::BR_CC:		return LowerBRCC(op, DAG);
 	case ISD::SETCC:		return LowerSETCC(op, DAG);
+	// We only ever get custom loads when it's an extload
+	case ISD::LOAD:			return LowerExtLoad(op, DAG);
 	default:
 		llvm_unreachable(op.getNode()->getOperationName().c_str());
 	}
@@ -433,6 +439,19 @@ TMS320C64XLowering::LowerJumpTable(SDValue op, SelectionDAG &DAG)
 	SDValue res = DAG.getTargetJumpTable(j->getIndex(), getPointerTy(), 0);
 	return DAG.getNode(TMSISD::WRAPPER, op.getDebugLoc(), getPointerTy(),
 									res);
+}
+
+SDValue
+TMS320C64XLowering::LowerExtLoad(SDValue op, SelectionDAG &DAG)
+{
+
+	const LoadSDNode *l = cast<LoadSDNode>(op);
+	SDVTList list = l->getVTList();
+
+	return DAG.getExtLoad(ISD::SEXTLOAD, op.getDebugLoc(), list.VTs[0],
+			l->getOperand(0), l->getOperand(1), l->getSrcValue(),
+			l->getSrcValueOffset(), l->getMemoryVT(),
+			l->isVolatile(), l->getAlignment());
 }
 
 SDValue
