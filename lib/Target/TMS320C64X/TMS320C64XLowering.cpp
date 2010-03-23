@@ -49,6 +49,7 @@ TMS320C64XLowering::TMS320C64XLowering(TMS320C64XTargetMachine &tm) :
 
 	/* No 32 bit load insn */
 	setOperationAction(ISD::GlobalAddress, MVT::i32, Custom);
+	setOperationAction(ISD::JumpTable, MVT::i32, Custom);
 
 	/* No in-reg sx */
 	setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i16, Expand);
@@ -400,6 +401,7 @@ TMS320C64XLowering::LowerOperation(SDValue op,  SelectionDAG &DAG)
 {
 	switch (op.getOpcode()) {
 	case ISD::GlobalAddress:	return LowerGlobalAddress(op, DAG);
+	case ISD::JumpTable:		return LowerJumpTable(op, DAG);
 	case ISD::RETURNADDR:		return LowerReturnAddr(op, DAG);
 	case ISD::BR_CC:		return LowerBRCC(op, DAG);
 	case ISD::SETCC:		return LowerSETCC(op, DAG);
@@ -418,6 +420,17 @@ TMS320C64XLowering::LowerGlobalAddress(SDValue op, SelectionDAG &DAG)
 	int64_t offset = cast<GlobalAddressSDNode>(op)->getOffset();
 
 	SDValue res = DAG.getTargetGlobalAddress(GV, getPointerTy(), offset);
+	return DAG.getNode(TMSISD::WRAPPER, op.getDebugLoc(), getPointerTy(),
+									res);
+}
+
+SDValue
+TMS320C64XLowering::LowerJumpTable(SDValue op, SelectionDAG &DAG)
+{
+
+	const JumpTableSDNode *j = cast<JumpTableSDNode>(op);
+
+	SDValue res = DAG.getTargetJumpTable(j->getIndex(), getPointerTy(), 0);
 	return DAG.getNode(TMSISD::WRAPPER, op.getDebugLoc(), getPointerTy(),
 									res);
 }

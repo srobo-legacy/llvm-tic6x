@@ -230,6 +230,8 @@ def : Pat<(i32 mvk_all_pred:$val),
 	(mvkh_p mvk_all_pred:$val, (mvkl_p mvk_all_pred:$val))>;
 def : Pat<(i32 (Wrapper tglobaladdr:$val)),
 	(mvkh_p tglobaladdr:$val, (mvkl_p tglobaladdr:$val))>;
+def : Pat<(i32 (Wrapper tjumptable:$dst)),
+	(mvkh_p tjumptable:$dst, (mvkl_p tjumptable:$dst))>;
 
 
 
