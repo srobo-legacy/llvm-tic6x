@@ -41,7 +41,6 @@ TMS320C64XLowering::TMS320C64XLowering(TMS320C64XTargetMachine &tm) :
 	TargetLowering(tm, new TargetLoweringObjectFileCOFF()), TM(tm)
 {
 
-	/* Ugh */
 	addRegisterClass(MVT::i32, TMS320C64X::GPRegsRegisterClass);
 
 	setLoadExtAction(ISD::SEXTLOAD, MVT::i1, Promote);
@@ -49,18 +48,18 @@ TMS320C64XLowering::TMS320C64XLowering(TMS320C64XTargetMachine &tm) :
 	setLoadExtAction(ISD::EXTLOAD, MVT::i8, Custom);
 	setLoadExtAction(ISD::EXTLOAD, MVT::i16, Custom);
 	setLoadExtAction(ISD::EXTLOAD, MVT::i32, Custom);
-	/* All other loads have sx and zx support */
+	// All other loads have sx and zx support
 
-	/* No 32 bit load insn */
+	// No 32 bit load insn
 	setOperationAction(ISD::GlobalAddress, MVT::i32, Custom);
 	setOperationAction(ISD::JumpTable, MVT::i32, Custom);
 
-	/* No in-reg sx */
+	// No in-reg sx
 	setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i16, Expand);
 	setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i8, Expand);
 	setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i1, Expand);
 
-	/* No divide anything */
+	// No divide anything
 	setOperationAction(ISD::UDIV, MVT::i32, Expand);
 	setOperationAction(ISD::SDIV, MVT::i32, Expand);
 	setOperationAction(ISD::UREM, MVT::i32, Expand);
@@ -68,21 +67,21 @@ TMS320C64XLowering::TMS320C64XLowering(TMS320C64XTargetMachine &tm) :
 	setOperationAction(ISD::UDIVREM, MVT::i32, Expand);
 	setOperationAction(ISD::SDIVREM, MVT::i32, Expand);
 
-	/* We can generate two conditional instructions for select, not so
-	 * easy for select_cc */
+	// We can generate two conditional instructions for select, not so
+	// easy for select_cc
 	setOperationAction(ISD::SELECT, MVT::i32, Custom);
 	setOperationAction(ISD::SELECT_CC, MVT::i32, Expand);
-	/* Manually beat condition code setting into cmps */
+	// Manually beat condition code setting into cmps
 	setOperationAction(ISD::SETCC, MVT::i32, Custom);
-	/* We can emulate br_cc, maybe not brcond, do what works */
+	// We can emulate br_cc, maybe not brcond, do what works
 	setOperationAction(ISD::BRCOND, MVT::i32, Expand);
 	setOperationAction(ISD::BR_CC, MVT::i32, Custom);
 	setOperationAction(ISD::BR_JT, MVT::Other, Expand);
 
-	/* Probably is a membarrier, but I'm not aware of it right now */
+	// Probably is a membarrier, but I'm not aware of it right now
 	setOperationAction(ISD::MEMBARRIER, MVT::Other, Expand);
 
-	/* Should also inject other invalid operations here */
+	// Should also inject other invalid operations here
 
 	setStackPointerRegisterToSaveRestore(TMS320C64X::A15);
 
@@ -93,7 +92,7 @@ TMS320C64XLowering::TMS320C64XLowering(TMS320C64XTargetMachine &tm) :
 TMS320C64XLowering::~TMS320C64XLowering()
 {
 
-	/* _nothing_ */
+	// _nothing_
 	return;
 }
 
@@ -119,7 +118,7 @@ unsigned
 TMS320C64XLowering::getFunctionAlignment(Function const*) const
 {
 
-	return 5; /* 32 bytes; instruction packet */
+	return 5; // 32 bytes; instruction packet
 }
 
 SDValue
@@ -148,10 +147,10 @@ TMS320C64XLowering::LowerFormalArguments(SDValue Chain,
 			unsigned Reg = MF.addLiveIn(VA.getLocReg(), &TMS320C64X::GPRegsRegClass);
 			SDValue Arg = DAG.getCopyFromReg(Chain, dl, Reg, RegVT);
 			if (ObjectVT != MVT::i32) {
-				/* Looks like AssertSext gets put in
-				 * here topoint out the caller will
-				 * have sign extended the incoming
-				 * value */
+				// Looks like AssertSext gets put in
+				// here topoint out the caller will
+				// have sign extended the incoming
+				// value
 				Arg = DAG.getNode(ISD::AssertSext, dl, MVT::i32,
 					Arg, DAG.getValueType(ObjectVT));
 				Arg = DAG.getNode(ISD::TRUNCATE, dl, 
@@ -211,7 +210,7 @@ TMS320C64XLowering::LowerReturn(SDValue Chain, unsigned CallConv, bool isVarArg,
 		Chain = DAG.getCopyToReg(Chain, dl, VA.getLocReg(), Outs[i].Val,
 									Flag);
 
-		Flag = Chain.getValue(1); // From sparc... why?
+		Flag = Chain.getValue(1);
 	}
 
 	if (Flag.getNode())
