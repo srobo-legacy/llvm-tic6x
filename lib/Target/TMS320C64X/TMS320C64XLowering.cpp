@@ -72,6 +72,7 @@ TMS320C64XLowering::TMS320C64XLowering(TMS320C64XTargetMachine &tm) :
 	/* We can emulate br_cc, maybe not brcond, do what works */
 	setOperationAction(ISD::BRCOND, MVT::i32, Expand);
 	setOperationAction(ISD::BR_CC, MVT::i32, Custom);
+	setOperationAction(ISD::BR_JT, MVT::Other, Expand);
 
 	/* Probably is a membarrier, but I'm not aware of it right now */
 	setOperationAction(ISD::MEMBARRIER, MVT::Other, Expand);
