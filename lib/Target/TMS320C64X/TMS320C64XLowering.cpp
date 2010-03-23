@@ -42,6 +42,9 @@ TMS320C64XLowering::TMS320C64XLowering(TMS320C64XTargetMachine &tm) :
 {
 
 	addRegisterClass(MVT::i32, TMS320C64X::GPRegsRegisterClass);
+	addRegisterClass(MVT::i32, TMS320C64X::ARegsRegisterClass);
+	addRegisterClass(MVT::i32, TMS320C64X::BRegsRegisterClass);
+	addRegisterClass(MVT::i32, TMS320C64X::PredRegsRegisterClass);
 
 	setLoadExtAction(ISD::SEXTLOAD, MVT::i1, Promote);
 	setLoadExtAction(ISD::EXTLOAD, MVT::i1, Custom);
