@@ -478,7 +478,6 @@ SDValue
 TMS320C64XLowering::LowerBRCC(SDValue op, SelectionDAG &DAG)
 {
 	int pred = 1;
-	DebugLoc dl = DebugLoc::getUnknownLoc();
 	ISD::CondCode cc = cast<CondCodeSDNode>(op.getOperand(1))->get();
 
 	// Can't do setne: instead invert predicate
@@ -487,12 +486,13 @@ TMS320C64XLowering::LowerBRCC(SDValue op, SelectionDAG &DAG)
 		pred = 0;
 	}
 
-	SDValue Chain = LowerSETCC(DAG.getSetCC(dl, MVT::i32, op.getOperand(2),
-						op.getOperand(3), cc), DAG);
+	SDValue Chain = LowerSETCC(DAG.getSetCC(op.getDebugLoc(), MVT::i32,
+				op.getOperand(2), op.getOperand(3), cc), DAG);
 
 	// Generate our own brcond form, operands BB, const/reg for predicate
-	Chain = DAG.getNode(TMSISD::BRCOND, dl, MVT::Other, op.getOperand(0),
-		op.getOperand(4), DAG.getTargetConstant(pred, MVT::i32), Chain);
+	Chain = DAG.getNode(TMSISD::BRCOND, op.getDebugLoc(), MVT::Other,
+		op.getOperand(0), op.getOperand(4),
+		DAG.getTargetConstant(pred, MVT::i32), Chain);
 
 	return Chain;
 }
@@ -505,7 +505,6 @@ TMS320C64XLowering::LowerSETCC(SDValue op, SelectionDAG &DAG)
 	SDValue lhs = op.getOperand(0);
 	SDValue rhs = op.getOperand(1);
 	ISD::CondCode cc = cast<CondCodeSDNode>(op.getOperand(2))->get();
-	DebugLoc dl = DebugLoc::getUnknownLoc();
 
 #define SWAP() {		\
 	tmp = lhs;		\
@@ -568,5 +567,5 @@ TMS320C64XLowering::LowerSETCC(SDValue op, SelectionDAG &DAG)
 		break;
 	}
 
-	return  DAG.getNode(opcode, dl, MVT::i32, lhs, rhs);
+	return  DAG.getNode(opcode, op.getDebugLoc(), MVT::i32, lhs, rhs);
 }
