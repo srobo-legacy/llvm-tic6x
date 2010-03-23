@@ -417,6 +417,7 @@ TMS320C64XLowering::LowerOperation(SDValue op,  SelectionDAG &DAG)
 	case ISD::SETCC:		return LowerSETCC(op, DAG);
 	// We only ever get custom loads when it's an extload
 	case ISD::LOAD:			return LowerExtLoad(op, DAG);
+	case ISD::SELECT:		return LowerSelect(op, DAG);
 	default:
 		llvm_unreachable(op.getNode()->getOperationName().c_str());
 	}
@@ -568,4 +569,24 @@ TMS320C64XLowering::LowerSETCC(SDValue op, SelectionDAG &DAG)
 	}
 
 	return  DAG.getNode(opcode, op.getDebugLoc(), MVT::i32, lhs, rhs);
+}
+
+SDValue
+TMS320C64XLowering::LowerSelect(SDValue op, SelectionDAG &DAG)
+{
+	SDValue ops[6];
+
+	// Operand 1 is true/false, selects operand 2 or 3 respectively
+	// We'll generate this with two conditional move instructions - moving
+	// the true/false result to the same register. In theory these could
+	// be scheduled in the same insn packet (given that only one will
+	// execute out of the pair, due to the conditional)
+
+	ops[0] = op.getOperand(1);
+	ops[1] = op.getOperand(2);
+	ops[2] = DAG.getTargetConstant(0, MVT::i32);
+	ops[3] = op.getOperand(0);
+	ops[4] = DAG.getTargetConstant(1, MVT::i32);
+	ops[5] = op.getOperand(0);
+	return DAG.getNode(TMSISD::SELECT, op.getDebugLoc(), MVT::i32, ops, 6);
 }

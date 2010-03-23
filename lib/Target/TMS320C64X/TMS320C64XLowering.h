@@ -31,6 +31,7 @@ namespace TMSISD {
 		CMPLT,
 		CMPLTU,
 		RET_FLAG,
+		SELECT,
 		WRAPPER
 	};
 }
@@ -70,6 +71,7 @@ public:
 	SDValue LowerReturnAddr(SDValue op, SelectionDAG &DAG);
 	SDValue LowerBRCC(SDValue op, SelectionDAG &DAG);
 	SDValue LowerSETCC(SDValue op, SelectionDAG &DAG);
+	SDValue LowerSelect(SDValue op, SelectionDAG &DAG);
 
 	const TMS320C64XTargetMachine &TM;
 };
