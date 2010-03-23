@@ -508,7 +508,8 @@ TMS320C64XLowering::LowerSETCC(SDValue op, SelectionDAG &DAG)
 		SWAP();
 		break;
 	case ISD::SETUNE:
-		llvm_unreachable("Halp. Can't do setne's");
+		opcode = TMSISD::CMPNE;
+		break;
 	case ISD::SETGT:
 		opcode = TMSISD::CMPGT;
 		break;
@@ -524,7 +525,8 @@ TMS320C64XLowering::LowerSETCC(SDValue op, SelectionDAG &DAG)
 		SWAP();
 		break;
 	case ISD::SETNE:
-		llvm_unreachable("Halp. Can't do setnes");
+		opcode = TMSISD::CMPNE;
+		break;
 	}
 
 	return  DAG.getNode(opcode, dl, MVT::i32, lhs, rhs);
