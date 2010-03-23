@@ -38,6 +38,8 @@ def call_ret_label_operand : SDNode<"TMSISD::CALL_RET_LABEL_OPERAND",
 					SDNPSideEffect]>;
 def cmpeq_node : SDNode<"TMSISD::CMPEQ", SDTIntBinOp,
 				[SDNPOutFlag, SDNPCommutative]>;
+def cmpne_node : SDNode<"TMSISD::CMPNE", SDTIntBinOp,
+				[SDNPOutFlag, SDNPCommutative]>;
 def cmpgt_node : SDNode<"TMSISD::CMPGT", SDTIntBinOp, [SDNPOutFlag]>;
 def cmpgtu_node : SDNode<"TMSISD::CMPGTU", SDTIntBinOp, [SDNPOutFlag]>;
 def cmplt_node : SDNode<"TMSISD::CMPLT", SDTIntBinOp, [SDNPOutFlag]>;
@@ -279,6 +281,9 @@ def cmpeq_p_ri : pseudo_ri<"cmpeq", (i32 sconst5:$imm), unit_l, cmpeq_node, 1>;
 defm cmpeq : inst_rx<"cmpeq", unit_l, cmpeq_node, 0>;
 defm cmpeq : inst_xr<"cmpeq", unit_l, cmpeq_node, 1>;
 defm cmpeq : inst_xi<"cmpeq", (i32 sconst5:$imm), unit_l, cmpeq_node, 1>;
+
+def : Pat<(cmpne_node GPRegs:$reg1, GPRegs:$reg2),
+		(xor_p_ri (cmpeq_p_rr GPRegs:$reg1, GPRegs:$reg2), (i32 1))>;
 
 def cmpgt_p_rr : pseudo_rr<"cmpgt", unit_l, cmpgt_node, 0>;
 def cmpgt_p_ri : pseudo_ri<"cmpgt", (i32 sconst5:$imm), unit_l, cmpgt_node, 1>;
