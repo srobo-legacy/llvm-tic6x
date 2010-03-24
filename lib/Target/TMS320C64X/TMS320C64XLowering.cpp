@@ -99,6 +99,13 @@ TMS320C64XLowering::TMS320C64XLowering(TMS320C64XTargetMachine &tm) :
 	setOperationAction(ISD::ADDE, MVT::i32, Expand);
 	setOperationAction(ISD::SUBE, MVT::i32, Expand);
 
+	// VACOPY and VAEND apparently have sane defaults, however
+	// VASTART and VAARG can't be expanded
+	setOperationAction(ISD::VASTART, MVT::Other, Custom);
+	setOperationAction(ISD::VAARG, MVT::Other, Custom);
+	setOperationAction(ISD::VACOPY, MVT::Other, Expand);
+	setOperationAction(ISD::VAEND, MVT::Other, Expand);
+
 	setStackPointerRegisterToSaveRestore(TMS320C64X::A15);
 
 	computeRegisterProperties();
