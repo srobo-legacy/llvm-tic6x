@@ -289,18 +289,26 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 	const Function *F;
 	const FunctionType *FT;
 	int bytes;
-	unsigned int i, retaddr, arg_idx;
+	unsigned int i, retaddr, arg_idx, fixed_args;
 	bool is_icall = false;;
 
 	retaddr = 0;
 	arg_idx = 0;
 	bytes = 0;
-	F = cast<Function>(cast<GlobalAddressSDNode>(Callee)->getGlobal());
-	FT = F->getFunctionType();
 
 	CCState CCInfo(CallConv, isVarArg, getTargetMachine(), ArgLocs,
 							*DAG.getContext());
 	CCInfo.AnalyzeCallOperands(Outs, CC_TMS320C64X);
+
+	if (Callee.getNode()->getOpcode() == ISD::GlobalAddress) {
+		F = cast<Function>(cast<GlobalAddressSDNode>(Callee)->
+							getGlobal());
+		FT = F->getFunctionType();
+		fixed_args = FT->getNumParams();
+	} else {
+		assert(!isVarArg && "VarArg call with no corresponding type");
+		fixed_args = ArgLocs.size();
+	}
 
 	// Make our own stack and register decisions; however keep CCInfos
 	// thoughts on sign extension, as they're handy.
@@ -312,7 +320,7 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 			bytes = 0;
 		}
 	} else {
-		bytes = (ArgLocs.size() - FT->getNumParams() + 1) * 4;
+		bytes = (ArgLocs.size() - fixed_args + 1) * 4;
 	}
 
 	Chain = DAG.getCALLSEQ_START(Chain, DAG.getConstant(bytes,
