@@ -312,6 +312,9 @@ TMS320C64XAsmPrinter::printOperand(const MachineInstr *MI, int op_num)
 	case MachineOperand::MO_ExternalSymbol:
 		O << MO.getSymbolName();
 		break;
+	case MachineOperand::MO_JumpTableIndex:
+		O << (int)MO.getIndex();
+		break;
 	case MachineOperand::MO_ConstantPoolIndex:
 	default:
 		llvm_unreachable("Unknown operand type");
