@@ -136,7 +136,7 @@ defm and_d : inst_xr<"and", unit_d, and, 1>;
 defm and_d : inst_xi<"and", (i32 sconst5:$imm), unit_d, and, 1>;
 
 def or_p_rr : pseudo_rr<"or", unit_d, or, 0>;
-def or_p_ri : pseudo_ri<"or", (i32 sconst5:$imm), unit_d, or, 0>;
+def or_p_ri : pseudo_ri<"or", (i32 sconst5:$imm), unit_d, or, 1>;
 
 defm or_d : inst_rx<"or", unit_d, or, 0>;
 defm or_d : inst_xi<"or", (i32 sconst5:$imm), unit_d, or, 1>;
