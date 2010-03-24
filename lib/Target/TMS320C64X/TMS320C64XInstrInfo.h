@@ -44,6 +44,10 @@ public:
 
 	virtual const TargetRegisterInfo &getRegisterInfo() const { return RI; }
 
+	virtual bool spillCalleeSavedRegisters(MachineBasicBlock &MBB,
+				MachineBasicBlock::iterator MBBI,
+				const std::vector<CalleeSavedInfo> &CSI) const;
+
 	virtual bool copyRegToReg(MachineBasicBlock &MBB,
 				MachineBasicBlock::iterator I,
 				unsigned desg_reg, unsigned src_reg,

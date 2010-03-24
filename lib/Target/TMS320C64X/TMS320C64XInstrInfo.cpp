@@ -28,6 +28,46 @@ TMS320C64XInstrInfo::TMS320C64XInstrInfo(TMS320C64XTargetMachine &tm)
 }
 
 bool
+TMS320C64XInstrInfo::spillCalleeSavedRegisters(MachineBasicBlock &MBB,
+		MachineBasicBlock::iterator MBBI,
+		const std::vector<CalleeSavedInfo> &CSI) const
+{
+	const MachineFunction *MF;
+	unsigned int i, reg;
+	bool is_kill;
+
+	MF = MBB.getParent();
+	const MachineRegisterInfo &MRI = MF->getRegInfo();
+
+	for (i = 0; i < CSI.size(); ++i) {
+		// Should this be a kill? Unfortunately the argument registers
+		// and nonvolatile registers on the target overlap, which leads
+		// to a situation where we spill a nonvolatile register,
+		// killing it, and then try and use it as an argument register
+		// -> "Using undefined register". So, check whether this reg is
+		// a _function_ LiveIn too.
+
+		is_kill = true;
+		reg = CSI[i].getReg();
+
+		MachineRegisterInfo::livein_iterator li = MRI.livein_begin();
+		for (; li != MRI.livein_end(); li++) {
+			if (li->first == reg) {
+				is_kill = false;
+				break;
+			}
+		}
+
+		MBB.addLiveIn(reg);
+		storeRegToStackSlot(MBB, MBBI, reg, is_kill,
+					CSI[i].getFrameIdx(),
+					CSI[i].getRegClass());
+	}
+
+	return true;
+}
+
+bool
 TMS320C64XInstrInfo::copyRegToReg(MachineBasicBlock &MBB, 
 				MachineBasicBlock::iterator I,
 				unsigned dst_reg, unsigned src_reg,
