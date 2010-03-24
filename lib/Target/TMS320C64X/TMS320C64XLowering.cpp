@@ -211,6 +211,7 @@ TMS320C64XLowering::LowerFormalArguments(SDValue Chain,
 				}
 				InVals.push_back(Arg);
 			} else {
+				// XXX - i64?
 				int frame_idx = MFI-> CreateFixedObject(4,
 								stack_offset);
 				SDValue FIPtr = DAG.getFrameIndex(frame_idx,
