@@ -500,8 +500,10 @@ TMS320C64XLowering::LowerBRCC(SDValue op, SelectionDAG &DAG)
 		pred = 0;
 	}
 
-	SDValue Chain = LowerSETCC(DAG.getSetCC(op.getDebugLoc(), MVT::i32,
-				op.getOperand(2), op.getOperand(3), cc), DAG);
+	SDValue Chain = DAG.getSetCC(op.getDebugLoc(), MVT::i32,
+				op.getOperand(2), op.getOperand(3), cc);
+	if (Chain.getNode()->getOpcode() != ISD::Constant)
+		Chain = LowerSETCC(Chain, DAG);
 
 	// Generate our own brcond form, operands BB, const/reg for predicate
 	Chain = DAG.getNode(TMSISD::BRCOND, op.getDebugLoc(), MVT::Other,
