@@ -148,6 +148,7 @@ TMS320C64XLowering::getFunctionAlignment(Function const*) const
 	return 5; // 32 bytes; instruction packet
 }
 
+using namespace TMS320C64X;
 SDValue
 TMS320C64XLowering::LowerFormalArguments(SDValue Chain,
 				unsigned CallConv, bool isVarArg,
@@ -156,55 +157,76 @@ TMS320C64XLowering::LowerFormalArguments(SDValue Chain,
 				SmallVectorImpl<SDValue> &InVals)
 {
 	SmallVector<CCValAssign, 16> ArgLocs;
-	unsigned int i;
+	static const unsigned int arg_regs[] =
+		{ A4, B4, A6, B6, A8, B8, A10, B10, A12, B12 };
+	unsigned int i, arg_idx, reg, stack_offset;
 
 	MachineFunction &MF = DAG.getMachineFunction();
 	MachineFrameInfo *MFI = MF.getFrameInfo();
+	MachineRegisterInfo &RegInfo = MF.getRegInfo();
+
+	arg_idx = 0;
+	stack_offset = 0;
 
 	CCState CCInfo(CallConv, isVarArg, getTargetMachine(), ArgLocs,
 			*DAG.getContext());
 	CCInfo.AnalyzeFormalArguments(Ins, CC_TMS320C64X);
 
-	// Also arguments, which is what this is all about
+	// Ditch location allocation of arguments and do our own thing - only
+	// way to make varargs work correctly
 	for (i = 0; i < ArgLocs.size(); ++i) {
 		CCValAssign &VA = ArgLocs[i];
 		EVT ObjectVT = VA.getValVT();
-		if (VA.isRegLoc()) {
-			EVT RegVT = VA.getLocVT();
-			unsigned Reg = MF.addLiveIn(VA.getLocReg(), &TMS320C64X::GPRegsRegClass);
-			SDValue Arg = DAG.getCopyFromReg(Chain, dl, Reg, RegVT);
-			if (ObjectVT != MVT::i32) {
-				// Looks like AssertSext gets put in
-				// here topoint out the caller will
-				// have sign extended the incoming
-				// value
-				Arg = DAG.getNode(ISD::AssertSext, dl, MVT::i32,
-					Arg, DAG.getValueType(ObjectVT));
-				Arg = DAG.getNode(ISD::TRUNCATE, dl, 
-							ObjectVT, Arg);
-			}
-			InVals.push_back(Arg);
-		} else {
-			EVT ValVT;
-			if (VA.getLocInfo() == CCValAssign::Indirect)
-				ValVT = VA.getLocVT();
-			else
-				ValVT = VA.getValVT();
+		switch (ObjectVT.getSimpleVT().SimpleTy) {
+		default: llvm_unreachable("Unhandled argument type");
+		case MVT::i1:
+		case MVT::i8:
+		case MVT::i16:
+		case MVT::i32:
+			if (!Ins[i].Used) {
+				if (arg_idx < 10) arg_idx++;
+				InVals.push_back(DAG.getUNDEF(ObjectVT));
+			} else if (arg_idx < 10) {
+				reg = RegInfo.createVirtualRegister(
+						&GPRegsRegClass);
+				MF.getRegInfo().addLiveIn(arg_regs[arg_idx++],
+									reg);
+				SDValue Arg = DAG.getCopyFromReg(Chain, dl,
+							reg, MVT::i32);
+				if (ObjectVT != MVT::i32) {
+					Arg = DAG.getNode(ISD::AssertSext,
+						dl, MVT::i32, Arg,
+						DAG.getValueType(ObjectVT));
+					Arg = DAG.getNode(ISD::TRUNCATE, dl,
+						ObjectVT, Arg);
+				}
+				InVals.push_back(Arg);
+			} else {
+				int frame_idx = MFI-> CreateFixedObject(4,
+								stack_offset);
+				SDValue FIPtr = DAG.getFrameIndex(frame_idx,
+								MVT::i32);
+				SDValue load;
+				if (ObjectVT == MVT::i32) {
+					load = DAG.getLoad(MVT::i32, dl, Chain,
+							FIPtr, NULL, 0);
+				} else {
+					load = DAG.getExtLoad(ISD::SEXTLOAD,
+							dl, MVT::i32,  Chain,
+							FIPtr, NULL, 0,
+							ObjectVT);
+					load = DAG.getNode(ISD::TRUNCATE, dl,
+							ObjectVT, load);
+				}
+				InVals.push_back(load);
 
-			int FI = MFI->CreateFixedObject(ValVT.getSizeInBits()/8,
-						VA.getLocMemOffset(), true);
-			SDValue FIN = DAG.getFrameIndex(FI, MVT::i32);
-			SDValue Load = DAG.getLoad(MVT::i32, dl, Chain, FIN,
-							NULL, 0);
-			InVals.push_back(Load);
-		}
-	}
+				stack_offset += 4;
+			}
+		} // switch
+	} // argloop
 
 	// XXX - varargs have to go on stack, and to match TI calling
 	// convention the previous argument has to go on stack too.
-	if (isVarArg) {
-		llvm_unreachable_internal("No varargs yet, pls");
-	}
 
 	return Chain;
 }
