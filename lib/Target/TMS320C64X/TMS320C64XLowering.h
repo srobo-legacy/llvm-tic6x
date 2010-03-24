@@ -64,6 +64,10 @@ public:
 				const SmallVectorImpl<ISD::InputArg> &Ins,
 				DebugLoc dl, SelectionDAG &DAG,
 				SmallVectorImpl<SDValue> &InVals);
+
+	virtual MachineBasicBlock *EmitInstrWithCustomInserter(
+				MachineInstr *MI, MachineBasicBlock *MBB) const;
+
 	SDValue LowerOperation(SDValue op, SelectionDAG &DAG);
 	SDValue LowerGlobalAddress(SDValue op, SelectionDAG &DAG);
 	SDValue LowerJumpTable(SDValue op, SelectionDAG &DAG);

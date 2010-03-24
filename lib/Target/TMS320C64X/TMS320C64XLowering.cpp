@@ -482,6 +482,25 @@ TMS320C64XLowering::LowerCallResult(SDValue Chain, SDValue InFlag,
 	return Chain;
 }
 
+MachineBasicBlock *
+TMS320C64XLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
+					MachineBasicBlock *MBB) const
+{
+	int delay;
+
+	MBB->insert(MBB->end(), MI);
+
+	const TargetInstrInfo *TII = getTargetMachine().getInstrInfo();
+	delay = GET_DELAY_SLOTS(MI->getDesc().TSFlags);
+	if (delay != 0) {
+		// We need to put some noops in
+		addDefaultPred(BuildMI(MBB, MI->getDebugLoc(),
+				TII->get(TMS320C64X::noop)).addImm(delay));
+	}
+
+	return MBB;
+}
+
 SDValue
 TMS320C64XLowering::LowerOperation(SDValue op,  SelectionDAG &DAG)
 {

@@ -236,6 +236,10 @@ class inst<dag outs, dag ins, string mnemonic, list<dag> pattern, bit side,
 	// Used to indicate memory datapath specifier, if this is memory access
 	bit mem_access = 0;
 	bit mem_load_store = 0; // 0 for load, 1 for store
+
+	// We need to squirt some nops behind instructions with delay slots;
+	// use this hook to do that
+	let usesCustomDAGSchedInserter = 1;
 }
 
 class pseudo_rr<string mnemonic, InstUnit u, SDNode op, int swap> :
