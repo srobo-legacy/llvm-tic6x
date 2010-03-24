@@ -88,6 +88,7 @@ TMS320C64XLowering::TMS320C64XLowering(TMS320C64XTargetMachine &tm) :
 	// The following might be supported, but I can't be bothered or don't
 	// have enough time to work on
 	setOperationAction(ISD::MULHS, MVT::i32, Expand);
+	setOperationAction(ISD::MULHU, MVT::i32, Expand);
 	setOperationAction(ISD::SMUL_LOHI, MVT::i32, Expand);
 	setOperationAction(ISD::UMUL_LOHI, MVT::i32, Expand);
 
