@@ -146,7 +146,7 @@ defm or_s : inst_rx<"or", unit_s, or, 0>;
 defm or_s : inst_xi<"or", (i32 sconst5:$imm), unit_s, or, 1>;
 
 def xor_p_rr : pseudo_rr<"xor", unit_d, xor, 0>;
-def xor_p_ri : pseudo_ri<"xor", (i32 sconst5:$imm), unit_d, xor, 0>;
+def xor_p_ri : pseudo_ri<"xor", (i32 sconst5:$imm), unit_d, xor, 1>;
 
 defm xor_d : inst_rx<"xor", unit_d, xor, 0>;
 defm xor_d : inst_xi<"xor", (i32 sconst5:$imm), unit_d, xor, 1>;
