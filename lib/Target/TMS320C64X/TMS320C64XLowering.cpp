@@ -159,7 +159,7 @@ TMS320C64XLowering::LowerFormalArguments(SDValue Chain,
 	SmallVector<CCValAssign, 16> ArgLocs;
 	static const unsigned int arg_regs[] =
 		{ A4, B4, A6, B6, A8, B8, A10, B10, A12, B12 };
-	unsigned int i, arg_idx, reg, stack_offset;
+	unsigned int i, arg_idx, reg, stack_offset, last_fixed_arg;
 
 	MachineFunction &MF = DAG.getMachineFunction();
 	MachineFrameInfo *MFI = MF.getFrameInfo();
@@ -172,6 +172,14 @@ TMS320C64XLowering::LowerFormalArguments(SDValue Chain,
 			*DAG.getContext());
 	CCInfo.AnalyzeFormalArguments(Ins, CC_TMS320C64X);
 
+	// TI calling convention dictates that the argument preceeding the
+	// variable list of arguments must also be placed on the stack.
+	// This doesn't cause a problem as C dictates there must always be one
+	// non-var argument. But in any case, we need to break out of the
+	// register-munging loop and ensure the last fixed argument goes to
+	// the stack.
+	last_fixed_arg = ArgLocs.size() - 1;
+
 	// Ditch location allocation of arguments and do our own thing - only
 	// way to make varargs work correctly
 	for (i = 0; i < ArgLocs.size(); ++i) {
@@ -183,10 +191,11 @@ TMS320C64XLowering::LowerFormalArguments(SDValue Chain,
 		case MVT::i8:
 		case MVT::i16:
 		case MVT::i32:
-			if (!Ins[i].Used) {
+			if (!Ins[i].Used && (!isVarArg || i != last_fixed_arg)){
 				if (arg_idx < 10) arg_idx++;
 				InVals.push_back(DAG.getUNDEF(ObjectVT));
-			} else if (arg_idx < 10) {
+			} else if (arg_idx < 10 &&
+					(!isVarArg || i != last_fixed_arg)) {
 				reg = RegInfo.createVirtualRegister(
 						&GPRegsRegClass);
 				MF.getRegInfo().addLiveIn(arg_regs[arg_idx++],
@@ -224,9 +233,6 @@ TMS320C64XLowering::LowerFormalArguments(SDValue Chain,
 			}
 		} // switch
 	} // argloop
-
-	// XXX - varargs have to go on stack, and to match TI calling
-	// convention the previous argument has to go on stack too.
 
 	return Chain;
 }
