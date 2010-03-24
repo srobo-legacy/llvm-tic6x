@@ -283,19 +283,37 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 			DebugLoc dl, SelectionDAG &DAG,
 			SmallVectorImpl<SDValue> &InVals)
 {
-
-// XXX XXX XXX - TI Calling convention dictates that the last argument before
-// a series of vararg values on the stack must also be on the stack.
-
-	bool is_icall = false;;
-	unsigned int bytes, i, retaddr;
 	SmallVector<CCValAssign, 16> ArgLocs;
+	static const unsigned int reg_arg_nums[] =
+		{ A4, B4, A6, B6, A8, B8, A10, B10, A12, B12 };
+	const Function *F;
+	const FunctionType *FT;
+	int bytes;
+	unsigned int i, retaddr, arg_idx;
+	bool is_icall = false;;
+
+	retaddr = 0;
+	arg_idx = 0;
+	bytes = 0;
+	F = cast<Function>(cast<GlobalAddressSDNode>(Callee)->getGlobal());
+	FT = F->getFunctionType();
+
 	CCState CCInfo(CallConv, isVarArg, getTargetMachine(), ArgLocs,
 							*DAG.getContext());
-
 	CCInfo.AnalyzeCallOperands(Outs, CC_TMS320C64X);
-	bytes = CCInfo.getNextStackOffset();
-	retaddr = 0;
+
+	// Make our own stack and register decisions; however keep CCInfos
+	// thoughts on sign extension, as they're handy.
+	// Start out by guessing how much stack space we need
+	if (!isVarArg) {
+		if (ArgLocs.size() > 10) {
+			bytes = (ArgLocs.size() - 10) * 4; // XXX - i64?
+		} else {
+			bytes = 0;
+		}
+	} else {
+		bytes = (ArgLocs.size() - FT->getNumParams() + 1) * 4;
+	}
 
 	Chain = DAG.getCALLSEQ_START(Chain, DAG.getConstant(bytes,
 						getPointerTy(), true));
@@ -325,21 +343,25 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 			break;
 		}
 
-		if (va.isRegLoc()) {
-			reg_args.push_back(std::make_pair(va.getLocReg(), arg));
-		} else if (va.isMemLoc()) {
+		if (arg_idx < 10 && (!isVarArg || i < FT->getNumParams()-1)) {
+			// Additional check to ensure last fixed param and all
+			// variable params go on stack, if we're vararging
+			reg_args.push_back(std::make_pair(reg_arg_nums[arg_idx],
+									arg));
+			arg_idx++;
+		} else {
+			bytes -= 4;
+			assert(bytes >= 0 && "Stack space miscalculation");
 			SDValue stack_ptr = DAG.getCopyFromReg(Chain, dl,
 								TMS320C64X::A15,
 								getPointerTy());
 			SDValue addr = DAG.getNode(ISD::ADD,
 				dl, getPointerTy(), stack_ptr,
-				DAG.getIntPtrConstant(va.getLocMemOffset()));
+				DAG.getIntPtrConstant(bytes));
 
 			SDValue store = DAG.getStore(Chain, dl, arg, addr,
 							NULL, 0);
 			stack_args.push_back(store);
-		} else {
-			llvm_unreachable("Invalid call argument location");
 		}
 	}
 
