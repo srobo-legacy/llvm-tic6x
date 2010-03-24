@@ -363,8 +363,8 @@ def brcond_2 : inst<(outs), (ins), "b\t$s\t$block",
 		[(brcond_node bb:$block, predwrapper:$bees)], 1, unit_s>;
 }
 
-def bindirect_2 : inst<(outs), (ins GPRegs:$reg), "b\t$s\t$reg",
-				[(brind GPRegs:$reg)], 1, unit_s> {
+def bindirect_2 : inst<(outs), (ins BRegs:$reg), "b\t$s\t$reg",
+				[(brind BRegs:$reg)], 1, unit_s> {
 	let Pattern = sched_pattern;
 }
 } // isBranch
