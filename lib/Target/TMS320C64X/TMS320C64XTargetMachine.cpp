@@ -27,7 +27,7 @@ TMS320C64XTargetMachine::TMS320C64XTargetMachine(const Target &T,
 						const std::string &FS) :
 	LLVMTargetMachine(T, TT),
 	Subtarget(),
-	DataLayout("e-p:32:32:32-i8:8:8-i16:16:16-i32:32:32-n32"),
+	DataLayout("e-p:32:32:32-i8:8:8-i16:16:16-i32:32:32-f32:32:32:f64:64:64-f80:64:64-n32"),
 	/* No float types - could define n40, in that the DSP supports 40 bit
 	 * arithmatic, however it doesn't support it for all logic operations,
 	 * only a variety of alu ops. */
