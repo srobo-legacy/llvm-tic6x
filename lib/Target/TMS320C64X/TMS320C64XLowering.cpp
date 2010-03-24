@@ -286,8 +286,6 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 	SmallVector<CCValAssign, 16> ArgLocs;
 	static const unsigned int reg_arg_nums[] =
 		{ A4, B4, A6, B6, A8, B8, A10, B10, A12, B12 };
-	const Function *F;
-	const FunctionType *FT;
 	int bytes;
 	unsigned int i, retaddr, arg_idx, fixed_args;
 	bool is_icall = false;;
@@ -295,19 +293,15 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 	retaddr = 0;
 	arg_idx = 0;
 	bytes = 0;
+	fixed_args = 0;
 
 	CCState CCInfo(CallConv, isVarArg, getTargetMachine(), ArgLocs,
 							*DAG.getContext());
 	CCInfo.AnalyzeCallOperands(Outs, CC_TMS320C64X);
 
-	if (Callee.getNode()->getOpcode() == ISD::GlobalAddress) {
-		F = cast<Function>(cast<GlobalAddressSDNode>(Callee)->
-							getGlobal());
-		FT = F->getFunctionType();
-		fixed_args = FT->getNumParams();
-	} else {
-		assert(!isVarArg && "VarArg call with no corresponding type");
-		fixed_args = ArgLocs.size();
+	for (i = 0; i < Outs.size(); i++) {
+		if (Outs[i].IsFixed)
+			fixed_args++;
 	}
 
 	// Make our own stack and register decisions; however keep CCInfos
@@ -351,7 +345,7 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 			break;
 		}
 
-		if (arg_idx < 10 && (!isVarArg || i < FT->getNumParams()-1)) {
+		if (arg_idx < 10 && (!isVarArg || i < fixed_args - 1)) {
 			// Additional check to ensure last fixed param and all
 			// variable params go on stack, if we're vararging
 			reg_args.push_back(std::make_pair(reg_arg_nums[arg_idx],
