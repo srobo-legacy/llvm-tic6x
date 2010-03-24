@@ -72,6 +72,8 @@ public:
 	SDValue LowerBRCC(SDValue op, SelectionDAG &DAG);
 	SDValue LowerSETCC(SDValue op, SelectionDAG &DAG);
 	SDValue LowerSelect(SDValue op, SelectionDAG &DAG);
+	SDValue LowerVASTART(SDValue op, SelectionDAG &DAG);
+	SDValue LowerVAARG(SDValue op, SelectionDAG &DAG);
 
 	const TMS320C64XTargetMachine &TM;
 };

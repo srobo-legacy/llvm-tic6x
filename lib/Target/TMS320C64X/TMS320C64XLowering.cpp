@@ -489,6 +489,8 @@ TMS320C64XLowering::LowerOperation(SDValue op,  SelectionDAG &DAG)
 	// We only ever get custom loads when it's an extload
 	case ISD::LOAD:			return LowerExtLoad(op, DAG);
 	case ISD::SELECT:		return LowerSelect(op, DAG);
+	case ISD::VASTART:		return LowerVASTART(op, DAG);
+	case ISD::VAARG:		return LowerVAARG(op, DAG);
 	default:
 		llvm_unreachable(op.getNode()->getOperationName().c_str());
 	}
@@ -662,4 +664,52 @@ TMS320C64XLowering::LowerSelect(SDValue op, SelectionDAG &DAG)
 	ops[4] = DAG.getTargetConstant(1, MVT::i32);
 	ops[5] = op.getOperand(0);
 	return DAG.getNode(TMSISD::SELECT, op.getDebugLoc(), MVT::i32, ops, 6);
+}
+
+SDValue
+TMS320C64XLowering::LowerVASTART(SDValue op, SelectionDAG &DAG)
+{
+	int num_normal_params, stackgap;
+
+	num_normal_params = DAG.getMachineFunction().getFunction()->
+					getFunctionType()->getNumParams();
+	// As referenced elsewhere, TI specify the last fixed argument has to
+	// go on the stack. Also, any other overflow.
+	if (num_normal_params <= 10) {
+		stackgap = 4;
+	} else {
+		stackgap = (num_normal_params - 10) * 4;
+	}
+
+	SDValue Chain = DAG.getNode(ISD::ADD, op.getDebugLoc(), MVT::i32,
+				DAG.getRegister(TMS320C64X::B15, MVT::i32),
+				DAG.getConstant(stackgap, MVT::i32));
+	const Value *SV = cast<SrcValueSDNode>(op.getOperand(2))->getValue();
+	return DAG.getStore(op.getOperand(0), op.getDebugLoc(), Chain,
+						op.getOperand(1), SV, 0);
+}
+
+SDValue
+TMS320C64XLowering::LowerVAARG(SDValue op, SelectionDAG &DAG)
+{
+
+	// Largely copy sparc
+	SDNode *n = op.getNode();
+	EVT vt = n->getValueType(0);
+	SDValue chain = n->getOperand(0);
+	SDValue valoc = n->getOperand(1);
+	const Value *SV = cast<SrcValueSDNode>(n->getOperand(2))->getValue();
+
+	// Load point to vaarg list
+	SDValue loadptr = DAG.getLoad(MVT::i32, op.getDebugLoc(), chain,
+								valoc, SV, 0);
+	// Calculate address of next vaarg
+	SDValue newptr = DAG.getNode(ISD::ADD, op.getDebugLoc(), MVT::i32,
+			chain, DAG.getConstant(vt.getSizeInBits()/8, MVT::i32));
+	// Store that back to wherever we're storing the vaarg list
+	chain = DAG.getStore(loadptr.getValue(1), op.getDebugLoc(),
+						newptr, valoc, SV, 0);
+
+	// Actually load the argument
+	return DAG.getLoad(vt, op.getDebugLoc(), chain, loadptr, NULL, 0);
 }
