@@ -91,6 +91,13 @@ TMS320C64XLowering::TMS320C64XLowering(TMS320C64XTargetMachine &tm) :
 	setOperationAction(ISD::SMUL_LOHI, MVT::i32, Expand);
 	setOperationAction(ISD::UMUL_LOHI, MVT::i32, Expand);
 
+	// There's no carry support, we're supposed to use 40 bit integers
+	// instead. Let llvm generate workarounds instead.
+	setOperationAction(ISD::ADDC, MVT::i32, Expand);
+	setOperationAction(ISD::SUBC, MVT::i32, Expand);
+	setOperationAction(ISD::ADDE, MVT::i32, Expand);
+	setOperationAction(ISD::SUBE, MVT::i32, Expand);
+
 	setStackPointerRegisterToSaveRestore(TMS320C64X::A15);
 
 	computeRegisterProperties();
