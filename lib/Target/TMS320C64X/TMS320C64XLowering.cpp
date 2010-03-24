@@ -85,6 +85,9 @@ TMS320C64XLowering::TMS320C64XLowering(TMS320C64XTargetMachine &tm) :
 	setOperationAction(ISD::MEMBARRIER, MVT::Other, Expand);
 
 	// Should also inject other invalid operations here
+	// The following might be supported, but I can't be bothered or don't
+	// have enough time to work on
+	setOperationAction(ISD::MULHS, MVT::i32, Expand);
 
 	setStackPointerRegisterToSaveRestore(TMS320C64X::A15);
 
