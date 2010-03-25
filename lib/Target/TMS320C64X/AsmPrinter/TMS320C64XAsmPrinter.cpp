@@ -76,6 +76,7 @@ TMS320C64XAsmPrinter::runOnMachineFunction(MachineFunction &MF)
 	O << "\n\n";
 	EmitAlignment(F->getAlignment(), F);
 	O << "\t.globl\t" << CurrentFnName << "\n";
+	O << "\t" << CurrentFnName << ":\n";
 	printVisibility(CurrentFnName, F->getVisibility());
 
 	for (MachineFunction::const_iterator I = MF.begin(), E = MF.end();
