@@ -120,7 +120,7 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 			return false;
 		}
 	} else if (N.getOperand(0).getOpcode() == ISD::Register &&
-		N.getOperand(1).getOpcode() == ISD::Constant) {
+		N.getOperand(1).getOpcode() == ISD::Register) {
 		// We can use operand as index if it's add - just leave
 		// as 2nd operand
 		if (N.getOpcode() != ISD::ADD)
