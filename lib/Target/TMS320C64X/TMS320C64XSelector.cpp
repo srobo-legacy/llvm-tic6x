@@ -63,12 +63,34 @@ bool
 TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 					SDValue &offs)
 {
+	MemSDNode *mem;
+	unsigned int align, want_align;
+
 	if (N.getOpcode() == ISD::FrameIndex)
 		return false;
 
 	if (N.getOpcode() == ISD::TargetExternalSymbol ||
 				N.getOpcode() == ISD::TargetGlobalAddress)
 		return false;
+
+	mem = dyn_cast<MemSDNode>(op);
+	if (mem == NULL)
+		return false;
+
+	align = mem->getAlignment();
+	if (!mem->getMemoryVT().isInteger()) {
+		llvm_unreachable("Memory access on non integer type\n");
+	} else if (!mem->getMemoryVT().isSimple()) {
+		llvm_unreachable("Memory access on non-simple type\n");
+	} else {
+		want_align = mem->getMemoryVT().getSimpleVT().getSizeInBits();
+		want_align /= 8;
+
+		if (align < want_align) {
+			fprintf(stderr, "knobbling nonalign access\n");
+			return false;
+		}
+	}
 
 	if (N.getOperand(0).getOpcode() == ISD::Register &&
 		N.getOperand(1).getOpcode() == ISD::Constant) {
@@ -114,7 +136,28 @@ bool
 TMS320C64XInstSelectorPass::select_idxaddr(SDValue op, SDValue addr,
 					SDValue &base, SDValue &offs)
 {
+	MemSDNode *mem;
 	FrameIndexSDNode *FIN;
+	unsigned int align, want_align;
+
+	mem = dyn_cast<MemSDNode>(op);
+	if (mem == NULL)
+		return false;
+
+	align = mem->getAlignment();
+	if (!mem->getMemoryVT().isInteger()) {
+		llvm_unreachable("Memory access on non integer type\n");
+	} else if (!mem->getMemoryVT().isSimple()) {
+		llvm_unreachable("Memory access on non-simple type\n");
+	} else {
+		want_align = mem->getMemoryVT().getSimpleVT().getSizeInBits();
+		want_align /= 8;
+
+		if (align < want_align) {
+			fprintf(stderr, "knobbling nonalign access\n");
+			return false;
+		}
+	}
 
 	FIN = dyn_cast<FrameIndexSDNode>(addr);
 	if (FIN) {
