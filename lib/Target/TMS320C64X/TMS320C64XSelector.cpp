@@ -95,9 +95,10 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 	if (N.getOperand(0).getOpcode() == ISD::Register &&
 		N.getOperand(1).getOpcode() == ISD::Constant) {
 		if (N.getOpcode() == ISD::ADD &&
+// XXX - actually, negative const5 can go here if the addr mode is correct.
 				(Predicate_uconst5(N.getOperand(1).getNode()) ||
 				Predicate_uconst15(N.getOperand(1).getNode()))){
-			// This is valid, we can just print it
+			// This is valid in a single instruction
 			base = N.getOperand(0);
 			offs = N.getOperand(1);
 			return true;
@@ -111,8 +112,7 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 			MachineRegisterInfo &MR = MF.getRegInfo();
 			unsigned reg = MR.createVirtualRegister(
 					&TMS320C64X::GPRegsRegClass);
-			// XXX - damned if I know what chain is supposed
-			// to be in this situation
+
 			offs = CurDAG->getCopyToReg(N.getOperand(1),
 					dl, reg, N.getOperand(1));
 			return true;
