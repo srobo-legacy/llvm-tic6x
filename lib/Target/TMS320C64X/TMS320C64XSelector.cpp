@@ -101,7 +101,6 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 			// This is valid in a single instruction
 			base = N.getOperand(0);
 			offs = N.getOperand(1);
-			return true;
 		} else if (N.getOpcode() == ISD::ADD ||
 						N.getOpcode() == ISD::SUB) {
 			// Too big - load into register
@@ -115,7 +114,6 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 
 			offs = CurDAG->getCopyToReg(N.getOperand(1),
 					dl, reg, N.getOperand(1));
-			return true;
 		} else {
 			return false;
 		}
@@ -125,11 +123,17 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 		// as 2nd operand
 		if (N.getOpcode() != ISD::ADD)
 			return false;
-		else
-			return true;
+	} else {
+		return false;
 	}
 
-	return false;
+	/* Ok, we have a memory reference in range. However its scaled by the
+	 * size of the data access before being used (XXX - fix size tests above
+	 * to handle this). So, insert a SHR on the offset: if a constant, fine,
+	 * if a register, it'll have to be shr'd at runtime */
+	DebugLoc dl = DebugLoc::getUnknownLoc();
+	offs = CurDAG->getNode(ISD::SRA, dl, MVT::i32, offs,
+			CurDAG->getTargetConstant(log2(align), MVT::i32));
 }
 
 bool
@@ -163,22 +167,23 @@ TMS320C64XInstSelectorPass::select_idxaddr(SDValue op, SDValue addr,
 	if (FIN) {
 		base = CurDAG->getRegister(TMS320C64X::A15, MVT::i32);
 		offs = CurDAG->getTargetFrameIndex(FIN->getIndex(), MVT::i32);
-		return true;
-	}
-
-	if (addr.getOpcode() == ISD::TargetExternalSymbol ||
-				addr.getOpcode() == ISD::TargetGlobalAddress)
+	} else if (addr.getOpcode() == ISD::TargetExternalSymbol ||
+				addr.getOpcode() == ISD::TargetGlobalAddress) {
 		return false;
-
-	if (addr.getOpcode() == ISD::ADD) {
+	} else if (addr.getOpcode() == ISD::ADD) {
 		// We could match against the proper indexed load things here,
 		// and emit a single instruction for loading, but that can be
 		// implemented at some other point in time
 		// XXX - death
+	} else {
+		base = addr;
+		offs = CurDAG->getTargetConstant(0, MVT::i32);
 	}
 
-	base = addr;
-	offs = CurDAG->getTargetConstant(0, MVT::i32);
+	/* See comment in select_addr */
+	DebugLoc dl = DebugLoc::getUnknownLoc();
+	offs = CurDAG->getNode(ISD::SRA, dl, MVT::i32, offs,
+			CurDAG->getTargetConstant(log2(align), MVT::i32));
 	return true;
 }
 
