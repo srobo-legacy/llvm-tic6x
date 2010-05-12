@@ -134,6 +134,8 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 	DebugLoc dl = DebugLoc::getUnknownLoc();
 	offs = CurDAG->getNode(ISD::SRA, dl, MVT::i32, offs,
 			CurDAG->getTargetConstant(log2(align), MVT::i32));
+	offs = SDValue(SelectCode(offs), 0);
+	return true;
 }
 
 bool
@@ -184,6 +186,7 @@ TMS320C64XInstSelectorPass::select_idxaddr(SDValue op, SDValue addr,
 	DebugLoc dl = DebugLoc::getUnknownLoc();
 	offs = CurDAG->getNode(ISD::SRA, dl, MVT::i32, offs,
 			CurDAG->getTargetConstant(log2(align), MVT::i32));
+	offs = SDValue(SelectCode(offs), 0);
 	return true;
 }
 
