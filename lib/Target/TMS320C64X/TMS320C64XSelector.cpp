@@ -85,6 +85,8 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 	unsigned int align, want_align;
 	int offset;
 
+	DebugLoc dl = DebugLoc::getUnknownLoc();
+
 	if (N.getOpcode() == ISD::FrameIndex)
 		return false;
 
@@ -177,9 +179,23 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 	} else if (N.getOperand(0).getOpcode() == ISD::Register &&
 		N.getOperand(1).getOpcode() == ISD::Register) {
 		// We can use operand as index if it's add - just leave
-		// as 2nd operand
-		if (N.getOpcode() == ISD::ADD)
-			return true;
+		// as 2nd operand. Could also implement allowing subtract,
+		// but this means passing addressing mode information down
+		// to the assembly printer, which I suspect will mean pain.
+		if (N.getOpcode() != ISD::ADD)
+			return false;
+
+		// As mentioned above though, hardware will scale the offset,
+		// so we need to insert a shift here.
+		base = N.getOperand(0);
+		offs = CurDAG->getNode(ISD::SRA, dl, MVT::i32, N.getOperand(1),
+					CurDAG->getTargetConstant(want_align,
+					MVT::i32));
+		// That's a MI instruction and we're in the middle of depth
+		// first instruction selection, this won't get selected. So,
+		// make that happen manually.
+		offs = SDValue(SelectCode(offs), 0);
+		return true;
 	}
 
 	return false;
