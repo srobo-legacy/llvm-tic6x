@@ -116,7 +116,11 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 		if ((N.getOpcode() == ISD::ADD || N.getOpcode() == ISD::SUB) &&
 				(Predicate_sconst_n(N.getOperand(1).getNode(),
 							want_align + 5))) {
-			// This is valid in a single instruction
+
+			// This is valid in a single instruction. Offset operand
+			// will be analysed by asm printer to detect the correct
+			// addressing mode to print. The assembler will scale
+			// the constant appropriately.
 			CN = cast<ConstantSDNode>(N.getOperand(1));
 			offset = CN->getSExtValue();
 
