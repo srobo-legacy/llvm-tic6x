@@ -32,6 +32,7 @@
 #include "TMS320C64XGenInstrInfo.inc"
 #include "llvm/Target/TargetInstrInfo.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
+#include "llvm/CodeGen/SelectionDAG.h"
 
 namespace llvm {
 
@@ -122,6 +123,37 @@ findRegisterSide(unsigned reg, const MachineFunction *MF)
         return c;
 }
 
+inline bool
+Predicate_sconst_n(SDNode *in, int bits)
+{
+	ConstantSDNode *N;
+	int maxval, val;
+
+	maxval = 1 << bits;
+	N = cast<ConstantSDNode>(in);
+	val = N->getSExtValue();
+
+	if (val < maxval && val >= (-maxval))
+		return true;
+
+	return false;
+}
+
+inline bool
+Predicate_uconst_n(SDNode *in, int bits)
+{
+	ConstantSDNode *N;
+	int maxval, val;
+
+	maxval = 1 << bits;
+	N = cast<ConstantSDNode>(in);
+	val = N->getZExtValue();
+
+	if (val < maxval)
+		return true;
+
+	return false;
+}
 
 } // llvm
 
