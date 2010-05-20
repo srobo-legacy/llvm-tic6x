@@ -130,6 +130,16 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 			base = N.getOperand(0);
 			offs = CurDAG->getTargetConstant(offset, MVT::i32);
 			return true;
+		} else if (N.getOpcode() == ISD::ADD &&
+				Predicate_sconst_n(N.getOperand(1).getNode(),
+				want_align + 15)) {
+			// We can use the uconst15 form of this instruction.
+			// Again, the assembler will scale this for us. Could
+			// put in some clauses to find sub insns with negative
+			// offsets, but I guess llvm might do that for us.
+			base = N.getOperand(0);
+			offs = N.getOperand(1);
+			return true;
 		} else if (N.getOpcode() == ISD::ADD ||
 						N.getOpcode() == ISD::SUB) {
 			// Too big - load into register. Because the processor
