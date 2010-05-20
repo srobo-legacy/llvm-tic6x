@@ -81,7 +81,9 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 					SDValue &offs)
 {
 	MemSDNode *mem;
+	ConstantSDNode *CN;
 	unsigned int align, want_align;
+	int offset;
 
 	if (N.getOpcode() == ISD::FrameIndex)
 		return false;
@@ -111,13 +113,18 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 
 	if (N.getOperand(0).getOpcode() == ISD::Register &&
 		N.getOperand(1).getOpcode() == ISD::Constant) {
-		if (N.getOpcode() == ISD::ADD &&
-// XXX - actually, negative const5 can go here if the addr mode is correct.
-				(Predicate_uconst5(N.getOperand(1).getNode()) ||
-				Predicate_uconst15(N.getOperand(1).getNode()))){
+		if ((N.getOpcode() == ISD::ADD || N.getOpcode() == ISD::SUB) &&
+				(Predicate_sconst6(N.getOperand(1).getNode())))
 			// This is valid in a single instruction
+			CN = cast<ConstantSDNode>(N.getOperand(1));
+			offset = CN->getSExtValue();
+
+			if (N.getOpcode() == ISD::SUB)
+				offset = -offset;
+
 			base = N.getOperand(0);
-			offs = N.getOperand(1);
+			offs = CurDAG->getTargetConstant(offset, MVT::i32);
+			return true;
 		} else if (N.getOpcode() == ISD::ADD ||
 						N.getOpcode() == ISD::SUB) {
 			// Too big - load into register
