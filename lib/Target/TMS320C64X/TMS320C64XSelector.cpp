@@ -162,28 +162,17 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 			offs = CurDAG->getCopyToReg(N.getOperand(1), dl, reg,
 					CurDAG->getTargetConstant(offset,
 					MVT::i32));
-		} else {
-			return false;
+			return true;
 		}
 	} else if (N.getOperand(0).getOpcode() == ISD::Register &&
 		N.getOperand(1).getOpcode() == ISD::Register) {
 		// We can use operand as index if it's add - just leave
 		// as 2nd operand
-		if (N.getOpcode() != ISD::ADD)
-			return false;
-	} else {
-		return false;
+		if (N.getOpcode() == ISD::ADD)
+			return true;
 	}
 
-	/* Ok, we have a memory reference in range. However its scaled by the
-	 * size of the data access before being used (XXX - fix size tests above
-	 * to handle this). So, insert a SHR on the offset: if a constant, fine,
-	 * if a register, it'll have to be shr'd at runtime */
-	DebugLoc dl = DebugLoc::getUnknownLoc();
-	offs = CurDAG->getNode(ISD::SRA, dl, MVT::i32, offs,
-			CurDAG->getTargetConstant(log2(align), MVT::i32));
-	offs = SDValue(SelectCode(offs), 0);
-	return true;
+	return false;
 }
 
 bool
