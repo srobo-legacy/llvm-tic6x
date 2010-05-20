@@ -114,7 +114,7 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 	if (N.getOperand(0).getOpcode() == ISD::Register &&
 		N.getOperand(1).getOpcode() == ISD::Constant) {
 		if ((N.getOpcode() == ISD::ADD || N.getOpcode() == ISD::SUB) &&
-				(Predicate_sconst6(N.getOperand(1).getNode())))
+				(Predicate_sconst6(N.getOperand(1).getNode()))){
 			// This is valid in a single instruction
 			CN = cast<ConstantSDNode>(N.getOperand(1));
 			offset = CN->getSExtValue();
