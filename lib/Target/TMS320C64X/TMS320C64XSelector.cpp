@@ -128,17 +128,36 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 			return true;
 		} else if (N.getOpcode() == ISD::ADD ||
 						N.getOpcode() == ISD::SUB) {
-			// Too big - load into register
+			// Too big - load into register. Because the processor
+			// scales the offset, even when its being used as an
+			// offset in a register, we need to shift what gets
+			// loaded at this point.
 			base = N.getOperand(0);
+			CN = cast<ConstantSDNode>(N.getOperand(1));
+			offset = CN->getSExtValue();
 
+			if (offset & ((1 << want_align) - 1)) {
+				// Offset doesn't honour alignment rules.
+				// Ideally we should now morph to using a
+				// nonaligned memory instruction, but for now
+				// leave this as unsupported
+				fprintf(stderr, "jmorse: unaligned offset to "
+					"memory access, implement swapping to "
+					"nonaligned instructions\n");
+				return false;
+			}
+
+			// scale offset by amount hardware will
+			offset >>= want_align;
 			DebugLoc dl = DebugLoc::getUnknownLoc();
 			MachineFunction &MF = CurDAG->getMachineFunction();
 			MachineRegisterInfo &MR = MF.getRegInfo();
 			unsigned reg = MR.createVirtualRegister(
 					&TMS320C64X::GPRegsRegClass);
 
-			offs = CurDAG->getCopyToReg(N.getOperand(1),
-					dl, reg, N.getOperand(1));
+			offs = CurDAG->getCopyToReg(N.getOperand(1), dl, reg,
+					CurDAG->getTargetConstant(offset,
+					MVT::i32));
 		} else {
 			return false;
 		}
