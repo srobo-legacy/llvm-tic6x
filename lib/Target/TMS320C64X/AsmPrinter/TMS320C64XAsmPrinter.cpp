@@ -352,6 +352,7 @@ void
 TMS320C64XAsmPrinter::printMemOperand(const MachineInstr *MI, int op_num,
 					const char *Modifier)
 {
+	int offset;
 
 	if (MI->getDesc().getOpcode() == TMS320C64X::lea_fail) {
 		// I can't find a reasonable way to bounce a memory addr
@@ -365,16 +366,35 @@ TMS320C64XAsmPrinter::printMemOperand(const MachineInstr *MI, int op_num,
 	}
 
 	O << "*";
+
+	// We may need to put a + or - in front of the base register to indicate
+	// what we plan on doing with the constant
+	if (MI->getOperand(op_num+1).isImm()) {
+		offset = MI->getOperand(op_num+1).getImm();
+		if (offset < 0)
+			O << "-";
+		else if (offset > 0)
+			O << "+";
+	}
+
+	// Base register
 	printOperand(MI, op_num);
 
-	// Don't print zero offset
-	if (MI->getOperand(op_num+1).isImm() &&
-				MI->getOperand(op_num+1).getImm() == 0)
-		return;
+	// Don't print zero offset, and if it's an immediate always print
+	// a positive offset */
+	if (MI->getOperand(op_num+1).isImm()) {
+		if (offset != 0) {
+			O << "(";
+			O << abs(offset);
+			O << ")";
+		}
+	} else {
+		O << "(";
+		printOperand(MI, op_num+1);
+		O << ")";
+	}
 
-	O << "(";
-	printOperand(MI, op_num+1);
-	O << ")";
+	return;
 }
 
 void
