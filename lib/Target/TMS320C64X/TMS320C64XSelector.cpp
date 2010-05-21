@@ -82,7 +82,6 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 {
 	MemSDNode *mem;
 	ConstantSDNode *CN;
-	FrameIndexSDNode *FIN;
 	unsigned int align, want_align;
 	int offset;
 
@@ -203,15 +202,6 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 		// make that happen manually.
 		offs = SDValue(SelectCode(offs), 0);
 		return true;
-	} else if (op.getOpcode() == ISD::FrameIndex) {
-		// Hackity hack: llvm wants the address of a stack slot. This
-		// is handled by returning the frame pointer as base and stack
-		// offset as offs; the "lea_fail" instruction then adds these
-		// to form a pointer.
-		base = CurDAG->getRegister(TMS320C64X::B15, MVT::i32);
-		FIN = cast<FrameIndexSDNode>(op);
-		offs = CurDAG->getTargetConstant(FIN->getIndex() << 2,MVT::i32);
-		return true;
 	} else {
 		// Doesn't match anything we recognize at all, use address
 		// as it is (aka let llvm deal with it), set offset to zero
@@ -235,6 +225,17 @@ TMS320C64XInstSelectorPass::select_idxaddr(SDValue op, SDValue addr,
 	FrameIndexSDNode *FIN;
 	unsigned int align, want_align;
 	int val;
+
+	if (op.getOpcode() == ISD::FrameIndex) {
+		// Hackity hack: llvm wants the address of a stack slot. This
+		// is handled by returning the frame pointer as base and stack
+		// offset as offs; the "lea_fail" instruction then adds these
+		// to form a pointer.
+		base = CurDAG->getRegister(TMS320C64X::B15, MVT::i32);
+		FIN = cast<FrameIndexSDNode>(op);
+		offs = CurDAG->getTargetConstant(FIN->getIndex() << 2,MVT::i32);
+		return true;
+	}
 
 	mem = dyn_cast<MemSDNode>(op);
 	if (mem == NULL)
