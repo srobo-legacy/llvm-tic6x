@@ -113,11 +113,10 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 		}
 	}
 
-	if (N.getOperand(0).getOpcode() == ISD::Register &&
-		N.getOperand(1).getOpcode() == ISD::Constant) {
-		if ((N.getOpcode() == ISD::ADD || N.getOpcode() == ISD::SUB) &&
-				(Predicate_sconst_n(N.getOperand(1).getNode(),
-						(int)log2(want_align) + 5))) {
+	if (N.getOperand(1).getOpcode() == ISD::Constant &&
+		(N.getOpcode() == ISD::ADD || N.getOpcode() == ISD::SUB)) {
+		if (Predicate_sconst_n(N.getOperand(1).getNode(),
+					(int)log2(want_align) + 5)) {
 
 			// This is valid in a single instruction. Offset operand
 			// will be analysed by asm printer to detect the correct
@@ -142,8 +141,7 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 			base = N.getOperand(0);
 			offs = N.getOperand(1);
 			return true;
-		} else if (N.getOpcode() == ISD::ADD ||
-						N.getOpcode() == ISD::SUB) {
+		} else {
 			// Too big - load into register. Because the processor
 			// scales the offset, even when its being used as an
 			// offset in a register, we need to shift what gets
@@ -176,14 +174,15 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 					MVT::i32));
 			return true;
 		}
-	} else if (N.getOperand(0).getOpcode() == ISD::Register &&
-		N.getOperand(1).getOpcode() == ISD::Register) {
+	} else if (N.getOpcode() == ISD::ADD) {
+		// No constant offset, so values will be in registers when
+		// the get to us. XXX: is operand(1) always the constant, or
+		// can it be in 0 too?
+
 		// We can use operand as index if it's add - just leave
 		// as 2nd operand. Could also implement allowing subtract,
 		// but this means passing addressing mode information down
 		// to the assembly printer, which I suspect will mean pain.
-		if (N.getOpcode() != ISD::ADD)
-			return false;
 
 		// As mentioned above though, hardware will scale the offset,
 		// so we need to insert a shift here.
@@ -200,6 +199,13 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 		// first instruction selection, this won't get selected. So,
 		// make that happen manually.
 		offs = SDValue(SelectCode(offs), 0);
+		return true;
+	} else {
+		// Doesn't match anything we recognize at all, use address
+		// as it is (aka let llvm deal with it), set offset to zero
+		// to ensure it doesn't intefere with address calculation.
+		base = N;
+		offs = CurDAG->getTargetConstant(0, MVT::i32);
 		return true;
 	}
 
