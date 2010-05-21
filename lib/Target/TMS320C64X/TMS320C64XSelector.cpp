@@ -115,6 +115,13 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 		}
 	}
 
+	if (N.getNumOperands() == 1) {
+		// Something unpleasent - leave addr as it is, 0 offset
+		base = N.getOperand(0);
+		offs = CurDAG->getTargetConstant(0, MVT::i32);
+		return true;
+	}
+
 	if (N.getOperand(1).getOpcode() == ISD::Constant &&
 		(N.getOpcode() == ISD::ADD || N.getOpcode() == ISD::SUB)) {
 		if (Predicate_uconst_n(N.getOperand(1).getNode(),
