@@ -117,7 +117,7 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 
 	if (N.getOperand(1).getOpcode() == ISD::Constant &&
 		(N.getOpcode() == ISD::ADD || N.getOpcode() == ISD::SUB)) {
-		if (Predicate_sconst_n(N.getOperand(1).getNode(),
+		if (Predicate_uconst_n(N.getOperand(1).getNode(),
 					(int)log2(want_align) + 5)) {
 
 			// This is valid in a single instruction. Offset operand
@@ -134,7 +134,7 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 			offs = CurDAG->getTargetConstant(offset, MVT::i32);
 			return true;
 		} else if (N.getOpcode() == ISD::ADD &&
-				Predicate_sconst_n(N.getOperand(1).getNode(),
+				Predicate_uconst_n(N.getOperand(1).getNode(),
 				log2(want_align) + 15)) {
 			// We can use the uconst15 form of this instruction.
 			// Again, the assembler will scale this for us. Could
