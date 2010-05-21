@@ -87,6 +87,8 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 
 	DebugLoc dl = DebugLoc::getUnknownLoc();
 
+	// We handle all memory access in this save frame index'd accesses,
+	// so bounce those to select_idxaddr
 	if (N.getOpcode() == ISD::FrameIndex)
 		return false;
 
@@ -209,7 +211,10 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 		return true;
 	}
 
-	return false;
+	// Initially concerning that all of the above return true - however this
+	// is after all the address selection code, and anything is valid for
+	// an address, all we're doing here is shortening the calculations for
+	// some forms.
 }
 
 bool
