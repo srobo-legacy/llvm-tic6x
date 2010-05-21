@@ -189,7 +189,7 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 		// so we need to insert a shift here.
 		base = N.getOperand(0);
 		SDValue ops[4];
-		ops[0] = offs;
+		ops[0] = N.getOperand(1);
 		ops[1] = CurDAG->getTargetConstant(log2(align), MVT::i32);
 		ops[2] = CurDAG->getTargetConstant(-1, MVT::i32);
 		ops[3] = CurDAG->getRegister(TMS320C64X::NoRegister, MVT::i32);
