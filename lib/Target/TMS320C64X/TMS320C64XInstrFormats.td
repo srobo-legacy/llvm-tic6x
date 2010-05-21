@@ -252,6 +252,7 @@ class inst<dag outs, dag ins, string mnemonic, list<dag> pattern, bit side,
 
 	// Used to indicate memory datapath specifier, if this is memory access
 	bit mem_access = 0;
+	bits<2> mem_shift_amt = 0;
 	bit mem_load_store = 0; // 0 for load, 1 for store
 
 	// We need to squirt some nops behind instructions with delay slots;
