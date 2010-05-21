@@ -125,6 +125,12 @@ findRegisterSide(unsigned reg, const MachineFunction *MF)
         return c;
 }
 
+// Some utility functions for checking that constants fit in a bit field in
+// an instruction. The sconst checking routines will verify that a signed
+// number will be representable withing the bitfield. The uconst checks change
+// the number to be absolute, then sees whether it fits in the bit field.
+// Finally there's a check to see whether a constant sdnode is positive or not
+
 inline bool
 check_sconst_fits(long int num, int bits)
 {
