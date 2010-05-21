@@ -225,7 +225,6 @@ TMS320C64XInstSelectorPass::select_idxaddr(SDValue op, SDValue addr,
 	MemSDNode *mem;
 	FrameIndexSDNode *FIN;
 	unsigned int align, want_align;
-	int val;
 
 	if (op.getOpcode() == ISD::FrameIndex) {
 		// Hackity hack: llvm wants the address of a stack slot. This
@@ -262,15 +261,7 @@ TMS320C64XInstSelectorPass::select_idxaddr(SDValue op, SDValue addr,
 		return false;
 
 	base = CurDAG->getRegister(TMS320C64X::A15, MVT::i32);
-
-	val = FIN->getIndex() << 2;
-	if (val < ((1 << (5 + (int)log2(want_align))) -1) &&
-			val >= -((1 << (5 + (int)log2(want_align))) -1)) {
-		offs = CurDAG->getTargetConstant(val, MVT::i32);
-	} else {
-		// Too large, load into register instead
-		offs = CurDAG->getConstant(val, MVT::i32);
-	}
+	offs = CurDAG->getTargetFrameIndex(FIN->getIndex(), MVT::i32);
 
 	return true;
 }
