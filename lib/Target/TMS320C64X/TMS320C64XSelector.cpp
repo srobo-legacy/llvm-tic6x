@@ -117,7 +117,7 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 		N.getOperand(1).getOpcode() == ISD::Constant) {
 		if ((N.getOpcode() == ISD::ADD || N.getOpcode() == ISD::SUB) &&
 				(Predicate_sconst_n(N.getOperand(1).getNode(),
-							log2(want_align) + 5))){
+						(int)log2(want_align) + 5))) {
 
 			// This is valid in a single instruction. Offset operand
 			// will be analysed by asm printer to detect the correct
@@ -152,7 +152,7 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 			CN = cast<ConstantSDNode>(N.getOperand(1));
 			offset = CN->getSExtValue();
 
-			if (offset & ((1 << log2(want_align)) - 1)) {
+			if (offset & ((1 << (int)log2(want_align)) - 1)) {
 				// Offset doesn't honour alignment rules.
 				// Ideally we should now morph to using a
 				// nonaligned memory instruction, but for now
@@ -164,7 +164,7 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 			}
 
 			// scale offset by amount hardware will
-			offset >>= log2(want_align);
+			offset >>= (int)log2(want_align);
 			DebugLoc dl = DebugLoc::getUnknownLoc();
 			MachineFunction &MF = CurDAG->getMachineFunction();
 			MachineRegisterInfo &MR = MF.getRegInfo();
@@ -190,7 +190,7 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 		base = N.getOperand(0);
 		SDValue ops[4];
 		ops[0] = N.getOperand(1);
-		ops[1] = CurDAG->getTargetConstant(log2(align), MVT::i32);
+		ops[1] = CurDAG->getTargetConstant((int)log2(align), MVT::i32);
 		ops[2] = CurDAG->getTargetConstant(-1, MVT::i32);
 		ops[3] = CurDAG->getRegister(TMS320C64X::NoRegister, MVT::i32);
 		offs = SDValue(CurDAG->getTargetNode(TMS320C64X::shr_p_ri, dl,
@@ -254,7 +254,7 @@ TMS320C64XInstSelectorPass::select_idxaddr(SDValue op, SDValue addr,
 	DebugLoc dl = DebugLoc::getUnknownLoc();
 	SDValue ops[4];
 	ops[0] = offs;
-	ops[1] = CurDAG->getTargetConstant(log2(align), MVT::i32);
+	ops[1] = CurDAG->getTargetConstant((int)log2(align), MVT::i32);
 	ops[2] = CurDAG->getTargetConstant(-1, MVT::i32);
 	ops[3] = CurDAG->getRegister(TMS320C64X::NoRegister, MVT::i32);
 	offs = SDValue(CurDAG->getTargetNode(TMS320C64X::shr_p_ri, dl,
