@@ -230,7 +230,7 @@ TMS320C64XInstSelectorPass::select_idxaddr(SDValue op, SDValue addr,
 		// is handled by returning the frame pointer as base and stack
 		// offset as offs; the "lea_fail" instruction then adds these
 		// to form a pointer.
-		base = CurDAG->getRegister(TMS320C64X::B15, MVT::i32);
+		base = CurDAG->getRegister(TMS320C64X::A15, MVT::i32);
 		FIN = cast<FrameIndexSDNode>(op);
 		offs = CurDAG->getTargetConstant(FIN->getIndex() << 2,MVT::i32);
 		return true;
