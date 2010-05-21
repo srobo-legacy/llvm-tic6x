@@ -124,35 +124,50 @@ findRegisterSide(unsigned reg, const MachineFunction *MF)
 }
 
 inline bool
-Predicate_sconst_n(SDNode *in, int bits)
+check_sconst_fits(long int num, int bits)
 {
-	ConstantSDNode *N;
-	int maxval, val;
+	long int maxval;
 
-	maxval = 1 << bits;
-	N = cast<ConstantSDNode>(in);
-	val = N->getSExtValue();
-
-	if (val < maxval && val >= (-maxval))
+	maxval = 1 << (bits - 1);
+	if (num < maxval && num >= (-maxval))
 		return true;
 
 	return false;
 }
 
 inline bool
-Predicate_uconst_n(SDNode *in, int bits)
+check_uconst_fits(unsigned long int num, int bits)
 {
-	ConstantSDNode *N;
-	int maxval, val;
+	unsigned long maxval;
 
 	maxval = 1 << bits;
-	N = cast<ConstantSDNode>(in);
-	val = N->getZExtValue();
-
-	if (val < maxval)
+	if (num < maxval)
 		return true;
 
 	return false;
+}
+
+inline bool
+Predicate_sconst_n(SDNode *in, int bits)
+{
+	ConstantSDNode *N;
+	int val;
+
+	N = cast<ConstantSDNode>(in);
+	val = N->getSExtValue();
+	return check_sconst_fits(val, bits);
+}
+
+inline bool
+Predicate_uconst_n(SDNode *in, int bits)
+{
+	ConstantSDNode *N;
+	unsigned int val;
+
+	N = cast<ConstantSDNode>(in);
+	val = N->getSExtValue();
+	val = abs(val);
+	return check_uconst_fits(val, bits);
 }
 
 } // llvm
