@@ -234,7 +234,7 @@ TMS320C64XInstSelectorPass::select_idxaddr(SDValue op, SDValue addr,
 		// to form a pointer.
 		base = CurDAG->getRegister(TMS320C64X::A15, MVT::i32);
 		FIN = cast<FrameIndexSDNode>(op);
-		offs = CurDAG->getTargetConstant(FIN->getIndex() << 2,MVT::i32);
+		offs = CurDAG->getTargetFrameIndex(FIN->getIndex(), MVT::i32);
 		return true;
 	}
 
