@@ -182,7 +182,7 @@ inline bool
 Predicate_const_is_positive(SDNode *in)
 {
 	ConstantSDNode *N;
-	unsigned long val;
+	long val;
 
 	N = cast<ConstantSDNode>(in);
 	val = N->getSExtValue();
