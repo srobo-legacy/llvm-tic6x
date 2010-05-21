@@ -188,9 +188,14 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 		// As mentioned above though, hardware will scale the offset,
 		// so we need to insert a shift here.
 		base = N.getOperand(0);
-		offs = CurDAG->getNode(ISD::SRA, dl, MVT::i32, N.getOperand(1),
-					CurDAG->getTargetConstant(want_align,
-					MVT::i32));
+		SDValue ops[4];
+		ops[0] = offs;
+		ops[1] = CurDAG->getTargetConstant(log2(align), MVT::i32);
+		ops[2] = CurDAG->getTargetConstant(-1, MVT::i32);
+		ops[3] = CurDAG->getRegister(TMS320C64X::NoRegister, MVT::i32);
+		offs = SDValue(CurDAG->getTargetNode(TMS320C64X::shr_p_ri, dl,
+				MVT::i32, ops, 4), 0);
+
 		// That's a MI instruction and we're in the middle of depth
 		// first instruction selection, this won't get selected. So,
 		// make that happen manually.
@@ -247,9 +252,14 @@ TMS320C64XInstSelectorPass::select_idxaddr(SDValue op, SDValue addr,
 
 	/* See comment in select_addr */
 	DebugLoc dl = DebugLoc::getUnknownLoc();
-	offs = CurDAG->getNode(ISD::SRA, dl, MVT::i32, offs,
-			CurDAG->getTargetConstant(log2(align), MVT::i32));
-	offs = SDValue(SelectCode(offs), 0);
+	SDValue ops[4];
+	ops[0] = offs;
+	ops[1] = CurDAG->getTargetConstant(log2(align), MVT::i32);
+	ops[2] = CurDAG->getTargetConstant(-1, MVT::i32);
+	ops[3] = CurDAG->getRegister(TMS320C64X::NoRegister, MVT::i32);
+	offs = SDValue(CurDAG->getTargetNode(TMS320C64X::shr_p_ri, dl,
+			MVT::i32, ops, 4), 0);
+
 	return true;
 }
 
