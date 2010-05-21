@@ -128,7 +128,8 @@ void
 TMS320C64XRegisterInfo::eliminateFrameIndex(
 	MachineBasicBlock::iterator MBBI, int SPAdj, RegScavenger *r) const
 {
-	unsigned i, frame_index, offs, reg;
+	unsigned i, frame_index, reg, access_alignment;
+	int offs;
 
 	MachineInstr &MI = *MBBI;
 	MachineFunction &MF = *MI.getParent()->getParent();
@@ -143,11 +144,28 @@ TMS320C64XRegisterInfo::eliminateFrameIndex(
 	frame_index = MI.getOperand(i).getIndex();
 	offs = MF.getFrameInfo()->getObjectOffset(frame_index);
 
-	// Clarinet eye-strike: load and store instructions don't happen to
-	// allow for negative immediates / offsets. So, we need to load the
-	// offset itself into a register.
-
 	const TargetInstrDesc tid = MI.getDesc();
+	access_alignment = (tid.TSFlags & TMS320C64XII::mem_align_amt_mask)
+				>> TMS320C64XII::mem_align_amt_shift;
+
+	// So, will this frame index actually fit inside the instruction field?
+	if (check_uconst_fits(abs(offs), 5 + access_alignment)) {
+		// We can just punt this constant into the instruction and
+		// it'll be scaled appropriately
+
+		MI.getOperand(i).ChangeToImmediate(offs);
+		return;
+	}
+
+	// Otherwise, we need to do some juggling to load that constant into
+	// a register correctly. First of all, because of the highly-unpleasent
+	// scaling feature of using indexing instructions we need to shift
+	// the stack offset :|
+	if (offs & ((1 << access_alignment) -1 ))
+		llvm_unreachable("Unaligned stack access - should never occur");
+
+	offs >>= access_alignment;
+
 	const TargetRegisterClass *c;
 	if (tid.TSFlags & TMS320C64XII::unit_2)
 		c = TMS320C64X::BRegsRegisterClass;
@@ -163,8 +181,9 @@ TMS320C64XRegisterInfo::eliminateFrameIndex(
 		reg = r->scavengeRegister(c, MBBI, 0);
 	}
 
-	// XXX - will explode when stack offset is > 2^15, but assembler will
-	// start complaining when that occurs
+	// XXX - this will explode when the stack offset is > 2^15, at which
+	// point we need to start pairing mvkl/mvkh. Don't worry about that for
+	// now, because the assembler will start complaining when that occurs
 	addDefaultPred(BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::mvk_p))
 		.addReg(reg, RegState::Define).addImm(offs));
 
