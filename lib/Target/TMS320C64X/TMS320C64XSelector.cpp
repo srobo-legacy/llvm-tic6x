@@ -213,6 +213,7 @@ TMS320C64XInstSelectorPass::select_idxaddr(SDValue op, SDValue addr,
 	MemSDNode *mem;
 	FrameIndexSDNode *FIN;
 	unsigned int align, want_align;
+	int val;
 
 	mem = dyn_cast<MemSDNode>(op);
 	if (mem == NULL)
@@ -234,31 +235,19 @@ TMS320C64XInstSelectorPass::select_idxaddr(SDValue op, SDValue addr,
 	}
 
 	FIN = dyn_cast<FrameIndexSDNode>(addr);
-	if (FIN) {
-		base = CurDAG->getRegister(TMS320C64X::A15, MVT::i32);
-		offs = CurDAG->getTargetFrameIndex(FIN->getIndex(), MVT::i32);
-	} else if (addr.getOpcode() == ISD::TargetExternalSymbol ||
-				addr.getOpcode() == ISD::TargetGlobalAddress) {
+	if (!FIN)
 		return false;
-	} else if (addr.getOpcode() == ISD::ADD) {
-		// We could match against the proper indexed load things here,
-		// and emit a single instruction for loading, but that can be
-		// implemented at some other point in time
-		// XXX - death
-	} else {
-		base = addr;
-		offs = CurDAG->getTargetConstant(0, MVT::i32);
-	}
 
-	/* See comment in select_addr */
-	DebugLoc dl = DebugLoc::getUnknownLoc();
-	SDValue ops[4];
-	ops[0] = offs;
-	ops[1] = CurDAG->getTargetConstant((int)log2(align), MVT::i32);
-	ops[2] = CurDAG->getTargetConstant(-1, MVT::i32);
-	ops[3] = CurDAG->getRegister(TMS320C64X::NoRegister, MVT::i32);
-	offs = SDValue(CurDAG->getTargetNode(TMS320C64X::shr_p_ri, dl,
-			MVT::i32, ops, 4), 0);
+	base = CurDAG->getRegister(TMS320C64X::A15, MVT::i32);
+
+	val = FIN->getIndex() << 2;
+	if (val < ((1 << (5 + (int)log2(want_align))) -1) &&
+			val >= -((1 << (5 + (int)log2(want_align))) -1)) {
+		offs = CurDAG->getTargetConstant(val, MVT::i32);
+	} else {
+		// Too large, load into register instead
+		offs = CurDAG->getConstant(val, MVT::i32);
+	}
 
 	return true;
 }
