@@ -144,6 +144,7 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 			// offsets, but I guess llvm might do that for us.
 			base = N.getOperand(0);
 			offs = N.getOperand(1);
+
 			return true;
 		} else {
 			// Too big - load into register. Because the processor
