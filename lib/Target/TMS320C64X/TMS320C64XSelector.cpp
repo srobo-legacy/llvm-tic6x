@@ -134,7 +134,9 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 			offs = CurDAG->getTargetConstant(offset, MVT::i32);
 			return true;
 		} else if (N.getOpcode() == ISD::ADD &&
-				Predicate_uconst_n(N.getOperand(1).getNode(),
+				Predicate_const_is_positive(
+				N.getOperand(1).getNode()),
+				Predicate_uconst_n( .getOperand(1).getNode(),
 				log2(want_align) + 15)) {
 			// We can use the uconst15 form of this instruction.
 			// Again, the assembler will scale this for us. Could
