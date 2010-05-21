@@ -117,7 +117,7 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 		N.getOperand(1).getOpcode() == ISD::Constant) {
 		if ((N.getOpcode() == ISD::ADD || N.getOpcode() == ISD::SUB) &&
 				(Predicate_sconst_n(N.getOperand(1).getNode(),
-							want_align + 5))) {
+							log2(want_align) + 5))){
 
 			// This is valid in a single instruction. Offset operand
 			// will be analysed by asm printer to detect the correct
@@ -134,7 +134,7 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 			return true;
 		} else if (N.getOpcode() == ISD::ADD &&
 				Predicate_sconst_n(N.getOperand(1).getNode(),
-				want_align + 15)) {
+				log2(want_align) + 15)) {
 			// We can use the uconst15 form of this instruction.
 			// Again, the assembler will scale this for us. Could
 			// put in some clauses to find sub insns with negative
@@ -152,7 +152,7 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 			CN = cast<ConstantSDNode>(N.getOperand(1));
 			offset = CN->getSExtValue();
 
-			if (offset & ((1 << want_align) - 1)) {
+			if (offset & ((1 << log2(want_align)) - 1)) {
 				// Offset doesn't honour alignment rules.
 				// Ideally we should now morph to using a
 				// nonaligned memory instruction, but for now
@@ -164,7 +164,7 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 			}
 
 			// scale offset by amount hardware will
-			offset >>= want_align;
+			offset >>= log2(want_align);
 			DebugLoc dl = DebugLoc::getUnknownLoc();
 			MachineFunction &MF = CurDAG->getMachineFunction();
 			MachineRegisterInfo &MR = MF.getRegInfo();
