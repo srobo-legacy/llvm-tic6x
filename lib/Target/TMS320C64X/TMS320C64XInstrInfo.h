@@ -172,6 +172,17 @@ Predicate_uconst_n(SDNode *in, int bits)
 	return check_uconst_fits(val, bits);
 }
 
+inline bool
+Predicate_const_is_positive(SDNode *in)
+{
+	ConstantSDNode *N;
+	unsigned long val;
+
+	N = cast<ConstantSDNode>(in);
+	val = N->getSExtValue();
+	return (val >= 0);
+}
+
 } // llvm
 
 #endif // LLVM_TARGET_TMS320C64X_INSTRINFO_H
