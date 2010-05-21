@@ -194,8 +194,7 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 		ops[1] = CurDAG->getTargetConstant((int)log2(align), MVT::i32);
 		ops[2] = CurDAG->getTargetConstant(-1, MVT::i32);
 		ops[3] = CurDAG->getRegister(TMS320C64X::NoRegister, MVT::i32);
-		offs = SDValue(CurDAG->getTargetNode(TMS320C64X::shr_p_ri, dl,
-				MVT::i32, ops, 4), 0);
+		offs = CurDAG->getNode(ISD::SRA, dl, MVT::i32, ops, 4);
 
 		// That's a MI instruction and we're in the middle of depth
 		// first instruction selection, this won't get selected. So,
