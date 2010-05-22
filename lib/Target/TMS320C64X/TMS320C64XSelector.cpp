@@ -115,7 +115,16 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 		}
 	}
 
-	if (N.getNumOperands() == 1) {
+	if (N.getOperand(0).getOpcode() == ISD::TargetGlobalAddress ||
+		N.getOperand(0).getOpcode() == ISD::TargetExternalSymbol) {
+		// Operand 0 is a global address, the node itself is a TMSISD
+		// wrapper which'll get lowered into a mvkl/mvkh pair later.
+		// So, we can allow the wrapper to become the base address
+		// safely.
+		base = N;
+		offs = CurDAG->getTargetConstant(0, MVT::i32);
+		return true;
+	} else if (N.getNumOperands() == 1) {
 		// Something unpleasent - leave addr as it is, 0 offset
 		base = N.getOperand(0);
 		offs = CurDAG->getTargetConstant(0, MVT::i32);
