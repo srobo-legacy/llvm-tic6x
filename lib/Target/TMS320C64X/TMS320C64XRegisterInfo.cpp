@@ -220,12 +220,9 @@ TMS320C64XRegisterInfo::emitPrologue(MachineFunction &MF) const
 		.addReg(TMS320C64X::B3, RegState::Kill));
 
 	// Store FP
-	addDefaultPred(BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::mvk_p))
-		.addReg(TMS320C64X::A0, RegState::Define).addImm(-4));
 	addDefaultPred(BuildMI(MBB, MBBI, dl,
 		TII.get(TMS320C64X::word_idx_store2))
-		.addReg(TMS320C64X::B15).addReg(TMS320C64X::A0, RegState::Kill)
-		.addReg(TMS320C64X::A15));
+		.addReg(TMS320C64X::B15).addImm(-4).addReg(TMS320C64X::A15));
 
 	// Setup our own FP using the current SP
 	addDefaultPred(BuildMI(MBB, MBBI, dl,
@@ -274,13 +271,11 @@ TMS320C64XRegisterInfo::emitEpilogue(MachineFunction &MF,
 	addDefaultPred(BuildMI(MBB, MBBI, DL,
 		TII.get(TMS320C64X::mv2))
 		.addReg(TMS320C64X::B15).addReg(TMS320C64X::A15));
-	addDefaultPred(BuildMI(MBB, MBBI, DL, TII.get(TMS320C64X::mvk_p))
-		.addReg(TMS320C64X::A0, RegState::Define).addImm(-4));
 	addDefaultPred(BuildMI(MBB, MBBI, DL,
 		TII.get(TMS320C64X::word_idx_load2))
 		.addReg(TMS320C64X::A15, RegState::Define)
 		.addReg(TMS320C64X::B15)
-		.addReg(TMS320C64X::A0, RegState::Kill));
+		.addImm(-4));
 	addDefaultPred(BuildMI(MBB, MBBI, DL,
 		TII.get(TMS320C64X::word_idx_load2))
 		.addReg(TMS320C64X::B3, RegState::Define)
