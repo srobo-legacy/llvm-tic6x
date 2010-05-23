@@ -399,23 +399,21 @@ let isCall = 1, isPredicable = 0,
 		A20, A21, A22, A23, A24, A25, A26, A27, A28, A29, A30, A31,
 		B0, B1, B2, B3, B4, B5, B6, B7, B8, B9, B16, B17, B18, B19,
 		B20, B21, B22, B23, B24, B25, B26, B27, B28, B29, B30, B31] in {
+
+// NB: Only side 2 callp instructions can be used - this is because they store
+// the return address in register 3, on whichever side the callp was executed
+// upon. So callp .S1 puts ret in A3, which isn't consistent with the TI
+// calling convention.
+
 def callp_p : inst<(outs), (ins calltarget:$dst), "callp\t$s\t$dst",
-			[(TMS320C64Xcall tglobaladdr:$dst)], 0, unit_s> {
+			[(TMS320C64Xcall tglobaladdr:$dst)], 1, unit_s> {
 	let Pattern = sched_pattern;
 }
-def callp_1 : inst<(outs), (ins calltarget:$dst), "callp\t$s\t$dst",
-		[(TMS320C64Xcall tglobaladdr:$dst)], 0, unit_s>;
-def callp_2 : inst<(outs), (ins calltarget:$dst), "callp\t$s\t$dst",
-		[(TMS320C64Xcall tglobaladdr:$dst)], 1, unit_s>;
 
 def callp_e_p : inst<(outs), (ins calltarget:$dst), "callp\t$s\t$dst",
-			[(TMS320C64Xcall texternalsym:$dst)], 0, unit_s> {
+			[(TMS320C64Xcall texternalsym:$dst)], 1, unit_s> {
 	let Pattern = sched_pattern;
 }
-def callp_e_1 : inst<(outs), (ins calltarget:$dst), "callp\t$s\t$dst",
-		[(TMS320C64Xcall texternalsym:$dst)], 0, unit_s>;
-def callp_e_2 : inst<(outs), (ins calltarget:$dst), "callp\t$s\t$dst",
-		[(TMS320C64Xcall texternalsym:$dst)], 1, unit_s>;
 
 def call_indirect_2 : inst<(outs), (ins BRegs:$reg), "b\t$s\t$reg",
 				[(TMS320C64Xcall BRegs:$reg)], 1, unit_s> {
