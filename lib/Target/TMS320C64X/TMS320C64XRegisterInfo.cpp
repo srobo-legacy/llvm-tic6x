@@ -280,6 +280,10 @@ TMS320C64XRegisterInfo::emitEpilogue(MachineFunction &MF,
 		TII.get(TMS320C64X::word_idx_load2))
 		.addReg(TMS320C64X::B3, RegState::Define)
 		.addReg(TMS320C64X::B15).addImm(0));
+
+	// Add no-op to give B3 time to load
+	addDefaultPred(BuildMI(MBB, MBBI, DL, TII.get(TMS320C64X::noop))
+		.addImm(4));
 }
 
 int
