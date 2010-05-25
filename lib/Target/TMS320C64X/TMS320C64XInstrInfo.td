@@ -314,31 +314,38 @@ defm cmpeq : inst_xi<"cmpeq", (i32 sconst5:$imm), unit_l, cmpeq_node, 1>;
 def : Pat<(cmpne_node GPRegs:$reg1, GPRegs:$reg2),
 		(xor_p_ri (cmpeq_p_rr GPRegs:$reg1, GPRegs:$reg2), (i32 1))>;
 
+// NOTE: Can't use any of the immediate forms of comparison instructions. LLVM
+// always puts the constant operand on the right hand side of all operations,
+// and TI instructions only allow constants on the left. That's fine and can
+// be flipped, but that requires llvm to then go through all uses and invert
+// the polarity of any tests/whatevers based on this. Not sure how to do that.
+// Possibly it can't be done, we just have to handle it in some machdep fashion.
+
 def cmpgt_p_rr : pseudo_rr<"cmpgt", unit_l, cmpgt_node, 0>;
-def cmpgt_p_ri : pseudo_ri<"cmpgt", (i32 sconst5:$imm), unit_l, cmpgt_node, 1>;
+//def cmpgt_p_ri : pseudo_ri<"cmpgt", (i32 sconst5:$imm), unit_l, cmpgt_node, 1>;
 defm cmpgt : inst_rx<"cmpgt", unit_l, cmpgt_node, 0>;
-defm cmpgt : inst_xr<"cmpgt", unit_l, cmpgt_node, 1>;
-defm cmpgt : inst_xi<"cmpgt", (i32 sconst5:$imm), unit_l, cmpgt_node, 1>;
+//defm cmpgt : inst_xr<"cmpgt", unit_l, cmpgt_node, 1>;
+//defm cmpgt : inst_xi<"cmpgt", (i32 sconst5:$imm), unit_l, cmpgt_node, 1>;
 
 def cmpgtu_p_rr : pseudo_rr<"cmpgtu", unit_l, cmpgtu_node, 0>;
-def cmpgtu_p_ri : pseudo_ri<"cmpgtu", (i32 uconst4:$imm), unit_l, cmpgtu_node,
-									1>;
+//def cmpgtu_p_ri : pseudo_ri<"cmpgtu", (i32 uconst4:$imm), unit_l, cmpgtu_node,
+//									1>;
 defm cmpgtu : inst_rx<"cmpgtu", unit_l, cmpgtu_node, 0>;
-defm cmpgtu : inst_xr<"cmpgtu", unit_l, cmpgtu_node, 1>;
-defm cmpgtu : inst_xi<"cmpgtu", (i32 uconst4:$imm), unit_l, cmpgtu_node, 1>;
+//defm cmpgtu : inst_xr<"cmpgtu", unit_l, cmpgtu_node, 1>;
+//defm cmpgtu : inst_xi<"cmpgtu", (i32 uconst4:$imm), unit_l, cmpgtu_node, 1>;
 
 def cmplt_p_rr : pseudo_rr<"cmplt", unit_l, cmplt_node, 0>;
-def cmplt_p_ri : pseudo_ri<"cmplt", (i32 sconst5:$imm), unit_l, cmplt_node, 1>;
+//def cmplt_p_ri : pseudo_ri<"cmplt", (i32 sconst5:$imm), unit_l, cmplt_node, 1>;
 defm cmplt : inst_rx<"cmplt", unit_l, cmplt_node, 0>;
-defm cmplt : inst_xr<"cmplt", unit_l, cmplt_node, 1>;
-defm cmplt : inst_xi<"cmplt", (i32 sconst5:$imm), unit_l, cmplt_node, 1>;
+//defm cmplt : inst_xr<"cmplt", unit_l, cmplt_node, 1>;
+//defm cmplt : inst_xi<"cmplt", (i32 sconst5:$imm), unit_l, cmplt_node, 1>;
 
 def cmpltu_p_rr : pseudo_rr<"cmpltu", unit_l, cmpltu_node, 0>;
-def cmpltu_p_ri : pseudo_ri<"cmpltu", (i32 uconst4:$imm), unit_l, cmpltu_node,
-									1>;
+//def cmpltu_p_ri : pseudo_ri<"cmpltu", (i32 uconst4:$imm), unit_l, cmpltu_node,
+//									1>;
 defm cmpltu : inst_rx<"cmpltu", unit_l, cmpltu_node, 0>;
-defm cmpltu : inst_xr<"cmpltu", unit_l, cmpltu_node, 1>;
-defm cmpltu : inst_xi<"cmpltu", (i32 uconst4:$imm), unit_l, cmpltu_node, 1>;
+//defm cmpltu : inst_xr<"cmpltu", unit_l, cmpltu_node, 1>;
+//defm cmpltu : inst_xi<"cmpltu", (i32 uconst4:$imm), unit_l, cmpltu_node, 1>;
 
 // To support select, we need two conditional instructions with the same
 // destination - copy what i32 loading does.
