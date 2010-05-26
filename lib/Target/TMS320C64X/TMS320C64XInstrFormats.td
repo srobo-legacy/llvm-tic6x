@@ -254,10 +254,6 @@ class inst<dag outs, dag ins, string mnemonic, list<dag> pattern, bit side,
 	bit mem_access = 0;
 	bits<2> mem_shift_amt = 0;
 	bit mem_load_store = 0; // 0 for load, 1 for store
-
-	// We need to squirt some nops behind instructions with delay slots;
-	// use this hook to do that
-	let usesCustomDAGSchedInserter = 1;
 }
 
 class pseudo_rr<string mnemonic, InstUnit u, SDNode op, int swap> :
@@ -284,6 +280,7 @@ multiclass meminst_load<string mnemonic, PatFrag op, dag ptr> {
 		[(set GPRegs:$dst, (op ptr))], 0, unit_d> {
 			let Pattern = sched_pattern;
 			let delay_slots = 4;
+			let hasDelaySlot = 1;
 			let mem_access = 1;
 		}
 
@@ -291,12 +288,14 @@ multiclass meminst_load<string mnemonic, PatFrag op, dag ptr> {
 		!strconcat("ld",!strconcat(mnemonic, "\t$s\t$ptr,\t$dst")),
 		[(set GPRegs:$dst, (op ptr))], 0, unit_d> {
 			let delay_slots = 4;
+			let hasDelaySlot = 1;
 			let mem_access = 1;
 		}
 	def _load2 : inst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
 		!strconcat("ld",!strconcat(mnemonic, "\t$s\t$ptr,\t$dst")),
 		[(set GPRegs:$dst, (op ptr))], 1, unit_d> {
 			let delay_slots = 4;
+			let hasDelaySlot = 1;
 			let mem_access = 1;
 		}
 }
