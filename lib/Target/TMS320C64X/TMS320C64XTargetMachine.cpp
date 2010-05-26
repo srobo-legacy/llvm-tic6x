@@ -60,3 +60,9 @@ bool TMS320C64XTargetMachine::addInstSelector(PassManagerBase &PM,
 	return false;
 }
 
+bool TMS320C64XTargetMachine::addPreEmitPass(PassManagerBase &PM,
+						CodeGenOpt::Level OptLevel) {
+
+	PM.add(createTMS320C64XDelaySlotFillerPass(*this));
+	return true;
+}
