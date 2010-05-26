@@ -35,6 +35,7 @@ namespace llvm {
 	extern Target TheTMS320C64XTarget;
 	class FunctionPass;
 	FunctionPass *TMS320C64XCreateInstSelector(TargetMachine &TM);
+	FunctionPass *createTMS320C64XDelaySlotFillerPass(TargetMachine &tm);
 }
 
 
