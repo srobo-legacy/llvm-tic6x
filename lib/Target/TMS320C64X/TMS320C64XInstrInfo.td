@@ -97,15 +97,15 @@ def noop : inst<(outs), (ins i32imm:$cycles), "nop\t$s\t$cycles", [], 0,unit_s>;
 
 // Shifts and rotates
 
-def srl_p_rr : pseudo_rr<"shr", unit_s, srl, 0>;
-def srl_p_ri : pseudo_ri<"shr", (i32 uconst5:$imm), unit_s, srl, 0>;
+def srl_p_rr : pseudo_rr<"shru", unit_s, srl, 0>;
+def srl_p_ri : pseudo_ri<"shru", (i32 uconst5:$imm), unit_s, srl, 0>;
 def shl_p_rr : pseudo_rr<"shl", unit_s, shl, 0>;
 def shl_p_ri : pseudo_ri<"shl", (i32 uconst5:$imm), unit_s, shl, 0>;
 def shr_p_rr : pseudo_rr<"shr", unit_s, sra, 0>;
 def shr_p_ri : pseudo_ri<"shr", (i32 uconst5:$imm), unit_s, sra, 0>;
 
-defm srl : inst_xr<"shr", unit_s, srl, 0>;
-defm srl : inst_xi<"shr", (i32 uconst5:$imm), unit_s, srl, 0>;
+defm srl : inst_xr<"shru", unit_s, srl, 0>;
+defm srl : inst_xi<"shru", (i32 uconst5:$imm), unit_s, srl, 0>;
 defm shl : inst_xr<"shl", unit_s, shl, 0>;
 defm shl : inst_xi<"shl", (i32 uconst5:$imm), unit_s, shl, 0>;
 defm shr : inst_xr<"shr", unit_s, sra, 0>;
@@ -314,31 +314,38 @@ defm cmpeq : inst_xi<"cmpeq", (i32 sconst5:$imm), unit_l, cmpeq_node, 1>;
 def : Pat<(cmpne_node GPRegs:$reg1, GPRegs:$reg2),
 		(xor_p_ri (cmpeq_p_rr GPRegs:$reg1, GPRegs:$reg2), (i32 1))>;
 
+// NOTE: Can't use any of the immediate forms of comparison instructions. LLVM
+// always puts the constant operand on the right hand side of all operations,
+// and TI instructions only allow constants on the left. That's fine and can
+// be flipped, but that requires llvm to then go through all uses and invert
+// the polarity of any tests/whatevers based on this. Not sure how to do that.
+// Possibly it can't be done, we just have to handle it in some machdep fashion.
+
 def cmpgt_p_rr : pseudo_rr<"cmpgt", unit_l, cmpgt_node, 0>;
-def cmpgt_p_ri : pseudo_ri<"cmpgt", (i32 sconst5:$imm), unit_l, cmpgt_node, 1>;
+//def cmpgt_p_ri : pseudo_ri<"cmpgt", (i32 sconst5:$imm), unit_l, cmpgt_node, 1>;
 defm cmpgt : inst_rx<"cmpgt", unit_l, cmpgt_node, 0>;
-defm cmpgt : inst_xr<"cmpgt", unit_l, cmpgt_node, 1>;
-defm cmpgt : inst_xi<"cmpgt", (i32 sconst5:$imm), unit_l, cmpgt_node, 1>;
+//defm cmpgt : inst_xr<"cmpgt", unit_l, cmpgt_node, 1>;
+//defm cmpgt : inst_xi<"cmpgt", (i32 sconst5:$imm), unit_l, cmpgt_node, 1>;
 
 def cmpgtu_p_rr : pseudo_rr<"cmpgtu", unit_l, cmpgtu_node, 0>;
-def cmpgtu_p_ri : pseudo_ri<"cmpgtu", (i32 uconst4:$imm), unit_l, cmpgtu_node,
-									1>;
+//def cmpgtu_p_ri : pseudo_ri<"cmpgtu", (i32 uconst4:$imm), unit_l, cmpgtu_node,
+//									1>;
 defm cmpgtu : inst_rx<"cmpgtu", unit_l, cmpgtu_node, 0>;
-defm cmpgtu : inst_xr<"cmpgtu", unit_l, cmpgtu_node, 1>;
-defm cmpgtu : inst_xi<"cmpgtu", (i32 uconst4:$imm), unit_l, cmpgtu_node, 1>;
+//defm cmpgtu : inst_xr<"cmpgtu", unit_l, cmpgtu_node, 1>;
+//defm cmpgtu : inst_xi<"cmpgtu", (i32 uconst4:$imm), unit_l, cmpgtu_node, 1>;
 
 def cmplt_p_rr : pseudo_rr<"cmplt", unit_l, cmplt_node, 0>;
-def cmplt_p_ri : pseudo_ri<"cmplt", (i32 sconst5:$imm), unit_l, cmplt_node, 1>;
+//def cmplt_p_ri : pseudo_ri<"cmplt", (i32 sconst5:$imm), unit_l, cmplt_node, 1>;
 defm cmplt : inst_rx<"cmplt", unit_l, cmplt_node, 0>;
-defm cmplt : inst_xr<"cmplt", unit_l, cmplt_node, 1>;
-defm cmplt : inst_xi<"cmplt", (i32 sconst5:$imm), unit_l, cmplt_node, 1>;
+//defm cmplt : inst_xr<"cmplt", unit_l, cmplt_node, 1>;
+//defm cmplt : inst_xi<"cmplt", (i32 sconst5:$imm), unit_l, cmplt_node, 1>;
 
 def cmpltu_p_rr : pseudo_rr<"cmpltu", unit_l, cmpltu_node, 0>;
-def cmpltu_p_ri : pseudo_ri<"cmpltu", (i32 uconst4:$imm), unit_l, cmpltu_node,
-									1>;
+//def cmpltu_p_ri : pseudo_ri<"cmpltu", (i32 uconst4:$imm), unit_l, cmpltu_node,
+//									1>;
 defm cmpltu : inst_rx<"cmpltu", unit_l, cmpltu_node, 0>;
-defm cmpltu : inst_xr<"cmpltu", unit_l, cmpltu_node, 1>;
-defm cmpltu : inst_xi<"cmpltu", (i32 uconst4:$imm), unit_l, cmpltu_node, 1>;
+//defm cmpltu : inst_xr<"cmpltu", unit_l, cmpltu_node, 1>;
+//defm cmpltu : inst_xi<"cmpltu", (i32 uconst4:$imm), unit_l, cmpltu_node, 1>;
 
 // To support select, we need two conditional instructions with the same
 // destination - copy what i32 loading does.
@@ -364,7 +371,7 @@ def : Pat<(i32 mvk_all_pred:$val),
 
 // Branch / call instructions
 
-let isBranch = 1, delay_slots = 4 in {
+let isTerminator = 1, isBranch = 1, delay_slots = 4 in {
 def branch_p : inst<(outs), (ins brtarget:$block), "b\t$s\t$block",
 				[(br bb:$block)], 0, unit_s> {
 	let Pattern = sched_pattern;
@@ -399,23 +406,21 @@ let isCall = 1, isPredicable = 0,
 		A20, A21, A22, A23, A24, A25, A26, A27, A28, A29, A30, A31,
 		B0, B1, B2, B3, B4, B5, B6, B7, B8, B9, B16, B17, B18, B19,
 		B20, B21, B22, B23, B24, B25, B26, B27, B28, B29, B30, B31] in {
+
+// NB: Only side 2 callp instructions can be used - this is because they store
+// the return address in register 3, on whichever side the callp was executed
+// upon. So callp .S1 puts ret in A3, which isn't consistent with the TI
+// calling convention.
+
 def callp_p : inst<(outs), (ins calltarget:$dst), "callp\t$s\t$dst",
-			[(TMS320C64Xcall tglobaladdr:$dst)], 0, unit_s> {
+			[(TMS320C64Xcall tglobaladdr:$dst)], 1, unit_s> {
 	let Pattern = sched_pattern;
 }
-def callp_1 : inst<(outs), (ins calltarget:$dst), "callp\t$s\t$dst",
-		[(TMS320C64Xcall tglobaladdr:$dst)], 0, unit_s>;
-def callp_2 : inst<(outs), (ins calltarget:$dst), "callp\t$s\t$dst",
-		[(TMS320C64Xcall tglobaladdr:$dst)], 1, unit_s>;
 
 def callp_e_p : inst<(outs), (ins calltarget:$dst), "callp\t$s\t$dst",
-			[(TMS320C64Xcall texternalsym:$dst)], 0, unit_s> {
+			[(TMS320C64Xcall texternalsym:$dst)], 1, unit_s> {
 	let Pattern = sched_pattern;
 }
-def callp_e_1 : inst<(outs), (ins calltarget:$dst), "callp\t$s\t$dst",
-		[(TMS320C64Xcall texternalsym:$dst)], 0, unit_s>;
-def callp_e_2 : inst<(outs), (ins calltarget:$dst), "callp\t$s\t$dst",
-		[(TMS320C64Xcall texternalsym:$dst)], 1, unit_s>;
 
 def call_indirect_2 : inst<(outs), (ins BRegs:$reg), "b\t$s\t$reg",
 				[(TMS320C64Xcall BRegs:$reg)], 1, unit_s> {
