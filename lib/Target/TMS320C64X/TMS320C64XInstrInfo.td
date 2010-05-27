@@ -71,7 +71,7 @@ def Wrapper : SDNode<"TMSISD::WRAPPER", SDT_Wrapper>;
 // Don't have flexibility to test right now though.
 def call_start_i : inst<(outs), (ins i32imm:$val),
 		"sub\t.D2\tB15,\t$val,\tB15",
-		[(callseq_start sconst5:$val)], 0, unit_d> {
+		[(callseq_start uconst5:$val)], 0, unit_d> {
 	let Pattern = sched_pattern;
 	let hasSideEffects = 1;
 }
@@ -84,14 +84,14 @@ def call_start_r : inst<(outs), (ins GPRegs:$val),
 }
 
 def call_end_i : inst<(outs), (ins i32imm:$val, i32imm:$val2),
-		"add\t.L2\tB15,\t$val,\tB15",
-		[(callseq_end timm:$val, sconst5:$val2)], 0, unit_d> {
+		"add\t.D2\t$val,\tB15,\tB15",
+		[(callseq_end timm:$val, uconst5:$val2)], 0, unit_d> {
 	let Pattern = sched_pattern;
 	let hasSideEffects = 1;
 }
 
 def call_end_r : inst<(outs), (ins GPRegs:$val, i32imm:$val2),
-		"add\t.L2\tB15,\t$val,\tB15",
+		"add\t.D2\t$val,\tB15,\tB15",
 		[(callseq_end GPRegs:$val, timm:$val2)], 0, unit_d> {
 	let Pattern = sched_pattern;
 	let hasSideEffects = 1;
