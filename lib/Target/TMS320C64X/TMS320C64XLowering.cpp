@@ -372,10 +372,10 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 									arg));
 			arg_idx++;
 		} else {
-			bytes -= 4;
-			assert(bytes >= 0 && "Stack space miscalculation");
+			bytes += 4; /* Offset from SP at call */
+
 			SDValue stack_ptr = DAG.getCopyFromReg(Chain, dl,
-								TMS320C64X::A15,
+								TMS320C64X::B15,
 								getPointerTy());
 			SDValue addr = DAG.getNode(ISD::ADD,
 				dl, getPointerTy(), stack_ptr,
