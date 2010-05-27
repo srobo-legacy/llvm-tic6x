@@ -306,7 +306,7 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 	SmallVector<CCValAssign, 16> ArgLocs;
 	static const unsigned int reg_arg_nums[] =
 		{ A4, B4, A6, B6, A8, B8, A10, B10, A12, B12 };
-	int bytes;
+	int bytes, stacksize;
 	unsigned int i, retaddr, arg_idx, fixed_args;
 	bool is_icall = false;;
 
@@ -329,15 +329,15 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 	// Start out by guessing how much stack space we need
 	if (!isVarArg) {
 		if (ArgLocs.size() > 10) {
-			bytes = (ArgLocs.size() - 10) * 4; // XXX - i64?
+			stacksize = (ArgLocs.size() - 10) * 4; // XXX - i64?
 		} else {
-			bytes = 0;
+			stacksize = 0;
 		}
 	} else {
-		bytes = (ArgLocs.size() - fixed_args + 1) * 4;
+		stacksize = (ArgLocs.size() - fixed_args + 1) * 4;
 	}
 
-	Chain = DAG.getCALLSEQ_START(Chain, DAG.getConstant(bytes,
+	Chain = DAG.getCALLSEQ_START(Chain, DAG.getConstant(stacksize,
 						getPointerTy(), true));
 
 	SmallVector<std::pair<unsigned int, SDValue>, 16> reg_args;
@@ -467,8 +467,9 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 	}
 
 	Chain = DAG.getCALLSEQ_END(Chain,
-			DAG.getConstant(bytes, getPointerTy(), true),
-			DAG.getConstant(0, getPointerTy(), true), in_flag);
+			DAG.getConstant(stacksize, getPointerTy(), true),
+			DAG.getConstant(0, getPointerTy(), true),
+			in_flag);
 	in_flag = Chain.getValue(1);
 
 	return LowerCallResult(Chain, in_flag, CallConv, isVarArg, Ins, dl,
