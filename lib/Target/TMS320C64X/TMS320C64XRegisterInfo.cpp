@@ -148,8 +148,19 @@ TMS320C64XRegisterInfo::eliminateFrameIndex(
 	access_alignment = (tid.TSFlags & TMS320C64XII::mem_align_amt_mask)
 				>> TMS320C64XII::mem_align_amt_shift;
 
-	// So, will this frame index actually fit inside the instruction field?
-	if (check_uconst_fits(abs(offs), 5 + access_alignment)) {
+	// Firstly, is this actually memory access? Might be lea (vomit)
+	if (!(MI.getDesc().TSFlags & TMS320C64XII::is_memaccess)) {
+		// If so, the candidates are sub and add - each of which
+		// have an sconst5 range. If the offset doesn't fit in there,
+		// need to scavenge a register
+		if (check_sconst_fits(offs, 5)) {
+			MI.getOperand(i).ChangeToImmediate(offs);
+			return;
+		}
+		access_alignment = 0;
+	// So for memory, will this frame index actually fit inside the
+	// instruction field?
+	} else if (check_uconst_fits(abs(offs), 5 + access_alignment)) {
 		// We can just punt this constant into the instruction and
 		// it'll be scaled appropriately
 
