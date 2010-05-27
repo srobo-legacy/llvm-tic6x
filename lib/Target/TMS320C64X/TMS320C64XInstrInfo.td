@@ -69,15 +69,30 @@ def Wrapper : SDNode<"TMSISD::WRAPPER", SDT_Wrapper>;
 
 // XXX These should probably be marked as for codegen modelling only.
 // Don't have flexibility to test right now though.
-def fake_call_start : inst<(outs), (ins i32imm:$val),
+def call_start_i : inst<(outs), (ins i32imm:$val),
 		"sub\t.D2\tB15,\t$val,\tB15",
-		[(callseq_start timm:$val)], 0, unit_d> {
+		[(callseq_start sconst5:$val)], 0, unit_d> {
 	let Pattern = sched_pattern;
 	let hasSideEffects = 1;
 }
-def fake_call_end : inst<(outs), (ins i32imm:$val, i32imm:$val2),
+
+def call_start_r : inst<(outs), (ins GPRegs:$val),
+		"sub\t.D2\tB15,\t$val,\tB15",
+		[(callseq_start GPRegs:$val)], 0, unit_d> {
+	let Pattern = sched_pattern;
+	let hasSideEffects = 1;
+}
+
+def call_end_i : inst<(outs), (ins i32imm:$val, i32imm:$val2),
 		"add\t.L2\tB15,\t$val,\tB15",
-		[(callseq_end timm:$val, timm:$val2)], 0, unit_d> {
+		[(callseq_end timm:$val, sconst5:$val2)], 0, unit_d> {
+	let Pattern = sched_pattern;
+	let hasSideEffects = 1;
+}
+
+def call_end_r : inst<(outs), (ins GPRegs:$val, i32imm:$val2),
+		"add\t.L2\tB15,\t$val,\tB15",
+		[(callseq_end GPRegs:$val, timm:$val2)], 0, unit_d> {
 	let Pattern = sched_pattern;
 	let hasSideEffects = 1;
 }
