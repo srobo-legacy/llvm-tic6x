@@ -453,7 +453,7 @@ def call_indirect_2 : inst<(outs), (ins BRegs:$reg), "b\t$s\t$reg",
 // So we have to work by loading the return address into B3 manually before
 // branching to the target. Which means injecting a label immediately after the
 // branch instruction itself. Which is what this is.
-def return_label : inst<(outs), (ins i32imm:$imm), ".ponylabel_$imm:",
+def return_label : inst<(outs), (ins i32imm:$imm), ".retaddr_$imm:",
 				[(call_ret_label imm:$imm)], 0, unit_m> {
 	let Pattern = sched_pattern;
 }
