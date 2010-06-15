@@ -339,6 +339,7 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 
 	Chain = DAG.getCALLSEQ_START(Chain, DAG.getTargetConstant(stacksize,
 						MVT::i32));
+	SDValue in_flag = Chain.getValue(1);
 
 	SmallVector<std::pair<unsigned int, SDValue>, 16> reg_args;
 	SmallVector<SDValue, 16> stack_args;
@@ -391,10 +392,10 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 	// into; apparently we can put the memory location ones into one big
 	// chain, because they can happen independantly
 
-	SDValue in_flag;
 	if (!stack_args.empty()) {
 		Chain = DAG.getNode(ISD::TokenFactor, dl, MVT::Other,
 					&stack_args[0], stack_args.size());
+		in_flag = Chain.getValue(1);
 	}
 
 	// This chains loading to specified registers sequentially
