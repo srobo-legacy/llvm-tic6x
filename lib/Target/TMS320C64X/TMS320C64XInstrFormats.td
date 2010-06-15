@@ -257,8 +257,8 @@ class inst<dag outs, dag ins, string mnemonic, list<dag> pattern, bit side,
 }
 
 class pseudo_rr<string mnemonic, InstUnit u, SDNode op, int swap> :
-		inst<(outs ARegs:$dst), (ins ARegs:$src1, ARegs:$src2), "",
-		[(set ARegs:$dst, (op ARegs:$src1, ARegs:$src2))], 0, u> {
+		inst<(outs GPRegs:$dst), (ins GPRegs:$src1, GPRegs:$src2), "",
+		[(set GPRegs:$dst, (op GPRegs:$src1, GPRegs:$src2))], 0, u> {
 			let AsmString = !if(swap,
 			!strconcat(mnemonic, "\t$s\t$src2,\t$src1,\t$dst"),
 			!strconcat(mnemonic, "\t$s\t$src1,\t$src2,\t$dst"));
@@ -266,8 +266,8 @@ class pseudo_rr<string mnemonic, InstUnit u, SDNode op, int swap> :
 		}
 
 class pseudo_ri<string mnemonic, dag imm, InstUnit u, SDNode op, int swap> :
-		inst<(outs ARegs:$dst), (ins ARegs:$src1, i32imm:$imm), "",
-		[(set ARegs:$dst, (op ARegs:$src1, imm))], 0, u> {
+		inst<(outs GPRegs:$dst), (ins GPRegs:$src1, i32imm:$imm), "",
+		[(set GPRegs:$dst, (op GPRegs:$src1, imm))], 0, u> {
 			let AsmString = !if(swap,
 			!strconcat(mnemonic, "\t$s\t$imm,\t$src1,\t$dst"),
 			!strconcat(mnemonic, "\t$s\t$src1,\t$imm,\t$dst"));
