@@ -271,3 +271,92 @@ TMS320C64XInstrInfo::RemoveBranch(MachineBasicBlock &MBB) const
 
 	return count;
 }
+
+bool
+TMS320C64XInstrInfo::isMoveInstr(const MachineInstr &MI, unsigned &src_reg,
+				unsigned &dst_reg, unsigned &src_sub_idx,
+				unsigned &dst_sub_idx) const
+{
+
+	if (MI.getDesc().getOpcode() == TMS320C64X::mv) {
+		src_sub_idx = 0;
+		dst_sub_idx = 0;
+		src_reg = MI.getOperand(1).getReg();
+		dst_reg = MI.getOperand(0).getReg();
+		return true;
+	}
+
+	return false;
+}
+
+unsigned
+TMS320C64XInstrInfo::isLoadFromStack(const MachineInstr *MI,int &frame_idx)const
+{
+	unsigned opcode;
+
+	opcode = MI->getDesc().getOpcode();
+
+	if (opcode == TMS320C64X::word_addr_load_p ||
+			opcode == TMS320C64X::hword_addr_load_p ||
+			opcode == TMS320C64X::uhword_addr_load_p ||
+			opcode == TMS320C64X::byte_addr_load_p ||
+			opcode == TMS320C64X::ubyte_addr_load_p) {
+		if (MI->getOperand(0).getReg() == TMS320C64X::B15) {
+			MachineOperand op = MI->getOperand(1);
+			if (op.isFI()) {
+				frame_idx = op.getIndex();
+				return true;
+			} else {
+				// XXX - are there any circumstances where
+				// we'll be handed an insn after frame index
+				// elimination? I find this unlikely, but just
+				// in case
+				llvm_unreachable("Found load-from-stack sans "
+						"frame index operand");
+			}
+		}
+	}
+
+	return false;
+}
+
+unsigned
+TMS320C64XInstrInfo::isStoreToStack(const MachineInstr *MI, int &frame_idx)const
+{
+	unsigned opcode;
+
+	opcode = MI->getDesc().getOpcode();
+
+	if (opcode == TMS320C64X::word_addr_store_p ||
+			opcode == TMS320C64X::hword_addr_store_p ||
+			opcode == TMS320C64X::byte_addr_store_p) {
+		if (MI->getOperand(1).getReg() == TMS320C64X::B15) {
+			MachineOperand op = MI->getOperand(2);
+			if (op.isFI()) {
+				frame_idx = op.getIndex();
+				return true;
+			} else {
+				llvm_unreachable("Found store-to-stack sans "
+						"frame index operand");
+			}
+		}
+	}
+
+	return false;
+}
+
+bool
+TMS320C64XInstrInfo::isPredicated(const MachineInstr *MI) const
+{
+	int pred_idx, pred_val;
+
+	pred_idx = MI->findFirstPredOperandIdx();
+	if (pred_idx == -1)
+		return false;
+
+	pred_val = MI->getOperand(pred_idx).getImm();
+	if (pred_val == -1)
+		return false;
+
+	return true;
+}
