@@ -8,6 +8,8 @@ endif( NOT PERL_FOUND )
 set(PERL ${PERL_EXECUTABLE})
 set(VERSION PACKAGE_VERSION)
 set(PREFIX ${LLVM_BINARY_DIR}) # TODO: Root for `make install'.
+set(abs_top_srcdir ${LLVM_MAIN_SRC_DIR})
+set(abs_top_builddir ${LLVM_BINARY_DIR})
 execute_process(COMMAND date
   OUTPUT_VARIABLE LLVM_CONFIGTIME
   OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -16,8 +18,6 @@ execute_process(COMMAND date
 #set(LLVMGCCDIR "")
 #set(LLVMGCC "")
 #set(LLVMGXX "")
-#set(LLVMGCC_VERSION "")
-#set(LLVMGCC_MAJVERS "")
 test_big_endian(IS_BIG_ENDIAN)
 if( IS_BIG_ENDIAN )
   set(ENDIAN "big")
@@ -27,15 +27,12 @@ endif( IS_BIG_ENDIAN )
 set(SHLIBEXT ${LTDL_SHLIB_EXT})
 #EXEEXT already set.
 set(OS "${CMAKE_SYSTEM}")
-set(ARCH "X86") # TODO: This gives "i686" in Linux: "${CMAKE_SYSTEM_PROCESSOR}")
+set(ARCH "${LLVM_NATIVE_ARCH}")
 
 get_system_libs(LLVM_SYSTEM_LIBS_LIST)
 foreach(l ${LLVM_SYSTEM_LIBS_LIST})
   set(LLVM_SYSTEM_LIBS ${LLVM_SYSTEM_LIBS} "-l${l}")
 endforeach()
-
-include(GetTargetTriple)
-get_target_triple(target)
 
 foreach(c ${LLVM_TARGETS_TO_BUILD})
   set(TARGETS_BUILT "${TARGETS_BUILT} ${c}")
@@ -134,7 +131,7 @@ set(LLVMLibDeps ${LLVM_MAIN_SRC_DIR}/cmake/modules/LLVMLibDeps.cmake)
 set(LLVMLibDeps_TMP ${CMAKE_CURRENT_BINARY_DIR}/LLVMLibDeps.cmake.tmp)
 
 add_custom_command(OUTPUT ${LLVMLibDeps_TMP}
-  COMMAND sed -e s'@\\.a@@g' -e 's@libLLVM@LLVM@g' -e 's@: @ @' -e 's@\\\(.*\\\)@set\(MSVC_LIB_DEPS_\\1\)@' ${FINAL_LIBDEPS} > ${LLVMLibDeps_TMP}
+  COMMAND sed -e s'@\\.a@@g' -e s'@\\.so@@g' -e 's@libLLVM@LLVM@g' -e 's@: @ @' -e 's@\\\(.*\\\)@set\(MSVC_LIB_DEPS_\\1\)@' ${FINAL_LIBDEPS} > ${LLVMLibDeps_TMP}
   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${LLVMLibDeps_TMP} ${LLVMLibDeps}
   DEPENDS ${FINAL_LIBDEPS}
   COMMENT "Updating cmake library dependencies file ${LLVMLibDeps}"

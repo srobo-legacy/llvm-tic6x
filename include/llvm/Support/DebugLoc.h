@@ -19,28 +19,7 @@
 #include <vector>
 
 namespace llvm {
-  class GlobalVariable;
-
-  /// DebugLocTuple - Debug location tuple of filename id, line and column.
-  ///
-  struct DebugLocTuple {
-    GlobalVariable *CompileUnit;
-    unsigned Line, Col;
-
-    DebugLocTuple()
-      : CompileUnit(0), Line(~0U), Col(~0U) {};
-
-    DebugLocTuple(GlobalVariable *v, unsigned l, unsigned c)
-      : CompileUnit(v), Line(l), Col(c) {};
-
-    bool operator==(const DebugLocTuple &DLT) const {
-      return CompileUnit == DLT.CompileUnit &&
-             Line == DLT.Line && Col == DLT.Col;
-    }
-    bool operator!=(const DebugLocTuple &DLT) const {
-      return !(*this == DLT);
-    }
-  };
+  class MDNode;
 
   /// DebugLoc - Debug location id. This is carried by SDNode and MachineInstr
   /// to index into a vector of unique debug location tuples.
@@ -63,38 +42,16 @@ namespace llvm {
     bool operator!=(const DebugLoc &DL) const { return !(*this == DL); }
   };
 
-  // Partially specialize DenseMapInfo for DebugLocTyple.
-  template<>  struct DenseMapInfo<DebugLocTuple> {
-    static inline DebugLocTuple getEmptyKey() {
-      return DebugLocTuple(0, ~0U, ~0U);
-    }
-    static inline DebugLocTuple getTombstoneKey() {
-      return DebugLocTuple((GlobalVariable*)~1U, ~1U, ~1U);
-    }
-    static unsigned getHashValue(const DebugLocTuple &Val) {
-      return DenseMapInfo<GlobalVariable*>::getHashValue(Val.CompileUnit) ^
-             DenseMapInfo<unsigned>::getHashValue(Val.Line) ^
-             DenseMapInfo<unsigned>::getHashValue(Val.Col);
-    }
-    static bool isEqual(const DebugLocTuple &LHS, const DebugLocTuple &RHS) {
-      return LHS.CompileUnit == RHS.CompileUnit &&
-             LHS.Line        == RHS.Line &&
-             LHS.Col         == RHS.Col;
-    }
-
-    static bool isPod() { return true; }
-  };
-
-  /// DebugLocTracker - This class tracks debug location information.
+    /// DebugLocTracker - This class tracks debug location information.
   ///
   struct DebugLocTracker {
     /// DebugLocations - A vector of unique DebugLocTuple's.
     ///
-    std::vector<DebugLocTuple> DebugLocations;
+    std::vector<MDNode *> DebugLocations;
 
     /// DebugIdMap - This maps DebugLocTuple's to indices into the
     /// DebugLocations vector.
-    DenseMap<DebugLocTuple, unsigned> DebugIdMap;
+    DenseMap<MDNode *, unsigned> DebugIdMap;
 
     DebugLocTracker() {}
   };

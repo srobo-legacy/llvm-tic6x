@@ -1,4 +1,4 @@
-; RUN: llvm-as -o - %s | llc -march=cellspu > %t1.s
+; RUN: llc < %s -march=cellspu > %t1.s
 ; RUN: grep mpy     %t1.s | count 44
 ; RUN: grep mpyu    %t1.s | count 4
 ; RUN: grep mpyh    %t1.s | count 10
@@ -11,7 +11,6 @@
 ; RUN: grep shli    %t1.s | count 4
 ; RUN: grep shlhi   %t1.s | count 4
 ; RUN: grep ila     %t1.s | count 2
-; RUN: grep xsbh    %t1.s | count 4
 target datalayout = "E-p:32:32:128-f64:64:128-f32:32:128-i64:32:128-i32:32:128-i16:16:128-i8:8:128-i1:8:128-a0:0:128-v128:128:128-s0:128:128"
 target triple = "spu"
 

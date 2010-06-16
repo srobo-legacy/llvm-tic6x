@@ -17,8 +17,8 @@
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
 using namespace llvm;
@@ -65,7 +65,8 @@ namespace {
     { ARM::t2ASRri, ARM::tASRri,  0,             5,   0,    1,   0,  0,0, 0 },
     { ARM::t2ASRrr, 0,            ARM::tASRrr,   0,   0,    0,   1,  0,0, 0 },
     { ARM::t2BICrr, 0,            ARM::tBIC,     0,   0,    0,   1,  0,0, 0 },
-    { ARM::t2CMNrr, ARM::tCMN,    0,             0,   0,    1,   0,  2,0, 0 },
+    //FIXME: Disable CMN, as CCodes are backwards from compare expectations
+    //{ ARM::t2CMNrr, ARM::tCMN,    0,             0,   0,    1,   0,  2,0, 0 },
     { ARM::t2CMPri, ARM::tCMPi8,  0,             8,   0,    1,   0,  2,0, 0 },
     { ARM::t2CMPrr, ARM::tCMPhir, 0,             0,   0,    0,   0,  2,0, 0 },
     { ARM::t2CMPzri,ARM::tCMPzi8, 0,             8,   0,    1,   0,  2,0, 0 },
@@ -78,10 +79,11 @@ namespace {
     { ARM::t2LSRri, ARM::tLSRri,  0,             5,   0,    1,   0,  0,0, 0 },
     { ARM::t2LSRrr, 0,            ARM::tLSRrr,   0,   0,    0,   1,  0,0, 0 },
     { ARM::t2MOVi,  ARM::tMOVi8,  0,             8,   0,    1,   0,  0,0, 0 },
+    { ARM::t2MOVi16,ARM::tMOVi8,  0,             8,   0,    1,   0,  0,0, 1 },
     // FIXME: Do we need the 16-bit 'S' variant?
     { ARM::t2MOVr,ARM::tMOVgpr2gpr,0,            0,   0,    0,   0,  1,0, 0 },
     { ARM::t2MOVCCr,0,            ARM::tMOVCCr,  0,   0,    0,   0,  0,1, 0 },
-    { ARM::t2MOVCCi,0,            ARM::tMOVCCi,  0,   8,    0,   0,  0,1, 0 },
+    { ARM::t2MOVCCi,0,            ARM::tMOVCCi,  0,   8,    0,   1,  0,1, 0 },
     { ARM::t2MUL,   0,            ARM::tMUL,     0,   0,    0,   1,  0,0, 0 },
     { ARM::t2MVNr,  ARM::tMVN,    0,             0,   0,    1,   0,  0,0, 0 },
     { ARM::t2ORRrr, 0,            ARM::tORR,     0,   0,    0,   1,  0,0, 0 },
@@ -104,7 +106,7 @@ namespace {
 
     // FIXME: Clean this up after splitting each Thumb load / store opcode
     // into multiple ones.
-    { ARM::t2LDRi12,ARM::tLDR,    0,             5,   0,    1,   0,  0,0, 1 },
+    { ARM::t2LDRi12,ARM::tLDR,    ARM::tLDRspi,  5,   8,    1,   0,  0,0, 1 },
     { ARM::t2LDRs,  ARM::tLDR,    0,             0,   0,    1,   0,  0,0, 1 },
     { ARM::t2LDRBi12,ARM::tLDRB,  0,             5,   0,    1,   0,  0,0, 1 },
     { ARM::t2LDRBs, ARM::tLDRB,   0,             0,   0,    1,   0,  0,0, 1 },
@@ -112,7 +114,7 @@ namespace {
     { ARM::t2LDRHs, ARM::tLDRH,   0,             0,   0,    1,   0,  0,0, 1 },
     { ARM::t2LDRSBs,ARM::tLDRSB,  0,             0,   0,    1,   0,  0,0, 1 },
     { ARM::t2LDRSHs,ARM::tLDRSH,  0,             0,   0,    1,   0,  0,0, 1 },
-    { ARM::t2STRi12,ARM::tSTR,    0,             5,   0,    1,   0,  0,0, 1 },
+    { ARM::t2STRi12,ARM::tSTR,    ARM::tSTRspi,  5,   8,    1,   0,  0,0, 1 },
     { ARM::t2STRs,  ARM::tSTR,    0,             0,   0,    1,   0,  0,0, 1 },
     { ARM::t2STRBi12,ARM::tSTRB,  0,             5,   0,    1,   0,  0,0, 1 },
     { ARM::t2STRBs, ARM::tSTRB,   0,             0,   0,    1,   0,  0,0, 1 },
@@ -124,7 +126,7 @@ namespace {
     { ARM::t2STM,   ARM::tSTM,    ARM::tPUSH,    0,   0,    1,   1,  1,1, 1 },
   };
 
-  class VISIBILITY_HIDDEN Thumb2SizeReduce : public MachineFunctionPass {
+  class Thumb2SizeReduce : public MachineFunctionPass {
   public:
     static char ID;
     Thumb2SizeReduce();
@@ -243,8 +245,13 @@ static bool VerifyLowRegs(MachineInstr *MI) {
       continue;
     if (isLROk && Reg == ARM::LR)
       continue;
-    if (isSPOk && Reg == ARM::SP)
-      continue;
+    if (Reg == ARM::SP) {
+      if (isSPOk)
+        continue;
+      if (i == 1 && (Opc == ARM::t2LDRi12 || Opc == ARM::t2STRi12))
+        // Special case for these ldr / str with sp as base register.
+        continue;
+    }
     if (!isARMLowRegister(Reg))
       return false;
   }
@@ -260,18 +267,26 @@ Thumb2SizeReduce::ReduceLoadStore(MachineBasicBlock &MBB, MachineInstr *MI,
   unsigned Scale = 1;
   bool HasImmOffset = false;
   bool HasShift = false;
+  bool HasOffReg = true;
   bool isLdStMul = false;
-  bool isPopPush = false;
   unsigned Opc = Entry.NarrowOpc1;
   unsigned OpNum = 3; // First 'rest' of operands.
+  uint8_t  ImmLimit = Entry.Imm1Limit;
   switch (Entry.WideOpc) {
   default:
     llvm_unreachable("Unexpected Thumb2 load / store opcode!");
   case ARM::t2LDRi12:
-  case ARM::t2STRi12:
+  case ARM::t2STRi12: {
+    unsigned BaseReg = MI->getOperand(1).getReg();
+    if (BaseReg == ARM::SP) {
+      Opc = Entry.NarrowOpc2;
+      ImmLimit = Entry.Imm2Limit;
+      HasOffReg = false;
+    }
     Scale = 4;
     HasImmOffset = true;
     break;
+  }
   case ARM::t2LDRBi12:
   case ARM::t2STRBi12:
     HasImmOffset = true;
@@ -300,7 +315,6 @@ Thumb2SizeReduce::ReduceLoadStore(MachineBasicBlock &MBB, MachineInstr *MI,
     unsigned Mode = MI->getOperand(1).getImm();
     if (BaseReg == ARM::SP && ARM_AM::getAM4WBFlag(Mode)) {
       Opc = Entry.NarrowOpc2;
-      isPopPush = true;
       OpNum = 2;
     } else if (Entry.WideOpc == ARM::t2LDM_RET ||
                !isARMLowRegister(BaseReg) ||
@@ -326,7 +340,7 @@ Thumb2SizeReduce::ReduceLoadStore(MachineBasicBlock &MBB, MachineInstr *MI,
   unsigned OffsetImm = 0;
   if (HasImmOffset) {
     OffsetImm = MI->getOperand(2).getImm();
-    unsigned MaxOffset = ((1 << Entry.Imm1Limit) - 1) * Scale;
+    unsigned MaxOffset = ((1 << ImmLimit) - 1) * Scale;
     if ((OffsetImm & (Scale-1)) || OffsetImm > MaxOffset)
       // Make sure the immediate field fits.
       return false;
@@ -338,7 +352,7 @@ Thumb2SizeReduce::ReduceLoadStore(MachineBasicBlock &MBB, MachineInstr *MI,
   MachineInstrBuilder MIB = BuildMI(MBB, *MI, dl, TII->get(Opc));
   if (!isLdStMul) {
     MIB.addOperand(MI->getOperand(0)).addOperand(MI->getOperand(1));
-    if (Entry.NarrowOpc1 != ARM::tLDRSB && Entry.NarrowOpc1 != ARM::tLDRSH) {
+    if (Opc != ARM::tLDRSB && Opc != ARM::tLDRSH) {
       // tLDRSB and tLDRSH do not have an immediate offset field. On the other
       // hand, it must have an offset register.
       // FIXME: Remove this special case.
@@ -346,14 +360,18 @@ Thumb2SizeReduce::ReduceLoadStore(MachineBasicBlock &MBB, MachineInstr *MI,
     }
     assert((!HasShift || OffsetReg) && "Invalid so_reg load / store address!");
 
-    MIB.addReg(OffsetReg, getKillRegState(OffsetKill));
+    if (HasOffReg)
+      MIB.addReg(OffsetReg, getKillRegState(OffsetKill));
   }
 
   // Transfer the rest of operands.
   for (unsigned e = MI->getNumOperands(); OpNum != e; ++OpNum)
     MIB.addOperand(MI->getOperand(OpNum));
 
-  DOUT << "Converted 32-bit: " << *MI << "       to 16-bit: " << *MIB;
+  // Transfer memoperands.
+  (*MIB).setMemRefs(MI->memoperands_begin(), MI->memoperands_end());
+
+  DEBUG(errs() << "Converted 32-bit: " << *MI << "       to 16-bit: " << *MIB);
 
   MBB.erase(MI);
   ++NumLdSts;
@@ -394,6 +412,12 @@ Thumb2SizeReduce::ReduceSpecial(MachineBasicBlock &MBB, MachineInstr *MI,
   case ARM::t2RSBri:
   case ARM::t2RSBSri:
     if (MI->getOperand(2).getImm() == 0)
+      return ReduceToNarrow(MBB, MI, Entry, LiveCPSR);
+    break;
+  case ARM::t2MOVi16:
+    // Can convert only 'pure' immediate operands, not immediates obtained as
+    // globals' addresses.
+    if (MI->getOperand(1).isImm())
       return ReduceToNarrow(MBB, MI, Entry, LiveCPSR);
     break;
   }
@@ -471,7 +495,7 @@ Thumb2SizeReduce::ReduceTo2Addr(MachineBasicBlock &MBB, MachineInstr *MI,
     MIB.addOperand(MI->getOperand(i));
   }
 
-  DOUT << "Converted 32-bit: " << *MI << "       to 16-bit: " << *MIB;
+  DEBUG(errs() << "Converted 32-bit: " << *MI << "       to 16-bit: " << *MIB);
 
   MBB.erase(MI);
   ++Num2Addrs;
@@ -505,7 +529,7 @@ Thumb2SizeReduce::ReduceToNarrow(MachineBasicBlock &MBB, MachineInstr *MI,
         return false;
     } else if (MO.isImm() &&
                !TID.OpInfo[i].isPredicate()) {
-      if (MO.getImm() > Limit || (MO.getImm() & (Scale-1)) != 0)
+      if (((unsigned)MO.getImm()) > Limit || (MO.getImm() & (Scale-1)) != 0)
         return false;
     }
   }
@@ -571,7 +595,7 @@ Thumb2SizeReduce::ReduceToNarrow(MachineBasicBlock &MBB, MachineInstr *MI,
   if (!TID.isPredicable() && NewTID.isPredicable())
     AddDefaultPred(MIB);
 
-  DOUT << "Converted 32-bit: " << *MI << "       to 16-bit: " << *MIB;
+  DEBUG(errs() << "Converted 32-bit: " << *MI << "       to 16-bit: " << *MIB);
 
   MBB.erase(MI);
   ++NumNarrows;
@@ -626,7 +650,7 @@ bool Thumb2SizeReduce::ReduceMBB(MachineBasicBlock &MBB) {
   MachineBasicBlock::iterator MII = MBB.begin(), E = MBB.end();
   MachineBasicBlock::iterator NextMII;
   for (; MII != E; MII = NextMII) {
-    NextMII = next(MII);
+    NextMII = llvm::next(MII);
 
     MachineInstr *MI = &*MII;
     LiveCPSR = UpdateCPSRUse(*MI, LiveCPSR);

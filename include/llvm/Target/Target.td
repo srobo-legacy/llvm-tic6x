@@ -199,26 +199,21 @@ class Instruction {
   bit isReMaterializable = 0; // Is this instruction re-materializable?
   bit isPredicable = 0;     // Is this instruction predicable?
   bit hasDelaySlot = 0;     // Does this instruction have an delay slot?
-  bit usesCustomDAGSchedInserter = 0; // Pseudo instr needing special help.
+  bit usesCustomInserter = 0; // Pseudo instr needing special help.
   bit hasCtrlDep   = 0;     // Does this instruction r/w ctrl-flow chains?
   bit isNotDuplicable = 0;  // Is it unsafe to duplicate this instruction?
   bit isAsCheapAsAMove = 0; // As cheap (or cheaper) than a move instruction.
+  bit hasExtraSrcRegAllocReq = 0; // Sources have special regalloc requirement?
+  bit hasExtraDefRegAllocReq = 0; // Defs have special regalloc requirement?
 
   // Side effect flags - When set, the flags have these meanings:
   //
   //  hasSideEffects - The instruction has side effects that are not
   //    captured by any operands of the instruction or other flags.
   //
-  //  mayHaveSideEffects  - Some instances of the instruction can have side
-  //    effects. The virtual method "isReallySideEffectFree" is called to
-  //    determine this. Load instructions are an example of where this is
-  //    useful. In general, loads always have side effects. However, loads from
-  //    constant pools don't. Individual back ends make this determination.
-  //
   //  neverHasSideEffects - Set on an instruction with no pattern if it has no
   //    side effects.
   bit hasSideEffects = 0;
-  bit mayHaveSideEffects = 0;
   bit neverHasSideEffects = 0;
 
   // Is this instruction a "real" instruction (with a distinct machine
@@ -374,7 +369,7 @@ class OptionalDefOperand<ValueType ty, dag OpTypes, dag defaultops>
 
 
 // InstrInfo - This class should only be instantiated once to provide parameters
-// which are global to the the target machine.
+// which are global to the target machine.
 //
 class InstrInfo {
   // If the target wants to associate some target-specific information with each
@@ -397,54 +392,57 @@ def PHI : Instruction {
   let OutOperandList = (ops);
   let InOperandList = (ops variable_ops);
   let AsmString = "PHINODE";
-  let Namespace = "TargetInstrInfo";
+  let Namespace = "TargetOpcode";
 }
 def INLINEASM : Instruction {
   let OutOperandList = (ops);
   let InOperandList = (ops variable_ops);
   let AsmString = "";
-  let Namespace = "TargetInstrInfo";
+  let Namespace = "TargetOpcode";
 }
 def DBG_LABEL : Instruction {
   let OutOperandList = (ops);
   let InOperandList = (ops i32imm:$id);
   let AsmString = "";
-  let Namespace = "TargetInstrInfo";
+  let Namespace = "TargetOpcode";
   let hasCtrlDep = 1;
+  let isNotDuplicable = 1;
 }
 def EH_LABEL : Instruction {
   let OutOperandList = (ops);
   let InOperandList = (ops i32imm:$id);
   let AsmString = "";
-  let Namespace = "TargetInstrInfo";
+  let Namespace = "TargetOpcode";
   let hasCtrlDep = 1;
+  let isNotDuplicable = 1;
 }
 def GC_LABEL : Instruction {
   let OutOperandList = (ops);
   let InOperandList = (ops i32imm:$id);
   let AsmString = "";
-  let Namespace = "TargetInstrInfo";
+  let Namespace = "TargetOpcode";
   let hasCtrlDep = 1;
+  let isNotDuplicable = 1;
 }
-def DECLARE : Instruction {
+def KILL : Instruction {
   let OutOperandList = (ops);
   let InOperandList = (ops variable_ops);
   let AsmString = "";
-  let Namespace = "TargetInstrInfo";
-  let hasCtrlDep = 1;
+  let Namespace = "TargetOpcode";
+  let neverHasSideEffects = 1;
 }
 def EXTRACT_SUBREG : Instruction {
   let OutOperandList = (ops unknown:$dst);
   let InOperandList = (ops unknown:$supersrc, i32imm:$subidx);
   let AsmString = "";
-  let Namespace = "TargetInstrInfo";
+  let Namespace = "TargetOpcode";
   let neverHasSideEffects = 1;
 }
 def INSERT_SUBREG : Instruction {
   let OutOperandList = (ops unknown:$dst);
   let InOperandList = (ops unknown:$supersrc, unknown:$subsrc, i32imm:$subidx);
   let AsmString = "";
-  let Namespace = "TargetInstrInfo";
+  let Namespace = "TargetOpcode";
   let neverHasSideEffects = 1;
   let Constraints = "$supersrc = $dst";
 }
@@ -452,7 +450,7 @@ def IMPLICIT_DEF : Instruction {
   let OutOperandList = (ops unknown:$dst);
   let InOperandList = (ops);
   let AsmString = "";
-  let Namespace = "TargetInstrInfo";
+  let Namespace = "TargetOpcode";
   let neverHasSideEffects = 1;
   let isReMaterializable = 1;
   let isAsCheapAsAMove = 1;
@@ -461,15 +459,22 @@ def SUBREG_TO_REG : Instruction {
   let OutOperandList = (ops unknown:$dst);
   let InOperandList = (ops unknown:$implsrc, unknown:$subsrc, i32imm:$subidx);
   let AsmString = "";
-  let Namespace = "TargetInstrInfo";
+  let Namespace = "TargetOpcode";
   let neverHasSideEffects = 1;
 }
 def COPY_TO_REGCLASS : Instruction {
   let OutOperandList = (ops unknown:$dst);
   let InOperandList = (ops unknown:$src, i32imm:$regclass);
   let AsmString = "";
-  let Namespace = "TargetInstrInfo";
+  let Namespace = "TargetOpcode";
   let neverHasSideEffects = 1;
+  let isAsCheapAsAMove = 1;
+}
+def DBG_VALUE : Instruction {
+  let OutOperandList = (ops);
+  let InOperandList = (ops variable_ops);
+  let AsmString = "DBG_VALUE";
+  let Namespace = "TargetOpcode";
   let isAsCheapAsAMove = 1;
 }
 }

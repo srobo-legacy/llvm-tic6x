@@ -1,6 +1,6 @@
 ; Test to make sure that the 'private' is used correctly.
 ;
-; RUN: llvm-as < %s | llc -mtriple=arm-linux-gnueabi > %t
+; RUN: llc < %s -mtriple=arm-linux-gnueabi > %t
 ; RUN: grep .Lfoo: %t
 ; RUN: egrep bl.*\.Lfoo %t
 ; RUN: grep .Lbaz: %t
@@ -12,7 +12,7 @@ define private void @foo() {
         ret void
 }
 
-@baz = private global i32 4;
+@baz = private global i32 4
 
 define i32 @bar() {
         call void @foo()

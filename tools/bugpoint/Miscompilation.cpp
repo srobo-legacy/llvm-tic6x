@@ -22,7 +22,6 @@
 #include "llvm/Module.h"
 #include "llvm/Pass.h"
 #include "llvm/Analysis/Verifier.h"
-#include "llvm/Support/Mangler.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileUtilities.h"
@@ -30,6 +29,7 @@
 using namespace llvm;
 
 namespace llvm {
+  extern cl::opt<std::string> OutputPrefix;
   extern cl::list<std::string> InputArgv;
 }
 
@@ -234,30 +234,16 @@ bool ReduceMiscompilingFunctions::TestFuncs(const std::vector<Function*>&Funcs){
   return TestFn(BD, ToOptimize, ToNotOptimize);
 }
 
-/// DisambiguateGlobalSymbols - Mangle symbols to guarantee uniqueness by
-/// modifying predominantly internal symbols rather than external ones.
+/// DisambiguateGlobalSymbols - Give anonymous global values names.
 ///
 static void DisambiguateGlobalSymbols(Module *M) {
-  // Try not to cause collisions by minimizing chances of renaming an
-  // already-external symbol, so take in external globals and functions as-is.
-  // The code should work correctly without disambiguation (assuming the same
-  // mangler is used by the two code generators), but having symbols with the
-  // same name causes warnings to be emitted by the code generator.
-  Mangler Mang(*M);
-  // Agree with the CBE on symbol naming
-  Mang.markCharUnacceptable('.');
   for (Module::global_iterator I = M->global_begin(), E = M->global_end();
-       I != E; ++I) {
-    // Don't mangle asm names.
-    if (!I->hasName() || I->getName()[0] != 1)
-      I->setName(Mang.getMangledName(I));
-  }
-  for (Module::iterator I = M->begin(), E = M->end(); I != E; ++I) {
-    // Don't mangle asm names or intrinsics.
-    if ((!I->hasName() || I->getName()[0] != 1) &&
-        I->getIntrinsicID() == 0)
-      I->setName(Mang.getMangledName(I));
-  }
+       I != E; ++I)
+    if (!I->hasName())
+      I->setName("anon_global");
+  for (Module::iterator I = M->begin(), E = M->end(); I != E; ++I)
+    if (!I->hasName())
+      I->setName("anon_fn");
 }
 
 /// ExtractLoops - Given a reduced list of functions that still exposed the bug,
@@ -301,12 +287,15 @@ static bool ExtractLoops(BugDriver &BD,
              << " Please report a bug!\n";
       errs() << "      Continuing on with un-loop-extracted version.\n";
 
-      BD.writeProgramToFile("bugpoint-loop-extract-fail-tno.bc", ToNotOptimize);
-      BD.writeProgramToFile("bugpoint-loop-extract-fail-to.bc", ToOptimize);
-      BD.writeProgramToFile("bugpoint-loop-extract-fail-to-le.bc",
+      BD.writeProgramToFile(OutputPrefix + "-loop-extract-fail-tno.bc",
+                            ToNotOptimize);
+      BD.writeProgramToFile(OutputPrefix + "-loop-extract-fail-to.bc",
+                            ToOptimize);
+      BD.writeProgramToFile(OutputPrefix + "-loop-extract-fail-to-le.bc",
                             ToOptimizeLoopExtracted);
 
-      errs() << "Please submit the bugpoint-loop-extract-fail-*.bc files.\n";
+      errs() << "Please submit the " 
+             << OutputPrefix << "-loop-extract-fail-*.bc files.\n";
       delete ToOptimize;
       delete ToNotOptimize;
       delete ToOptimizeLoopExtracted;
@@ -544,10 +533,6 @@ DebugAMiscompilation(BugDriver &BD,
       ExtractLoops(BD, TestFn, MiscompiledFunctions)) {
     // Okay, we extracted some loops and the problem still appears.  See if we
     // can eliminate some of the created functions from being candidates.
-
-    // Loop extraction can introduce functions with the same name (foo_code).
-    // Make sure to disambiguate the symbols so that when the program is split
-    // apart that we can link it back together again.
     DisambiguateGlobalSymbols(BD.getProgram());
 
     // Do the reduction...
@@ -565,10 +550,6 @@ DebugAMiscompilation(BugDriver &BD,
       ExtractBlocks(BD, TestFn, MiscompiledFunctions)) {
     // Okay, we extracted some blocks and the problem still appears.  See if we
     // can eliminate some of the created functions from being candidates.
-
-    // Block extraction can introduce functions with the same name (foo_code).
-    // Make sure to disambiguate the symbols so that when the program is split
-    // apart that we can link it back together again.
     DisambiguateGlobalSymbols(BD.getProgram());
 
     // Do the reduction...
@@ -700,8 +681,8 @@ static void CleanupAndPrepareModules(BugDriver &BD, Module *&Test,
   // Prototype: void *getPointerToNamedFunction(const char* Name)
   Constant *resolverFunc =
     Safe->getOrInsertFunction("getPointerToNamedFunction",
-                    PointerType::getUnqual(Type::getInt8Ty(Safe->getContext())),
-                    PointerType::getUnqual(Type::getInt8Ty(Safe->getContext())),
+                    Type::getInt8PtrTy(Safe->getContext()),
+                    Type::getInt8PtrTy(Safe->getContext()),
                        (Type *)0);
 
   // Use the function we just added to get addresses of functions we need.
@@ -826,8 +807,9 @@ static bool TestCodeGenerator(BugDriver &BD, Module *Test, Module *Safe) {
            << ErrMsg << "\n";
     exit(1);
   }
-  if (BD.writeProgramToFile(TestModuleBC.toString(), Test)) {
-    errs() << "Error writing bitcode to `" << TestModuleBC << "'\nExiting.";
+  if (BD.writeProgramToFile(TestModuleBC.str(), Test)) {
+    errs() << "Error writing bitcode to `" << TestModuleBC.str()
+           << "'\nExiting.";
     exit(1);
   }
   delete Test;
@@ -840,16 +822,17 @@ static bool TestCodeGenerator(BugDriver &BD, Module *Test, Module *Safe) {
     exit(1);
   }
 
-  if (BD.writeProgramToFile(SafeModuleBC.toString(), Safe)) {
-    errs() << "Error writing bitcode to `" << SafeModuleBC << "'\nExiting.";
+  if (BD.writeProgramToFile(SafeModuleBC.str(), Safe)) {
+    errs() << "Error writing bitcode to `" << SafeModuleBC.str()
+           << "'\nExiting.";
     exit(1);
   }
-  std::string SharedObject = BD.compileSharedObject(SafeModuleBC.toString());
+  std::string SharedObject = BD.compileSharedObject(SafeModuleBC.str());
   delete Safe;
 
   // Run the code generator on the `Test' code, loading the shared library.
   // The function returns whether or not the new output differs from reference.
-  int Result = BD.diffProgram(TestModuleBC.toString(), SharedObject, false);
+  int Result = BD.diffProgram(TestModuleBC.str(), SharedObject, false);
 
   if (Result)
     errs() << ": still failing!\n";
@@ -899,8 +882,9 @@ bool BugDriver::debugCodeGenerator() {
     exit(1);
   }
 
-  if (writeProgramToFile(TestModuleBC.toString(), ToCodeGen)) {
-    errs() << "Error writing bitcode to `" << TestModuleBC << "'\nExiting.";
+  if (writeProgramToFile(TestModuleBC.str(), ToCodeGen)) {
+    errs() << "Error writing bitcode to `" << TestModuleBC.str()
+           << "'\nExiting.";
     exit(1);
   }
   delete ToCodeGen;
@@ -913,31 +897,33 @@ bool BugDriver::debugCodeGenerator() {
     exit(1);
   }
 
-  if (writeProgramToFile(SafeModuleBC.toString(), ToNotCodeGen)) {
-    errs() << "Error writing bitcode to `" << SafeModuleBC << "'\nExiting.";
+  if (writeProgramToFile(SafeModuleBC.str(), ToNotCodeGen)) {
+    errs() << "Error writing bitcode to `" << SafeModuleBC.str()
+           << "'\nExiting.";
     exit(1);
   }
-  std::string SharedObject = compileSharedObject(SafeModuleBC.toString());
+  std::string SharedObject = compileSharedObject(SafeModuleBC.str());
   delete ToNotCodeGen;
 
   outs() << "You can reproduce the problem with the command line: \n";
   if (isExecutingJIT()) {
-    outs() << "  lli -load " << SharedObject << " " << TestModuleBC;
+    outs() << "  lli -load " << SharedObject << " " << TestModuleBC.str();
   } else {
-    outs() << "  llc -f " << TestModuleBC << " -o " << TestModuleBC<< ".s\n";
-    outs() << "  gcc " << SharedObject << " " << TestModuleBC
-              << ".s -o " << TestModuleBC << ".exe";
+    outs() << "  llc -f " << TestModuleBC.str() << " -o " << TestModuleBC.str()
+           << ".s\n";
+    outs() << "  gcc " << SharedObject << " " << TestModuleBC.str()
+              << ".s -o " << TestModuleBC.str() << ".exe";
 #if defined (HAVE_LINK_R)
     outs() << " -Wl,-R.";
 #endif
     outs() << "\n";
-    outs() << "  " << TestModuleBC << ".exe";
+    outs() << "  " << TestModuleBC.str() << ".exe";
   }
   for (unsigned i=0, e = InputArgv.size(); i != e; ++i)
     outs() << " " << InputArgv[i];
   outs() << '\n';
   outs() << "The shared object was created with:\n  llc -march=c "
-         << SafeModuleBC << " -o temporary.c\n"
+         << SafeModuleBC.str() << " -o temporary.c\n"
          << "  gcc -xc temporary.c -O2 -o " << SharedObject;
   if (TargetTriple.getArch() == Triple::sparc)
     outs() << " -G";              // Compile a shared library, `-G' for Sparc

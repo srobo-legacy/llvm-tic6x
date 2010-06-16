@@ -51,7 +51,6 @@
 #include "llvm/Module.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CallSite.h"
-#include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
@@ -62,7 +61,7 @@ using namespace llvm;
 STATISTIC(NumFunctionsMerged, "Number of functions merged");
 
 namespace {
-  struct VISIBILITY_HIDDEN MergeFunctions : public ModulePass {
+  struct MergeFunctions : public ModulePass {
     static char ID; // Pass identification, replacement for typeid
     MergeFunctions() : ModulePass(&ID) {}
 
@@ -188,7 +187,8 @@ static bool
 isEquivalentOperation(const Instruction *I1, const Instruction *I2) {
   if (I1->getOpcode() != I2->getOpcode() ||
       I1->getNumOperands() != I2->getNumOperands() ||
-      !isEquivalentType(I1->getType(), I2->getType()))
+      !isEquivalentType(I1->getType(), I2->getType()) ||
+      !I1->hasSameSubclassOptionalData(I2))
     return false;
 
   // We have two instructions of identical opcode and #operands.  Check to see
@@ -467,7 +467,6 @@ static LinkageCategory categorize(const Function *F) {
   case GlobalValue::AppendingLinkage:
   case GlobalValue::DLLImportLinkage:
   case GlobalValue::DLLExportLinkage:
-  case GlobalValue::GhostLinkage:
   case GlobalValue::CommonLinkage:
     return ExternalStrong;
   }
@@ -498,7 +497,7 @@ static void ThunkGToF(Function *F, Function *G) {
   CallInst *CI = CallInst::Create(F, Args.begin(), Args.end(), "", BB);
   CI->setTailCall();
   CI->setCallingConv(F->getCallingConv());
-  if (NewG->getReturnType() == Type::getVoidTy(F->getContext())) {
+  if (NewG->getReturnType()->isVoidTy()) {
     ReturnInst::Create(F->getContext(), BB);
   } else if (CI->getType() != NewG->getReturnType()) {
     Value *BCI = new BitCastInst(CI, NewG->getReturnType(), "", BB);
@@ -581,19 +580,19 @@ static bool fold(std::vector<Function *> &FnVec, unsigned i, unsigned j) {
           llvm_unreachable(0);
           // fall-through
         case ExternalWeak:
-	  if (F->hasAddressTaken())
+          if (F->hasAddressTaken())
             ThunkGToF(F, G);
           else
             AliasGToF(F, G);
-	  break;
+          break;
         case Internal: {
           bool addrTakenF = F->hasAddressTaken();
           bool addrTakenG = G->hasAddressTaken();
           if (!addrTakenF && addrTakenG) {
             std::swap(FnVec[i], FnVec[j]);
             std::swap(F, G);
-	    std::swap(addrTakenF, addrTakenG);
-	  }
+            std::swap(addrTakenF, addrTakenG);
+          }
 
           if (addrTakenF && addrTakenG) {
             ThunkGToF(F, G);
@@ -601,7 +600,7 @@ static bool fold(std::vector<Function *> &FnVec, unsigned i, unsigned j) {
             assert(!addrTakenG);
             AliasGToF(F, G);
           }
-	} break;
+        } break;
       }
       break;
   }
@@ -633,17 +632,17 @@ bool MergeFunctions::runOnModule(Module &M) {
   bool LocalChanged;
   do {
     LocalChanged = false;
-    DOUT << "size: " << FnMap.size() << "\n";
+    DEBUG(dbgs() << "size: " << FnMap.size() << "\n");
     for (std::map<unsigned long, std::vector<Function *> >::iterator
          I = FnMap.begin(), E = FnMap.end(); I != E; ++I) {
       std::vector<Function *> &FnVec = I->second;
-      DOUT << "hash (" << I->first << "): " << FnVec.size() << "\n";
+      DEBUG(dbgs() << "hash (" << I->first << "): " << FnVec.size() << "\n");
 
       for (int i = 0, e = FnVec.size(); i != e; ++i) {
         for (int j = i + 1; j != e; ++j) {
           bool isEqual = equals(FnVec[i], FnVec[j]);
 
-          DEBUG(errs() << "  " << FnVec[i]->getName()
+          DEBUG(dbgs() << "  " << FnVec[i]->getName()
                 << (isEqual ? " == " : " != ")
                 << FnVec[j]->getName() << "\n");
 

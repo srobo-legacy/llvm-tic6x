@@ -1,4 +1,4 @@
-//===- Thumb2InstrInfo.h - Thumb-2 Instruction Information ----------*- C++ -*-===//
+//===- Thumb2InstrInfo.h - Thumb-2 Instruction Information ------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -30,9 +30,6 @@ public:
   // Return the non-pre/post incrementing version of 'Opc'. Return 0
   // if there is not such an opcode.
   unsigned getUnindexedOpcode(unsigned Opc) const;
-
-  // Return true if the block does not fall through.
-  bool BlockHasNoFallThrough(const MachineBasicBlock &MBB) const;
 
   bool copyRegToReg(MachineBasicBlock &MBB,
                     MachineBasicBlock::iterator I,

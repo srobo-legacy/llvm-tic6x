@@ -17,19 +17,21 @@
 #include "llvm/Pass.h"
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/Function.h"
-#include "llvm/Support/Compiler.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
-
+#include "llvm/Support/raw_ostream.h"
 using namespace llvm;
 
 namespace {
   
-  class VISIBILITY_HIDDEN Printer : public FunctionPass {
+  class Printer : public FunctionPass {
     static char ID;
-    std::ostream &OS;
+    raw_ostream &OS;
     
   public:
-    explicit Printer(std::ostream &OS = *cerr);
+    Printer() : FunctionPass(&ID), OS(errs()) {}
+    explicit Printer(raw_ostream &OS) : FunctionPass(&ID), OS(OS) {}
+
     
     const char *getPassName() const;
     void getAnalysisUsage(AnalysisUsage &AU) const;
@@ -37,7 +39,7 @@ namespace {
     bool runOnFunction(Function &F);
   };
   
-  class VISIBILITY_HIDDEN Deleter : public FunctionPass {
+  class Deleter : public FunctionPass {
     static char ID;
     
   public:
@@ -91,7 +93,7 @@ GCStrategy *GCModuleInfo::getOrCreateStrategy(const Module *M,
     }
   }
  
-  cerr << "unsupported GC: " << Name << "\n";
+  dbgs() << "unsupported GC: " << Name << "\n";
   llvm_unreachable(0);
 }
 
@@ -122,12 +124,10 @@ void GCModuleInfo::clear() {
 
 char Printer::ID = 0;
 
-FunctionPass *llvm::createGCInfoPrinter(std::ostream &OS) {
+FunctionPass *llvm::createGCInfoPrinter(raw_ostream &OS) {
   return new Printer(OS);
 }
 
-Printer::Printer(std::ostream &OS)
-  : FunctionPass(&ID), OS(OS) {}
 
 const char *Printer::getPassName() const {
   return "Print Garbage Collector Information";

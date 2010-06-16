@@ -216,7 +216,6 @@ public:
   explicit FastISelMap(std::string InstNS);
 
   void CollectPatterns(CodeGenDAGPatterns &CGP);
-  void PrintClass(raw_ostream &OS);
   void PrintFunctionDefinitions(raw_ostream &OS);
 };
 
@@ -587,7 +586,7 @@ void FastISelMap::PrintFunctionDefinitions(raw_ostream &OS) {
     // on opcode and type.
     OS << "unsigned FastEmit_";
     Operands.PrintManglingSuffix(OS);
-    OS << "(MVT VT, MVT RetVT, ISD::NodeType Opcode";
+    OS << "(MVT VT, MVT RetVT, unsigned Opcode";
     if (!Operands.empty())
       OS << ", ";
     Operands.PrintParameters(OS);

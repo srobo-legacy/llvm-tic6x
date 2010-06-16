@@ -13,6 +13,7 @@
 #ifndef MSILWRITER_H
 #define MSILWRITER_H
 
+#include "llvm/CallingConv.h"
 #include "llvm/Constants.h"
 #include "llvm/Module.h"
 #include "llvm/Instructions.h"
@@ -26,7 +27,6 @@
 #include "llvm/Support/GetElementPtrTypeIterator.h"
 #include "llvm/Target/TargetData.h"
 #include "llvm/Target/TargetMachine.h"
-#include "llvm/Support/Mangler.h"
 
 namespace llvm {
   extern Target TheMSILTarget;
@@ -77,7 +77,6 @@ namespace llvm {
     formatted_raw_ostream &Out;
     Module* ModulePtr;
     const TargetData* TD;
-    Mangler* Mang;
     LoopInfo *LInfo;
     std::vector<StaticInitializer>* InitListPtr;
     std::map<const GlobalVariable*,std::vector<StaticInitializer> >
@@ -133,7 +132,7 @@ namespace llvm {
 
     std::string getLabelName(const std::string& Name);
 
-    std::string getConvModopt(unsigned CallingConvID);
+    std::string getConvModopt(CallingConv::ID CallingConvID);
 
     std::string getArrayTypeName(Type::TypeID TyID, const Type* Ty);
 
@@ -248,7 +247,7 @@ namespace llvm {
     const char* getLibraryName(const GlobalVariable* GV); 
     
     const char* getLibraryForSymbol(const StringRef &Name, bool isFunction,
-                                    unsigned CallingConv);
+                                    CallingConv::ID CallingConv);
 
     void printExternals();
   };

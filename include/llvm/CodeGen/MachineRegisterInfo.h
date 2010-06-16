@@ -16,7 +16,6 @@
 
 #include "llvm/Target/TargetRegisterInfo.h"
 #include "llvm/ADT/BitVector.h"
-#include "llvm/ADT/iterator.h"
 #include <vector>
 
 namespace llvm {
@@ -79,12 +78,12 @@ public:
   /// reg_begin/reg_end - Provide iteration support to walk over all definitions
   /// and uses of a register within the MachineFunction that corresponds to this
   /// MachineRegisterInfo object.
-  template<bool Uses, bool Defs>
+  template<bool Uses, bool Defs, bool SkipDebug>
   class defusechain_iterator;
 
   /// reg_iterator/reg_begin/reg_end - Walk all defs and uses of the specified
   /// register.
-  typedef defusechain_iterator<true,true> reg_iterator;
+  typedef defusechain_iterator<true,true,false> reg_iterator;
   reg_iterator reg_begin(unsigned RegNo) const {
     return reg_iterator(getRegUseDefListHead(RegNo));
   }
@@ -95,7 +94,7 @@ public:
   bool reg_empty(unsigned RegNo) const { return reg_begin(RegNo) == reg_end(); }
 
   /// def_iterator/def_begin/def_end - Walk all defs of the specified register.
-  typedef defusechain_iterator<false,true> def_iterator;
+  typedef defusechain_iterator<false,true,false> def_iterator;
   def_iterator def_begin(unsigned RegNo) const {
     return def_iterator(getRegUseDefListHead(RegNo));
   }
@@ -106,7 +105,7 @@ public:
   bool def_empty(unsigned RegNo) const { return def_begin(RegNo) == def_end(); }
 
   /// use_iterator/use_begin/use_end - Walk all uses of the specified register.
-  typedef defusechain_iterator<true,false> use_iterator;
+  typedef defusechain_iterator<true,false,false> use_iterator;
   use_iterator use_begin(unsigned RegNo) const {
     return use_iterator(getRegUseDefListHead(RegNo));
   }
@@ -116,7 +115,28 @@ public:
   /// register.
   bool use_empty(unsigned RegNo) const { return use_begin(RegNo) == use_end(); }
 
+  /// hasOneUse - Return true if there is exactly one instruction using the
+  /// specified register.
+  bool hasOneUse(unsigned RegNo) const;
+
+  /// use_nodbg_iterator/use_nodbg_begin/use_nodbg_end - Walk all uses of the
+  /// specified register, skipping those marked as Debug.
+  typedef defusechain_iterator<true,false,true> use_nodbg_iterator;
+  use_nodbg_iterator use_nodbg_begin(unsigned RegNo) const {
+    return use_nodbg_iterator(getRegUseDefListHead(RegNo));
+  }
+  static use_nodbg_iterator use_nodbg_end() { return use_nodbg_iterator(0); }
   
+  /// use_nodbg_empty - Return true if there are no non-Debug instructions
+  /// using the specified register.
+  bool use_nodbg_empty(unsigned RegNo) const {
+    return use_nodbg_begin(RegNo) == use_nodbg_end();
+  }
+
+  /// hasOneNonDBGUse - Return true if there is exactly one non-Debug
+  /// instruction using the specified register.
+  bool hasOneNonDBGUse(unsigned RegNo) const;
+
   /// replaceRegWith - Replace all instances of FromReg with ToReg in the
   /// machine function.  This is like llvm-level X->replaceAllUsesWith(Y),
   /// except that it also changes any definitions of the register as well.
@@ -244,6 +264,12 @@ public:
         return true;
     return false;
   }
+  bool isLiveOut(unsigned Reg) const {
+    for (liveout_iterator I = liveout_begin(), E = liveout_end(); I != E; ++I)
+      if (*I == Reg)
+        return true;
+    return false;
+  }
 
 private:
   void HandleVRegListReallocation();
@@ -253,24 +279,28 @@ public:
   /// operands in the function that use or define a specific register.  If
   /// ReturnUses is true it returns uses of registers, if ReturnDefs is true it
   /// returns defs.  If neither are true then you are silly and it always
-  /// returns end().
-  template<bool ReturnUses, bool ReturnDefs>
+  /// returns end().  If SkipDebug is true it skips uses marked Debug
+  /// when incrementing.
+  template<bool ReturnUses, bool ReturnDefs, bool SkipDebug>
   class defusechain_iterator
-    : public forward_iterator<MachineInstr, ptrdiff_t> {
+    : public std::iterator<std::forward_iterator_tag, MachineInstr, ptrdiff_t> {
     MachineOperand *Op;
     explicit defusechain_iterator(MachineOperand *op) : Op(op) {
       // If the first node isn't one we're interested in, advance to one that
       // we are interested in.
       if (op) {
         if ((!ReturnUses && op->isUse()) ||
-            (!ReturnDefs && op->isDef()))
+            (!ReturnDefs && op->isDef()) ||
+            (SkipDebug && op->isDebug()))
           ++*this;
       }
     }
     friend class MachineRegisterInfo;
   public:
-    typedef forward_iterator<MachineInstr, ptrdiff_t>::reference reference;
-    typedef forward_iterator<MachineInstr, ptrdiff_t>::pointer pointer;
+    typedef std::iterator<std::forward_iterator_tag,
+                          MachineInstr, ptrdiff_t>::reference reference;
+    typedef std::iterator<std::forward_iterator_tag,
+                          MachineInstr, ptrdiff_t>::pointer pointer;
     
     defusechain_iterator(const defusechain_iterator &I) : Op(I.Op) {}
     defusechain_iterator() : Op(0) {}
@@ -292,7 +322,8 @@ public:
       
       // If this is an operand we don't care about, skip it.
       while (Op && ((!ReturnUses && Op->isUse()) || 
-                    (!ReturnDefs && Op->isDef())))
+                    (!ReturnDefs && Op->isDef()) ||
+                    (SkipDebug && Op->isDebug())))
         Op = Op->getNextOperandForReg();
       
       return *this;

@@ -86,10 +86,11 @@ eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
   MBB.erase(I);
 }
 
-int SystemZRegisterInfo::getFrameIndexOffset(MachineFunction &MF, int FI) const {
+int SystemZRegisterInfo::getFrameIndexOffset(const MachineFunction &MF,
+                                             int FI) const {
   const TargetFrameInfo &TFI = *MF.getTarget().getFrameInfo();
-  MachineFrameInfo *MFI = MF.getFrameInfo();
-  SystemZMachineFunctionInfo *SystemZMFI =
+  const MachineFrameInfo *MFI = MF.getFrameInfo();
+  const SystemZMachineFunctionInfo *SystemZMFI =
     MF.getInfo<SystemZMachineFunctionInfo>();
   int Offset = MFI->getObjectOffset(FI) + MFI->getOffsetAdjustment();
   uint64_t StackSize = MFI->getStackSize();
@@ -107,8 +108,10 @@ int SystemZRegisterInfo::getFrameIndexOffset(MachineFunction &MF, int FI) const 
   return Offset;
 }
 
-void SystemZRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
-                                            int SPAdj, RegScavenger *RS) const {
+unsigned
+SystemZRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
+                                         int SPAdj, int *Value,
+                                         RegScavenger *RS) const {
   assert(SPAdj == 0 && "Unxpected");
 
   unsigned i = 0;
@@ -136,6 +139,7 @@ void SystemZRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   MI.setDesc(TII.getMemoryInstr(MI.getOpcode(), Offset));
 
   MI.getOperand(i+1).ChangeToImmediate(Offset);
+  return 0;
 }
 
 void
@@ -244,7 +248,7 @@ void SystemZRegisterInfo::emitPrologue(MachineFunction &MF) const {
       .addReg(SystemZ::R15D);
 
     // Mark the FramePtr as live-in in every block except the entry.
-    for (MachineFunction::iterator I = next(MF.begin()), E = MF.end();
+    for (MachineFunction::iterator I = llvm::next(MF.begin()), E = MF.end();
          I != E; ++I)
       I->addLiveIn(SystemZ::R11D);
 
@@ -259,7 +263,6 @@ void SystemZRegisterInfo::emitEpilogue(MachineFunction &MF,
   SystemZMachineFunctionInfo *SystemZMFI =
     MF.getInfo<SystemZMachineFunctionInfo>();
   unsigned RetOpcode = MBBI->getOpcode();
-  DebugLoc DL = MBBI->getDebugLoc();
 
   switch (RetOpcode) {
   case SystemZ::RET: break;  // These are ok
@@ -318,7 +321,8 @@ unsigned SystemZRegisterInfo::getRARegister() const {
   return 0;
 }
 
-unsigned SystemZRegisterInfo::getFrameRegister(MachineFunction &MF) const {
+unsigned
+SystemZRegisterInfo::getFrameRegister(const MachineFunction &MF) const {
   assert(0 && "What is the frame register");
   return 0;
 }

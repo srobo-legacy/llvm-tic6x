@@ -34,9 +34,14 @@
 namespace llvm {
 using namespace sys;
 
-Program::Program() : Pid_(0) {}
+Program::Program() : Data_(0) {}
 
 Program::~Program() {}
+
+unsigned Program::GetPid() const {
+  uint64_t pid = reinterpret_cast<uint64_t>(Data_);
+  return static_cast<unsigned>(pid);
+}
 
 // This function just uses the PATH environment variable to find the program.
 Path
@@ -97,7 +102,7 @@ static bool RedirectIO(const Path *Path, int FD, std::string* ErrMsg) {
     // Redirect empty paths to /dev/null
     File = "/dev/null";
   else
-    File = Path->toString();
+    File = Path->str();
 
   // Open the file
   int InFD = open(File.c_str(), FD == 0 ? O_RDONLY : O_WRONLY|O_CREAT, 0666);
@@ -116,14 +121,12 @@ static bool RedirectIO(const Path *Path, int FD, std::string* ErrMsg) {
   return false;
 }
 
-static bool Timeout = false;
 static void TimeOutHandler(int Sig) {
-  Timeout = true;
 }
 
 static void SetMemoryLimits (unsigned size)
 {
-#if HAVE_SYS_RESOURCE_H
+#if HAVE_SYS_RESOURCE_H && HAVE_GETRLIMIT && HAVE_SETRLIMIT
   struct rlimit r;
   __typeof__ (r.rlim_cur) limit = (__typeof__ (r.rlim_cur)) (size) * 1048576;
 
@@ -156,7 +159,7 @@ Program::Execute(const Path& path,
 {
   if (!path.canExecute()) {
     if (ErrMsg)
-      *ErrMsg = path.toString() + " is not executable";
+      *ErrMsg = path.str() + " is not executable";
     return false;
   }
 
@@ -214,7 +217,7 @@ Program::Execute(const Path& path,
       break;
   }
 
-  Pid_ = child;
+  Data_ = reinterpret_cast<void*>(child);
 
   return true;
 }
@@ -226,14 +229,15 @@ Program::Wait(unsigned secondsToWait,
 #ifdef HAVE_SYS_WAIT_H
   struct sigaction Act, Old;
 
-  if (Pid_ == 0) {
+  if (Data_ == 0) {
     MakeErrMsg(ErrMsg, "Process not started!");
     return -1;
   }
 
-  // Install a timeout handler.
+  // Install a timeout handler.  The handler itself does nothing, but the simple
+  // fact of having a handler at all causes the wait below to return with EINTR,
+  // unlike if we used SIG_IGN.
   if (secondsToWait) {
-    Timeout = false;
     Act.sa_sigaction = 0;
     Act.sa_handler = TimeOutHandler;
     sigemptyset(&Act.sa_mask);
@@ -244,8 +248,9 @@ Program::Wait(unsigned secondsToWait,
 
   // Parent process: Wait for the child process to terminate.
   int status;
-  int child = this->Pid_;
-  while (wait(&status) != child)
+  uint64_t pid = reinterpret_cast<uint64_t>(Data_);
+  pid_t child = static_cast<pid_t>(pid);
+  while (waitpid(pid, &status, 0) != child)
     if (secondsToWait && errno == EINTR) {
       // Kill the child.
       kill(child, SIGKILL);
@@ -290,12 +295,35 @@ Program::Wait(unsigned secondsToWait,
 
 }
 
+bool
+Program::Kill(std::string* ErrMsg) {
+  if (Data_ == 0) {
+    MakeErrMsg(ErrMsg, "Process not started!");
+    return true;
+  }
+
+  uint64_t pid64 = reinterpret_cast<uint64_t>(Data_);
+  pid_t pid = static_cast<pid_t>(pid64);
+
+  if (kill(pid, SIGKILL) != 0) {
+    MakeErrMsg(ErrMsg, "The process couldn't be killed!");
+    return true;
+  }
+
+  return false;
+}
+
 bool Program::ChangeStdinToBinary(){
   // Do nothing, as Unix doesn't differentiate between text and binary.
   return false;
 }
 
 bool Program::ChangeStdoutToBinary(){
+  // Do nothing, as Unix doesn't differentiate between text and binary.
+  return false;
+}
+
+bool Program::ChangeStderrToBinary(){
   // Do nothing, as Unix doesn't differentiate between text and binary.
   return false;
 }

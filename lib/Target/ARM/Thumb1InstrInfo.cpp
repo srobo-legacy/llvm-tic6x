@@ -1,4 +1,4 @@
-//===- Thumb1InstrInfo.cpp - Thumb-1 Instruction Information --------*- C++ -*-===//
+//===- Thumb1InstrInfo.cpp - Thumb-1 Instruction Information ----*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -11,40 +11,25 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ARMInstrInfo.h"
+#include "Thumb1InstrInfo.h"
 #include "ARM.h"
 #include "ARMGenInstrInfo.inc"
 #include "ARMMachineFunctionInfo.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
+#include "llvm/CodeGen/MachineMemOperand.h"
+#include "llvm/CodeGen/PseudoSourceValue.h"
 #include "llvm/ADT/SmallVector.h"
 #include "Thumb1InstrInfo.h"
 
 using namespace llvm;
 
-Thumb1InstrInfo::Thumb1InstrInfo(const ARMSubtarget &STI) : RI(*this, STI) {
+Thumb1InstrInfo::Thumb1InstrInfo(const ARMSubtarget &STI)
+  : ARMBaseInstrInfo(STI), RI(*this, STI) {
 }
 
 unsigned Thumb1InstrInfo::getUnindexedOpcode(unsigned Opc) const {
   return 0;
-}
-
-bool
-Thumb1InstrInfo::BlockHasNoFallThrough(const MachineBasicBlock &MBB) const {
-  if (MBB.empty()) return false;
-
-  switch (MBB.back().getOpcode()) {
-  case ARM::tBX_RET:
-  case ARM::tBX_RET_vararg:
-  case ARM::tPOP_RET:
-  case ARM::tB:
-  case ARM::tBR_JTr:
-    return true;
-  default:
-    break;
-  }
-
-  return false;
 }
 
 bool Thumb1InstrInfo::copyRegToReg(MachineBasicBlock &MBB,
@@ -120,10 +105,19 @@ storeRegToStackSlot(MachineBasicBlock &MBB, MachineBasicBlock::iterator I,
           (TargetRegisterInfo::isPhysicalRegister(SrcReg) &&
            isARMLowRegister(SrcReg))) && "Unknown regclass!");
 
-  if (RC == ARM::tGPRRegisterClass) {
+  if (RC == ARM::tGPRRegisterClass ||
+      (TargetRegisterInfo::isPhysicalRegister(SrcReg) &&
+       isARMLowRegister(SrcReg))) {
+    MachineFunction &MF = *MBB.getParent();
+    MachineFrameInfo &MFI = *MF.getFrameInfo();
+    MachineMemOperand *MMO =
+      MF.getMachineMemOperand(PseudoSourceValue::getFixedStack(FI),
+                              MachineMemOperand::MOStore, 0,
+                              MFI.getObjectSize(FI),
+                              MFI.getObjectAlignment(FI));
     AddDefaultPred(BuildMI(MBB, I, DL, get(ARM::tSpill))
                    .addReg(SrcReg, getKillRegState(isKill))
-                   .addFrameIndex(FI).addImm(0));
+                   .addFrameIndex(FI).addImm(0).addMemOperand(MMO));
   }
 }
 
@@ -138,9 +132,18 @@ loadRegFromStackSlot(MachineBasicBlock &MBB, MachineBasicBlock::iterator I,
           (TargetRegisterInfo::isPhysicalRegister(DestReg) &&
            isARMLowRegister(DestReg))) && "Unknown regclass!");
 
-  if (RC == ARM::tGPRRegisterClass) {
+  if (RC == ARM::tGPRRegisterClass ||
+      (TargetRegisterInfo::isPhysicalRegister(DestReg) &&
+       isARMLowRegister(DestReg))) {
+    MachineFunction &MF = *MBB.getParent();
+    MachineFrameInfo &MFI = *MF.getFrameInfo();
+    MachineMemOperand *MMO =
+      MF.getMachineMemOperand(PseudoSourceValue::getFixedStack(FI),
+                              MachineMemOperand::MOLoad, 0,
+                              MFI.getObjectSize(FI),
+                              MFI.getObjectAlignment(FI));
     AddDefaultPred(BuildMI(MBB, I, DL, get(ARM::tRestore), DestReg)
-                   .addFrameIndex(FI).addImm(0));
+                   .addFrameIndex(FI).addImm(0).addMemOperand(MMO));
   }
 }
 
@@ -156,6 +159,7 @@ spillCalleeSavedRegisters(MachineBasicBlock &MBB,
 
   MachineInstrBuilder MIB = BuildMI(MBB, MI, DL, get(ARM::tPUSH));
   AddDefaultPred(MIB);
+  MIB.addReg(0); // No write back.
   for (unsigned i = CSI.size(); i != 0; --i) {
     unsigned Reg = CSI[i-1].getReg();
     // Add the callee-saved register as live-in. It's killed at the spill.
@@ -178,8 +182,9 @@ restoreCalleeSavedRegisters(MachineBasicBlock &MBB,
   DebugLoc DL = MI->getDebugLoc();
   MachineInstrBuilder MIB = BuildMI(MF, DL, get(ARM::tPOP));
   AddDefaultPred(MIB);
+  MIB.addReg(0); // No write back.
 
-  bool NumRegs = 0;
+  bool NumRegs = false;
   for (unsigned i = CSI.size(); i != 0; --i) {
     unsigned Reg = CSI[i-1].getReg();
     if (Reg == ARM::LR) {
@@ -191,7 +196,7 @@ restoreCalleeSavedRegisters(MachineBasicBlock &MBB,
       MI = MBB.erase(MI);
     }
     MIB.addReg(Reg, getDefRegState(true));
-    ++NumRegs;
+    NumRegs = true;
   }
 
   // It's illegal to emit pop instruction without operands.

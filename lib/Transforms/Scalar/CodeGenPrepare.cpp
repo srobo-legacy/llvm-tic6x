@@ -21,8 +21,8 @@
 #include "llvm/InlineAsm.h"
 #include "llvm/Instructions.h"
 #include "llvm/IntrinsicInst.h"
-#include "llvm/LLVMContext.h"
 #include "llvm/Pass.h"
+#include "llvm/Analysis/ProfileInfo.h"
 #include "llvm/Target/TargetData.h"
 #include "llvm/Target/TargetLowering.h"
 #include "llvm/Transforms/Utils/AddrModeMatcher.h"
@@ -32,8 +32,6 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/Assembly/Writer.h"
 #include "llvm/Support/CallSite.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/GetElementPtrTypeIterator.h"
 #include "llvm/Support/PatternMatch.h"
@@ -41,14 +39,12 @@
 using namespace llvm;
 using namespace llvm::PatternMatch;
 
-static cl::opt<bool> FactorCommonPreds("split-critical-paths-tweak",
-                                       cl::init(false), cl::Hidden);
-
 namespace {
-  class VISIBILITY_HIDDEN CodeGenPrepare : public FunctionPass {
+  class CodeGenPrepare : public FunctionPass {
     /// TLI - Keep a pointer of a TargetLowering to consult for determining
     /// transformation profitability.
     const TargetLowering *TLI;
+    ProfileInfo *PFI;
 
     /// BackEdges - Keep a set of all the loop back edges.
     ///
@@ -59,6 +55,14 @@ namespace {
       : FunctionPass(&ID), TLI(tli) {}
     bool runOnFunction(Function &F);
 
+    virtual void getAnalysisUsage(AnalysisUsage &AU) const {
+      AU.addPreserved<ProfileInfo>();
+    }
+
+    virtual void releaseMemory() {
+      BackEdges.clear();
+    }
+
   private:
     bool EliminateMostlyEmptyBlocks(Function &F);
     bool CanMergeBlocks(const BasicBlock *BB, const BasicBlock *DestBB) const;
@@ -68,6 +72,7 @@ namespace {
                             DenseMap<Value*,Value*> &SunkAddrs);
     bool OptimizeInlineAsmInst(Instruction *I, CallSite CS,
                                DenseMap<Value*,Value*> &SunkAddrs);
+    bool MoveExtToFormExtLoad(Instruction *I);
     bool OptimizeExtUses(Instruction *I);
     void findLoopBackEdges(const Function &F);
   };
@@ -94,6 +99,7 @@ void CodeGenPrepare::findLoopBackEdges(const Function &F) {
 bool CodeGenPrepare::runOnFunction(Function &F) {
   bool EverMadeChange = false;
 
+  PFI = getAnalysisIfAvailable<ProfileInfo>();
   // First pass, eliminate blocks that contain only PHI nodes and an
   // unconditional branch.
   EverMadeChange |= EliminateMostlyEmptyBlocks(F);
@@ -231,7 +237,7 @@ void CodeGenPrepare::EliminateMostlyEmptyBlock(BasicBlock *BB) {
   BranchInst *BI = cast<BranchInst>(BB->getTerminator());
   BasicBlock *DestBB = BI->getSuccessor(0);
 
-  DOUT << "MERGING MOSTLY EMPTY BLOCKS - BEFORE:\n" << *BB << *DestBB;
+  DEBUG(dbgs() << "MERGING MOSTLY EMPTY BLOCKS - BEFORE:\n" << *BB << *DestBB);
 
   // If the destination block has a single pred, then this is a trivial edge,
   // just collapse it.
@@ -240,12 +246,12 @@ void CodeGenPrepare::EliminateMostlyEmptyBlock(BasicBlock *BB) {
       // Remember if SinglePred was the entry block of the function.  If so, we
       // will need to move BB back to the entry position.
       bool isEntry = SinglePred == &SinglePred->getParent()->getEntryBlock();
-      MergeBasicBlockIntoOnlyPred(DestBB);
+      MergeBasicBlockIntoOnlyPred(DestBB, this);
 
       if (isEntry && BB != &BB->getParent()->getEntryBlock())
         BB->moveBefore(&BB->getParent()->getEntryBlock());
       
-      DOUT << "AFTER:\n" << *DestBB << "\n\n\n";
+      DEBUG(dbgs() << "AFTER:\n" << *DestBB << "\n\n\n");
       return;
     }
   }
@@ -282,9 +288,77 @@ void CodeGenPrepare::EliminateMostlyEmptyBlock(BasicBlock *BB) {
   // The PHIs are now updated, change everything that refers to BB to use
   // DestBB and remove BB.
   BB->replaceAllUsesWith(DestBB);
+  if (PFI) {
+    PFI->replaceAllUses(BB, DestBB);
+    PFI->removeEdge(ProfileInfo::getEdge(BB, DestBB));
+  }
   BB->eraseFromParent();
 
-  DOUT << "AFTER:\n" << *DestBB << "\n\n\n";
+  DEBUG(dbgs() << "AFTER:\n" << *DestBB << "\n\n\n");
+}
+
+/// FindReusablePredBB - Check all of the predecessors of the block DestPHI
+/// lives in to see if there is a block that we can reuse as a critical edge
+/// from TIBB.
+static BasicBlock *FindReusablePredBB(PHINode *DestPHI, BasicBlock *TIBB) {
+  BasicBlock *Dest = DestPHI->getParent();
+  
+  /// TIPHIValues - This array is lazily computed to determine the values of
+  /// PHIs in Dest that TI would provide.
+  SmallVector<Value*, 32> TIPHIValues;
+  
+  /// TIBBEntryNo - This is a cache to speed up pred queries for TIBB.
+  unsigned TIBBEntryNo = 0;
+  
+  // Check to see if Dest has any blocks that can be used as a split edge for
+  // this terminator.
+  for (unsigned pi = 0, e = DestPHI->getNumIncomingValues(); pi != e; ++pi) {
+    BasicBlock *Pred = DestPHI->getIncomingBlock(pi);
+    // To be usable, the pred has to end with an uncond branch to the dest.
+    BranchInst *PredBr = dyn_cast<BranchInst>(Pred->getTerminator());
+    if (!PredBr || !PredBr->isUnconditional())
+      continue;
+    // Must be empty other than the branch and debug info.
+    BasicBlock::iterator I = Pred->begin();
+    while (isa<DbgInfoIntrinsic>(I))
+      I++;
+    if (&*I != PredBr)
+      continue;
+    // Cannot be the entry block; its label does not get emitted.
+    if (Pred == &Dest->getParent()->getEntryBlock())
+      continue;
+    
+    // Finally, since we know that Dest has phi nodes in it, we have to make
+    // sure that jumping to Pred will have the same effect as going to Dest in
+    // terms of PHI values.
+    PHINode *PN;
+    unsigned PHINo = 0;
+    unsigned PredEntryNo = pi;
+    
+    bool FoundMatch = true;
+    for (BasicBlock::iterator I = Dest->begin();
+         (PN = dyn_cast<PHINode>(I)); ++I, ++PHINo) {
+      if (PHINo == TIPHIValues.size()) {
+        if (PN->getIncomingBlock(TIBBEntryNo) != TIBB)
+          TIBBEntryNo = PN->getBasicBlockIndex(TIBB);
+        TIPHIValues.push_back(PN->getIncomingValue(TIBBEntryNo));
+      }
+      
+      // If the PHI entry doesn't work, we can't use this pred.
+      if (PN->getIncomingBlock(PredEntryNo) != Pred)
+        PredEntryNo = PN->getBasicBlockIndex(Pred);
+      
+      if (TIPHIValues[PHINo] != PN->getIncomingValue(PredEntryNo)) {
+        FoundMatch = false;
+        break;
+      }
+    }
+    
+    // If we found a workable predecessor, change TI to branch to Succ.
+    if (FoundMatch)
+      return Pred;
+  }
+  return 0;  
 }
 
 
@@ -301,12 +375,12 @@ static void SplitEdgeNicely(TerminatorInst *TI, unsigned SuccNum,
   BasicBlock *Dest = TI->getSuccessor(SuccNum);
   assert(isa<PHINode>(Dest->begin()) &&
          "This should only be called if Dest has a PHI!");
+  PHINode *DestPHI = cast<PHINode>(Dest->begin());
 
   // Do not split edges to EH landing pads.
-  if (InvokeInst *Invoke = dyn_cast<InvokeInst>(TI)) {
+  if (InvokeInst *Invoke = dyn_cast<InvokeInst>(TI))
     if (Invoke->getSuccessor(1) == Dest)
       return;
-  }
 
   // As a hack, never split backedges of loops.  Even though the copy for any
   // PHIs inserted on the backedge would be dead for exits from the loop, we
@@ -314,89 +388,16 @@ static void SplitEdgeNicely(TerminatorInst *TI, unsigned SuccNum,
   if (BackEdges.count(std::make_pair(TIBB, Dest)))
     return;
 
-  if (!FactorCommonPreds) {
-    /// TIPHIValues - This array is lazily computed to determine the values of
-    /// PHIs in Dest that TI would provide.
-    SmallVector<Value*, 32> TIPHIValues;
-
-    // Check to see if Dest has any blocks that can be used as a split edge for
-    // this terminator.
-    for (pred_iterator PI = pred_begin(Dest), E = pred_end(Dest); PI != E; ++PI) {
-      BasicBlock *Pred = *PI;
-      // To be usable, the pred has to end with an uncond branch to the dest.
-      BranchInst *PredBr = dyn_cast<BranchInst>(Pred->getTerminator());
-      if (!PredBr || !PredBr->isUnconditional())
-        continue;
-      // Must be empty other than the branch and debug info.
-      BasicBlock::iterator I = Pred->begin();
-      while (isa<DbgInfoIntrinsic>(I))
-        I++;
-      if (dyn_cast<Instruction>(I) != PredBr)
-        continue;
-      // Cannot be the entry block; its label does not get emitted.
-      if (Pred == &(Dest->getParent()->getEntryBlock()))
-        continue;
-
-      // Finally, since we know that Dest has phi nodes in it, we have to make
-      // sure that jumping to Pred will have the same effect as going to Dest in
-      // terms of PHI values.
-      PHINode *PN;
-      unsigned PHINo = 0;
-      bool FoundMatch = true;
-      for (BasicBlock::iterator I = Dest->begin();
-           (PN = dyn_cast<PHINode>(I)); ++I, ++PHINo) {
-        if (PHINo == TIPHIValues.size())
-          TIPHIValues.push_back(PN->getIncomingValueForBlock(TIBB));
-
-        // If the PHI entry doesn't work, we can't use this pred.
-        if (TIPHIValues[PHINo] != PN->getIncomingValueForBlock(Pred)) {
-          FoundMatch = false;
-          break;
-        }
-      }
-
-      // If we found a workable predecessor, change TI to branch to Succ.
-      if (FoundMatch) {
-        Dest->removePredecessor(TIBB);
-        TI->setSuccessor(SuccNum, Pred);
-        return;
-      }
-    }
-
-    SplitCriticalEdge(TI, SuccNum, P, true);
+  if (BasicBlock *ReuseBB = FindReusablePredBB(DestPHI, TIBB)) {
+    ProfileInfo *PFI = P->getAnalysisIfAvailable<ProfileInfo>();
+    if (PFI)
+      PFI->splitEdge(TIBB, Dest, ReuseBB);
+    Dest->removePredecessor(TIBB);
+    TI->setSuccessor(SuccNum, ReuseBB);
     return;
   }
 
-  PHINode *PN;
-  SmallVector<Value*, 8> TIPHIValues;
-  for (BasicBlock::iterator I = Dest->begin();
-       (PN = dyn_cast<PHINode>(I)); ++I)
-    TIPHIValues.push_back(PN->getIncomingValueForBlock(TIBB));
-
-  SmallVector<BasicBlock*, 8> IdenticalPreds;
-  for (pred_iterator PI = pred_begin(Dest), E = pred_end(Dest); PI != E; ++PI) {
-    BasicBlock *Pred = *PI;
-    if (BackEdges.count(std::make_pair(Pred, Dest)))
-      continue;
-    if (PI == TIBB)
-      IdenticalPreds.push_back(Pred);
-    else {
-      bool Identical = true;
-      unsigned PHINo = 0;
-      for (BasicBlock::iterator I = Dest->begin();
-           (PN = dyn_cast<PHINode>(I)); ++I, ++PHINo)
-        if (TIPHIValues[PHINo] != PN->getIncomingValueForBlock(Pred)) {
-          Identical = false;
-          break;
-        }
-      if (Identical)
-        IdenticalPreds.push_back(Pred);
-    }
-  }
-
-  assert(!IdenticalPreds.empty());
-  SplitBlockPredecessors(Dest, &IdenticalPreds[0], IdenticalPreds.size(),
-                         ".critedge", P);
+  SplitCriticalEdge(TI, SuccNum, P, true);
 }
 
 
@@ -519,7 +520,7 @@ static bool OptimizeCmpExpression(CmpInst *CI) {
       BasicBlock::iterator InsertPt = UserBB->getFirstNonPHI();
 
       InsertedCmp =
-        CmpInst::Create(DefBB->getContext(), CI->getOpcode(), 
+        CmpInst::Create(CI->getOpcode(),
                         CI->getPredicate(),  CI->getOperand(0),
                         CI->getOperand(1), "", InsertPt);
       MadeChange = true;
@@ -548,7 +549,7 @@ static bool IsNonLocalValue(Value *V, BasicBlock *BB) {
   return false;
 }
 
-/// OptimizeMemoryInst - Load and Store Instructions have often have
+/// OptimizeMemoryInst - Load and Store Instructions often have
 /// addressing modes that can do significant amounts of computation.  As such,
 /// instruction selection will try to get the load or store to do as much
 /// computation as possible for the program.  The problem is that isel can only
@@ -577,7 +578,7 @@ bool CodeGenPrepare::OptimizeMemoryInst(Instruction *MemoryInst, Value *Addr,
 
   // If all the instructions matched are already in this BB, don't do anything.
   if (!AnyNonLocal) {
-    DEBUG(errs() << "CGP: Found      local addrmode: " << AddrMode << "\n");
+    DEBUG(dbgs() << "CGP: Found      local addrmode: " << AddrMode << "\n");
     return false;
   }
 
@@ -592,23 +593,39 @@ bool CodeGenPrepare::OptimizeMemoryInst(Instruction *MemoryInst, Value *Addr,
   // computation.
   Value *&SunkAddr = SunkAddrs[Addr];
   if (SunkAddr) {
-    DEBUG(errs() << "CGP: Reusing nonlocal addrmode: " << AddrMode << " for "
+    DEBUG(dbgs() << "CGP: Reusing nonlocal addrmode: " << AddrMode << " for "
                  << *MemoryInst);
     if (SunkAddr->getType() != Addr->getType())
       SunkAddr = new BitCastInst(SunkAddr, Addr->getType(), "tmp", InsertPt);
   } else {
-    DEBUG(errs() << "CGP: SINKING nonlocal addrmode: " << AddrMode << " for "
+    DEBUG(dbgs() << "CGP: SINKING nonlocal addrmode: " << AddrMode << " for "
                  << *MemoryInst);
     const Type *IntPtrTy =
           TLI->getTargetData()->getIntPtrType(AccessTy->getContext());
 
     Value *Result = 0;
-    // Start with the scale value.
+
+    // Start with the base register. Do this first so that subsequent address
+    // matching finds it last, which will prevent it from trying to match it
+    // as the scaled value in case it happens to be a mul. That would be
+    // problematic if we've sunk a different mul for the scale, because then
+    // we'd end up sinking both muls.
+    if (AddrMode.BaseReg) {
+      Value *V = AddrMode.BaseReg;
+      if (V->getType()->isPointerTy())
+        V = new PtrToIntInst(V, IntPtrTy, "sunkaddr", InsertPt);
+      if (V->getType() != IntPtrTy)
+        V = CastInst::CreateIntegerCast(V, IntPtrTy, /*isSigned=*/true,
+                                        "sunkaddr", InsertPt);
+      Result = V;
+    }
+
+    // Add the scale value.
     if (AddrMode.Scale) {
       Value *V = AddrMode.ScaledReg;
       if (V->getType() == IntPtrTy) {
         // done.
-      } else if (isa<PointerType>(V->getType())) {
+      } else if (V->getType()->isPointerTy()) {
         V = new PtrToIntInst(V, IntPtrTy, "sunkaddr", InsertPt);
       } else if (cast<IntegerType>(IntPtrTy)->getBitWidth() <
                  cast<IntegerType>(V->getType())->getBitWidth()) {
@@ -620,17 +637,6 @@ bool CodeGenPrepare::OptimizeMemoryInst(Instruction *MemoryInst, Value *Addr,
         V = BinaryOperator::CreateMul(V, ConstantInt::get(IntPtrTy,
                                                                 AddrMode.Scale),
                                       "sunkaddr", InsertPt);
-      Result = V;
-    }
-
-    // Add in the base register.
-    if (AddrMode.BaseReg) {
-      Value *V = AddrMode.BaseReg;
-      if (isa<PointerType>(V->getType()))
-        V = new PtrToIntInst(V, IntPtrTy, "sunkaddr", InsertPt);
-      if (V->getType() != IntPtrTy)
-        V = CastInst::CreateIntegerCast(V, IntPtrTy, /*isSigned=*/true,
-                                        "sunkaddr", InsertPt);
       if (Result)
         Result = BinaryOperator::CreateAdd(Result, V, "sunkaddr", InsertPt);
       else
@@ -718,6 +724,43 @@ bool CodeGenPrepare::OptimizeInlineAsmInst(Instruction *I, CallSite CS,
   return MadeChange;
 }
 
+/// MoveExtToFormExtLoad - Move a zext or sext fed by a load into the same
+/// basic block as the load, unless conditions are unfavorable. This allows
+/// SelectionDAG to fold the extend into the load.
+///
+bool CodeGenPrepare::MoveExtToFormExtLoad(Instruction *I) {
+  // Look for a load being extended.
+  LoadInst *LI = dyn_cast<LoadInst>(I->getOperand(0));
+  if (!LI) return false;
+
+  // If they're already in the same block, there's nothing to do.
+  if (LI->getParent() == I->getParent())
+    return false;
+
+  // If the load has other users and the truncate is not free, this probably
+  // isn't worthwhile.
+  if (!LI->hasOneUse() &&
+      TLI && !TLI->isTruncateFree(I->getType(), LI->getType()))
+    return false;
+
+  // Check whether the target supports casts folded into loads.
+  unsigned LType;
+  if (isa<ZExtInst>(I))
+    LType = ISD::ZEXTLOAD;
+  else {
+    assert(isa<SExtInst>(I) && "Unexpected ext type!");
+    LType = ISD::SEXTLOAD;
+  }
+  if (TLI && !TLI->isLoadExtLegal(LType, TLI->getValueType(LI->getType())))
+    return false;
+
+  // Move the extend into the same block as the load, so that SelectionDAG
+  // can fold it.
+  I->removeFromParent();
+  I->insertAfter(LI);
+  return true;
+}
+
 bool CodeGenPrepare::OptimizeExtUses(Instruction *I) {
   BasicBlock *DefBB = I->getParent();
 
@@ -801,7 +844,7 @@ bool CodeGenPrepare::OptimizeBlock(BasicBlock &BB) {
 
   // Split all critical edges where the dest block has a PHI.
   TerminatorInst *BBTI = BB.getTerminator();
-  if (BBTI->getNumSuccessors() > 1) {
+  if (BBTI->getNumSuccessors() > 1 && !isa<IndirectBrInst>(BBTI)) {
     for (unsigned i = 0, e = BBTI->getNumSuccessors(); i != e; ++i) {
       BasicBlock *SuccBB = BBTI->getSuccessor(i);
       if (isa<PHINode>(SuccBB->begin()) && isCriticalEdge(BBTI, i, true))
@@ -833,8 +876,10 @@ bool CodeGenPrepare::OptimizeBlock(BasicBlock &BB) {
         MadeChange |= Change;
       }
 
-      if (!Change && (isa<ZExtInst>(I) || isa<SExtInst>(I)))
+      if (!Change && (isa<ZExtInst>(I) || isa<SExtInst>(I))) {
+        MadeChange |= MoveExtToFormExtLoad(I);
         MadeChange |= OptimizeExtUses(I);
+      }
     } else if (CmpInst *CI = dyn_cast<CmpInst>(I)) {
       MadeChange |= OptimizeCmpExpression(CI);
     } else if (LoadInst *LI = dyn_cast<LoadInst>(I)) {

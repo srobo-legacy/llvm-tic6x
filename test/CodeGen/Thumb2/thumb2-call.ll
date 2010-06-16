@@ -1,5 +1,5 @@
-; RUN: llvm-as < %s | llc -mtriple=thumbv7-apple-darwin -mattr=+thumb2 | FileCheck %s -check-prefix=DARWIN
-; RUN: llvm-as < %s | llc -mtriple=thumbv7-linux -mattr=+thumb2 | FileCheck %s -check-prefix=LINUX
+; RUN: llc < %s -mtriple=thumbv7-apple-darwin -mattr=+thumb2 | FileCheck %s -check-prefix=DARWIN
+; RUN: llc < %s -mtriple=thumbv7-linux -mattr=+thumb2 | FileCheck %s -check-prefix=LINUX
 
 @t = weak global i32 ()* null           ; <i32 ()**> [#uses=1]
 
@@ -7,7 +7,7 @@ declare void @g(i32, i32, i32, i32)
 
 define void @f() {
 ; DARWIN: f:
-; DARWIN: blx L_g$stub
+; DARWIN: blx _g
 
 ; LINUX: f:
 ; LINUX: bl g

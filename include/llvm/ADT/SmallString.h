@@ -16,8 +16,6 @@
 
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/DataTypes.h"
-#include <cstring>
 
 namespace llvm {
 
@@ -40,14 +38,23 @@ public:
   // Extra methods.
   StringRef str() const { return StringRef(this->begin(), this->size()); }
 
+  // Implicit conversion to StringRef.
+  operator StringRef() const { return str(); }
+
+  const char *c_str() {
+    this->push_back(0);
+    this->pop_back();
+    return this->data();
+  }
+
   // Extra operators.
-  const SmallString &operator=(const char *RHS) {
+  const SmallString &operator=(StringRef RHS) {
     this->clear();
     return *this += RHS;
   }
 
-  SmallString &operator+=(const char *RHS) {
-    this->append(RHS, RHS+strlen(RHS));
+  SmallString &operator+=(StringRef RHS) {
+    this->append(RHS.begin(), RHS.end());
     return *this;
   }
   SmallString &operator+=(char C) {
@@ -55,7 +62,6 @@ public:
     return *this;
   }
 };
-
 
 }
 

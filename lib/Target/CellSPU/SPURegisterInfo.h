@@ -63,8 +63,9 @@ namespace llvm {
                                        MachineBasicBlock &MBB,
                                        MachineBasicBlock::iterator I) const;
     //! Convert frame indicies into machine operands
-    void eliminateFrameIndex(MachineBasicBlock::iterator II, int,
-                             RegScavenger *RS) const;
+    unsigned eliminateFrameIndex(MachineBasicBlock::iterator II, int SPAdj,
+                                 int *Value = NULL,
+                                 RegScavenger *RS = NULL) const;
     //! Determine the frame's layour
     void determineFrameLayout(MachineFunction &MF) const;
 
@@ -77,7 +78,7 @@ namespace llvm {
     //! Get return address register (LR, aka R0)
     unsigned getRARegister() const;
     //! Get the stack frame register (SP, aka R1)
-    unsigned getFrameRegister(MachineFunction &MF) const;
+    unsigned getFrameRegister(const MachineFunction &MF) const;
     //! Perform target-specific stack frame setup.
     void getInitialFrameState(std::vector<MachineMove> &Moves) const;
 

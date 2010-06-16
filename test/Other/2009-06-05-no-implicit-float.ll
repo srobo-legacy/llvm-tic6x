@@ -1,4 +1,4 @@
 
-; RUN: llvm-as < %s | opt -verify | llvm-dis | grep noimplicitfloat
-define void @f() noimplicitfloat {
-}
+; RUN: opt < %s -verify -S | grep noimplicitfloat
+declare void @f() noimplicitfloat
+

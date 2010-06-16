@@ -64,8 +64,9 @@ namespace llvm {
                                        MachineBasicBlock &MBB,
                                        MachineBasicBlock::iterator I) const;
 
-    void eliminateFrameIndex(MachineBasicBlock::iterator II,
-                             int SPAdj, RegScavenger *RS = NULL) const;
+    unsigned eliminateFrameIndex(MachineBasicBlock::iterator II,
+                                 int SPAdj, int *Value = NULL,
+                                 RegScavenger *RS = NULL) const;
 
     void processFunctionBeforeCalleeSavedScan(MachineFunction &MF,
                                               RegScavenger *RS) const;
@@ -75,8 +76,7 @@ namespace llvm {
     void emitPrologue(MachineFunction &MF) const;
     void emitEpilogue(MachineFunction &MF, MachineBasicBlock &MBB) const;
 
-    unsigned getFrameRegister(MachineFunction &MF) const;
-    int getFrameIndexOffset(MachineFunction &MF, int FI) const;
+    unsigned getFrameRegister(const MachineFunction &MF) const;
     unsigned getRARegister() const;
 
     // Exception handling queries.

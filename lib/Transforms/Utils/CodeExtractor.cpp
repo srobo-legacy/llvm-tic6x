@@ -26,9 +26,10 @@
 #include "llvm/Analysis/Verifier.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include <algorithm>
 #include <set>
@@ -43,9 +44,9 @@ AggregateArgsOpt("aggregate-extracted-args", cl::Hidden,
                  cl::desc("Aggregate arguments to code-extracted functions"));
 
 namespace {
-  class VISIBILITY_HIDDEN CodeExtractor {
-    typedef std::vector<Value*> Values;
-    std::set<BasicBlock*> BlocksToExtract;
+  class CodeExtractor {
+    typedef SetVector<Value*> Values;
+    SetVector<BasicBlock*> BlocksToExtract;
     DominatorTree* DT;
     bool AggregateArgs;
     unsigned NumExitBlocks;
@@ -135,7 +136,7 @@ void CodeExtractor::severSplitPHINodes(BasicBlock *&Header) {
   // We only want to code extract the second block now, and it becomes the new
   // header of the region.
   BasicBlock *OldPred = Header;
-  BlocksToExtract.erase(OldPred);
+  BlocksToExtract.remove(OldPred);
   BlocksToExtract.insert(NewBB);
   Header = NewBB;
 
@@ -180,17 +181,33 @@ void CodeExtractor::severSplitPHINodes(BasicBlock *&Header) {
 }
 
 void CodeExtractor::splitReturnBlocks() {
-  for (std::set<BasicBlock*>::iterator I = BlocksToExtract.begin(),
+  for (SetVector<BasicBlock*>::iterator I = BlocksToExtract.begin(),
          E = BlocksToExtract.end(); I != E; ++I)
-    if (ReturnInst *RI = dyn_cast<ReturnInst>((*I)->getTerminator()))
-      (*I)->splitBasicBlock(RI, (*I)->getName()+".ret");
+    if (ReturnInst *RI = dyn_cast<ReturnInst>((*I)->getTerminator())) {
+      BasicBlock *New = (*I)->splitBasicBlock(RI, (*I)->getName()+".ret");
+      if (DT) {
+        // Old dominates New. New node domiantes all other nodes dominated
+        //by Old.
+        DomTreeNode *OldNode = DT->getNode(*I);
+        SmallVector<DomTreeNode*, 8> Children;
+        for (DomTreeNode::iterator DI = OldNode->begin(), DE = OldNode->end();
+             DI != DE; ++DI) 
+          Children.push_back(*DI);
+
+        DomTreeNode *NewNode = DT->addNewBlock(New, *I);
+
+        for (SmallVector<DomTreeNode*, 8>::iterator I = Children.begin(),
+               E = Children.end(); I != E; ++I) 
+          DT->changeImmediateDominator(*I, NewNode);
+      }
+    }
 }
 
 // findInputsOutputs - Find inputs to, outputs from the code region.
 //
 void CodeExtractor::findInputsOutputs(Values &inputs, Values &outputs) {
   std::set<BasicBlock*> ExitBlocks;
-  for (std::set<BasicBlock*>::const_iterator ci = BlocksToExtract.begin(),
+  for (SetVector<BasicBlock*>::const_iterator ci = BlocksToExtract.begin(),
        ce = BlocksToExtract.end(); ci != ce; ++ci) {
     BasicBlock *BB = *ci;
 
@@ -199,13 +216,13 @@ void CodeExtractor::findInputsOutputs(Values &inputs, Values &outputs) {
       // instruction is used outside the region, it's an output.
       for (User::op_iterator O = I->op_begin(), E = I->op_end(); O != E; ++O)
         if (definedInCaller(*O))
-          inputs.push_back(*O);
+          inputs.insert(*O);
 
       // Consider uses of this instruction (outputs).
       for (Value::use_iterator UI = I->use_begin(), E = I->use_end();
            UI != E; ++UI)
         if (!definedInRegion(*UI)) {
-          outputs.push_back(I);
+          outputs.insert(I);
           break;
         }
     } // for: insts
@@ -218,12 +235,6 @@ void CodeExtractor::findInputsOutputs(Values &inputs, Values &outputs) {
   } // for: basic blocks
 
   NumExitBlocks = ExitBlocks.size();
-
-  // Eliminate duplicates.
-  std::sort(inputs.begin(), inputs.end());
-  inputs.erase(std::unique(inputs.begin(), inputs.end()), inputs.end());
-  std::sort(outputs.begin(), outputs.end());
-  outputs.erase(std::unique(outputs.begin(), outputs.end()), outputs.end());
 }
 
 /// constructFunction - make a function based on inputs and outputs, as follows:
@@ -236,8 +247,8 @@ Function *CodeExtractor::constructFunction(const Values &inputs,
                                            BasicBlock *newHeader,
                                            Function *oldFunction,
                                            Module *M) {
-  DOUT << "inputs: " << inputs.size() << "\n";
-  DOUT << "outputs: " << outputs.size() << "\n";
+  DEBUG(dbgs() << "inputs: " << inputs.size() << "\n");
+  DEBUG(dbgs() << "outputs: " << outputs.size() << "\n");
 
   // This function returns unsigned, outputs will go back by reference.
   switch (NumExitBlocks) {
@@ -253,25 +264,25 @@ Function *CodeExtractor::constructFunction(const Values &inputs,
   for (Values::const_iterator i = inputs.begin(),
          e = inputs.end(); i != e; ++i) {
     const Value *value = *i;
-    DOUT << "value used in func: " << *value << "\n";
+    DEBUG(dbgs() << "value used in func: " << *value << "\n");
     paramTy.push_back(value->getType());
   }
 
   // Add the types of the output values to the function's argument list.
   for (Values::const_iterator I = outputs.begin(), E = outputs.end();
        I != E; ++I) {
-    DOUT << "instr used in func: " << **I << "\n";
+    DEBUG(dbgs() << "instr used in func: " << **I << "\n");
     if (AggregateArgs)
       paramTy.push_back((*I)->getType());
     else
       paramTy.push_back(PointerType::getUnqual((*I)->getType()));
   }
 
-  DOUT << "Function type: " << *RetTy << " f(";
+  DEBUG(dbgs() << "Function type: " << *RetTy << " f(");
   for (std::vector<const Type*>::iterator i = paramTy.begin(),
          e = paramTy.end(); i != e; ++i)
-    DOUT << **i << ", ";
-  DOUT << ")\n";
+    DEBUG(dbgs() << **i << ", ");
+  DEBUG(dbgs() << ")\n");
 
   if (AggregateArgs && (inputs.size() + outputs.size() > 0)) {
     PointerType *StructPtr =
@@ -344,6 +355,20 @@ Function *CodeExtractor::constructFunction(const Values &inputs,
   return newFunction;
 }
 
+/// FindPhiPredForUseInBlock - Given a value and a basic block, find a PHI
+/// that uses the value within the basic block, and return the predecessor
+/// block associated with that use, or return 0 if none is found.
+static BasicBlock* FindPhiPredForUseInBlock(Value* Used, BasicBlock* BB) {
+  for (Value::use_iterator UI = Used->use_begin(),
+       UE = Used->use_end(); UI != UE; ++UI) {
+     PHINode *P = dyn_cast<PHINode>(*UI);
+     if (P && P->getParent() == BB)
+       return P->getIncomingBlock(UI);
+  }
+  
+  return 0;
+}
+
 /// emitCallAndSwitchStatement - This method sets up the caller side by adding
 /// the call instruction, splitting any PHI nodes in the header block as
 /// necessary.
@@ -352,7 +377,7 @@ emitCallAndSwitchStatement(Function *newFunction, BasicBlock *codeReplacer,
                            Values &inputs, Values &outputs) {
   // Emit a call to the new function, passing in: *pointer to struct (if
   // aggregating parameters), or plan inputs and allocated memory for outputs
-  std::vector<Value*> params, StructValues, ReloadOutputs;
+  std::vector<Value*> params, StructValues, ReloadOutputs, Reloads;
   
   LLVMContext &Context = newFunction->getContext();
 
@@ -429,6 +454,7 @@ emitCallAndSwitchStatement(Function *newFunction, BasicBlock *codeReplacer,
       Output = ReloadOutputs[i];
     }
     LoadInst *load = new LoadInst(Output, outputs[i]->getName()+".reload");
+    Reloads.push_back(load);
     codeReplacer->getInstList().push_back(load);
     std::vector<User*> Users(outputs[i]->use_begin(), outputs[i]->use_end());
     for (unsigned u = 0, e = Users.size(); u != e; ++u) {
@@ -451,7 +477,7 @@ emitCallAndSwitchStatement(Function *newFunction, BasicBlock *codeReplacer,
   std::map<BasicBlock*, BasicBlock*> ExitBlockMap;
 
   unsigned switchVal = 0;
-  for (std::set<BasicBlock*>::const_iterator i = BlocksToExtract.begin(),
+  for (SetVector<BasicBlock*>::const_iterator i = BlocksToExtract.begin(),
          e = BlocksToExtract.end(); i != e; ++i) {
     TerminatorInst *TI = (*i)->getTerminator();
     for (unsigned i = 0, e = TI->getNumSuccessors(); i != e; ++i)
@@ -515,8 +541,18 @@ emitCallAndSwitchStatement(Function *newFunction, BasicBlock *codeReplacer,
                 DominatesDef = false;
             }
 
-            if (DT)
+            if (DT) {
               DominatesDef = DT->dominates(DefBlock, OldTarget);
+              
+              // If the output value is used by a phi in the target block,
+              // then we need to test for dominance of the phi's predecessor
+              // instead.  Unfortunately, this a little complicated since we
+              // have already rewritten uses of the value to uses of the reload.
+              BasicBlock* pred = FindPhiPredForUseInBlock(Reloads[out], 
+                                                          OldTarget);
+              if (pred && DT && DT->dominates(DefBlock, pred))
+                DominatesDef = true;
+            }
 
             if (DominatesDef) {
               if (AggregateArgs) {
@@ -552,7 +588,7 @@ emitCallAndSwitchStatement(Function *newFunction, BasicBlock *codeReplacer,
     // this should be rewritten as a `ret'
 
     // Check if the function should return a value
-    if (OldFnRetTy == Type::getVoidTy(Context)) {
+    if (OldFnRetTy->isVoidTy()) {
       ReturnInst::Create(Context, 0, TheSwitch);  // Return void
     } else if (OldFnRetTy == TheSwitch->getCondition()->getType()) {
       // return what we have
@@ -592,7 +628,7 @@ void CodeExtractor::moveCodeToFunction(Function *newFunction) {
   Function::BasicBlockListType &oldBlocks = oldFunc->getBasicBlockList();
   Function::BasicBlockListType &newBlocks = newFunction->getBasicBlockList();
 
-  for (std::set<BasicBlock*>::const_iterator i = BlocksToExtract.begin(),
+  for (SetVector<BasicBlock*>::const_iterator i = BlocksToExtract.begin(),
          e = BlocksToExtract.end(); i != e; ++i) {
     // Delete the basic block from the old function, and the list of blocks
     oldBlocks.remove(*i);

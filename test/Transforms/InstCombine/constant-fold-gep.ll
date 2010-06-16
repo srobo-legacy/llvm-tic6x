@@ -1,4 +1,5 @@
-; RUN: llvm-as < %s | opt -instcombine | llvm-dis | FileCheck %s
+; RUN: opt < %s -instcombine -S | FileCheck %s
+target datalayout = "E-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:32:64-f32:32:32-f64:64:64-v64:64:64-v128:128:128-a0:0:64"
 
 ; Constant folding should fix notionally out-of-bounds indices
 ; and add inbounds keywords.
@@ -44,7 +45,11 @@ define void @frob() {
   store i32 1, i32* getelementptr ([3 x %struct.X]* @Y, i64 0, i64 0, i32 0, i64 16), align 8
 ; CHECK: store i32 1, i32* getelementptr inbounds ([3 x %struct.X]* @Y, i64 0, i64 2, i32 1, i64 2), align 8
   store i32 1, i32* getelementptr ([3 x %struct.X]* @Y, i64 0, i64 0, i32 0, i64 17), align 8
-; CHECK: store i32 1, i32* getelementptr ([3 x %struct.X]* @Y, i64 1, i64 0, i32 0, i64 0), align 8
+; CHECK: store i32 1, i32* getelementptr inbounds ([3 x %struct.X]* @Y, i64 1, i64 0, i32 0, i64 0), align 8
   store i32 1, i32* getelementptr ([3 x %struct.X]* @Y, i64 0, i64 0, i32 0, i64 18), align 8
+; CHECK: store i32 1, i32* getelementptr ([3 x %struct.X]* @Y, i64 2, i64 0, i32 0, i64 0), align 8
+  store i32 1, i32* getelementptr ([3 x %struct.X]* @Y, i64 0, i64 0, i32 0, i64 36), align 8
+; CHECK: store i32 1, i32* getelementptr ([3 x %struct.X]* @Y, i64 1, i64 0, i32 0, i64 1), align 8
+  store i32 1, i32* getelementptr ([3 x %struct.X]* @Y, i64 0, i64 0, i32 0, i64 19), align 8
   ret void
 }

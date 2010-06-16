@@ -32,7 +32,7 @@
 #define LLVM_CODEGEN_MACHINEMODULEINFO_H
 
 #include "llvm/Support/Dwarf.h"
-#include "llvm/Support/DataTypes.h"
+#include "llvm/System/DataTypes.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/UniqueVector.h"
@@ -42,18 +42,40 @@
 #include "llvm/CodeGen/MachineLocation.h"
 #include "llvm/GlobalValue.h"
 #include "llvm/Pass.h"
+#include "llvm/Metadata.h"
+#include "llvm/Support/ValueHandle.h"
 
 namespace llvm {
 
 //===----------------------------------------------------------------------===//
 // Forward declarations.
 class Constant;
+class MCSymbol;
+class MDNode;
 class GlobalVariable;
 class MachineBasicBlock;
 class MachineFunction;
 class Module;
 class PointerType;
 class StructType;
+  
+  
+/// MachineModuleInfoImpl - This class can be derived from and used by targets
+/// to hold private target-specific information for each Module.  Objects of
+/// type are accessed/created with MMI::getInfo and destroyed when the
+/// MachineModuleInfo is destroyed.
+class MachineModuleInfoImpl {
+public:
+  virtual ~MachineModuleInfoImpl();
+
+  typedef std::vector<std::pair<MCSymbol*, MCSymbol*> >
+      SymbolListTy;
+protected:
+    static SymbolListTy
+    GetSortedStubs(const DenseMap<MCSymbol*, MCSymbol*> &Map);
+};
+  
+  
 
 //===----------------------------------------------------------------------===//
 /// LandingPadInfo - This structure is used to retain landing pad info for
@@ -80,7 +102,11 @@ struct LandingPadInfo {
 /// schemes and reformated for specific use.
 ///
 class MachineModuleInfo : public ImmutablePass {
-private:
+  /// ObjFileMMI - This is the object-file-format-specific implementation of
+  /// MachineModuleInfoImpl, which lets targets accumulate whatever info they
+  /// want.
+  MachineModuleInfoImpl *ObjFileMMI;
+
   // LabelIDList - One entry per assigned label.  Normally the entry is equal to
   // the list index(+1).  If the entry is zero then the label has been deleted.
   // Any other value indicates the label has been deleted by is mapped to
@@ -94,7 +120,14 @@ private:
   // LandingPads - List of LandingPadInfo describing the landing pad information
   // in the current function.
   std::vector<LandingPadInfo> LandingPads;
-  
+
+  // Map of invoke call site index values to associated begin EH_LABEL for
+  // the current function.
+  DenseMap<unsigned, unsigned> CallSiteMap;
+
+  // The current call site index being processed, if any. 0 if none.
+  unsigned CurCallSite;
+
   // TypeInfos - List of C++ TypeInfo used in the current function.
   //
   std::vector<GlobalVariable *> TypeInfos;
@@ -117,37 +150,46 @@ private:
   /// llvm.compiler.used.
   SmallPtrSet<const Function *, 32> UsedFunctions;
 
-  /// UsedDbgLabels - labels are used by debug info entries.
-  SmallSet<unsigned, 8> UsedDbgLabels;
-
   bool CallsEHReturn;
   bool CallsUnwindInit;
  
   /// DbgInfoAvailable - True if debugging information is available
   /// in this module.
   bool DbgInfoAvailable;
+
 public:
   static char ID; // Pass identification, replacement for typeid
+
+  typedef std::pair<unsigned, TrackingVH<MDNode> > UnsignedAndMDNodePair;
+  typedef SmallVector< std::pair<TrackingVH<MDNode>, UnsignedAndMDNodePair>, 4>
+    VariableDbgInfoMapTy;
+  VariableDbgInfoMapTy VariableDbgInfo;
 
   MachineModuleInfo();
   ~MachineModuleInfo();
   
-  /// doInitialization - Initialize the state for a new module.
-  ///
   bool doInitialization();
-  
-  /// doFinalization - Tear down the state after completion of a module.
-  ///
   bool doFinalization();
-  
-  /// BeginFunction - Begin gathering function meta information.
-  ///
-  void BeginFunction(MachineFunction *MF);
-  
+
   /// EndFunction - Discard function meta information.
   ///
   void EndFunction();
 
+  /// getInfo - Keep track of various per-function pieces of information for
+  /// backends that would like to do so.
+  ///
+  template<typename Ty>
+  Ty &getObjFileInfo() {
+    if (ObjFileMMI == 0)
+      ObjFileMMI = new Ty(*this);
+    return *static_cast<Ty*>(ObjFileMMI);
+  }
+  
+  template<typename Ty>
+  const Ty &getObjFileInfo() const {
+    return const_cast<MachineModuleInfo*>(this)->getObjFileInfo<Ty>();
+  }
+  
   /// AnalyzeModule - Scan the module for global debug information.
   ///
   void AnalyzeModule(Module &M);
@@ -193,19 +235,6 @@ public:
   unsigned MappedLabel(unsigned LabelID) const {
     assert(LabelID <= LabelIDList.size() && "Debug label ID out of range.");
     return LabelID ? LabelIDList[LabelID - 1] : 0;
-  }
-
-  /// isDbgLabelUsed - Return true if label with LabelID is used by
-  /// DwarfWriter.
-  bool isDbgLabelUsed(unsigned LabelID) {
-    return UsedDbgLabels.count(LabelID);
-  }
-  
-  /// RecordUsedDbgLabel - Mark label with LabelID as used. This is used
-  /// by DwarfWriter to inform DebugLabelFolder that certain labels are
-  /// not to be deleted.
-  void RecordUsedDbgLabel(unsigned LabelID) {
-    UsedDbgLabels.insert(LabelID);
   }
 
   /// getFrameMoves - Returns a reference to a list of moves done in the current
@@ -279,7 +308,26 @@ public:
   const std::vector<LandingPadInfo> &getLandingPads() const {
     return LandingPads;
   }
-  
+
+  /// setCallSiteBeginLabel - Map the begin label for a call site
+  void setCallSiteBeginLabel(unsigned BeginLabel, unsigned Site) {
+    CallSiteMap[BeginLabel] = Site;
+  }
+
+  /// getCallSiteBeginLabel - Get the call site number for a begin label
+  unsigned getCallSiteBeginLabel(unsigned BeginLabel) {
+    assert(CallSiteMap.count(BeginLabel) &&
+           "Missing call site number for EH_LABEL!");
+    return CallSiteMap[BeginLabel];
+  }
+
+  /// setCurrentCallSite - Set the call site currently being processed.
+  void setCurrentCallSite(unsigned Site) { CurCallSite = Site; }
+
+  /// getCurrentCallSite - Get the call site currently being processed, if any.
+  /// return zero if none.
+  unsigned getCurrentCallSite(void) { return CurCallSite; }
+
   /// getTypeInfos - Return a reference to the C++ typeinfo for the current
   /// function.
   const std::vector<GlobalVariable *> &getTypeInfos() const {
@@ -295,6 +343,14 @@ public:
   /// getPersonality - Return a personality function if available.  The presence
   /// of one is required to emit exception handling info.
   Function *getPersonality() const;
+
+  /// setVariableDbgInfo - Collect information used to emit debugging information
+  /// of a variable.
+  void setVariableDbgInfo(MDNode *N, unsigned Slot, MDNode *Scope) {
+    VariableDbgInfo.push_back(std::make_pair(N, std::make_pair(Slot, Scope)));
+  }
+
+  VariableDbgInfoMapTy &getVariableDbgInfo() {  return VariableDbgInfo;  }
 
 }; // End class MachineModuleInfo
 

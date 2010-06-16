@@ -26,7 +26,6 @@
 #include "llvm/Support/MathExtras.h"
 #include <algorithm>
 #include <cmath>
-#include <cstring>
 using namespace llvm;
 
 STATISTIC(NumDynamicInsts, "Number of dynamic instructions executed");
@@ -57,7 +56,7 @@ static void executeFAddInst(GenericValue &Dest, GenericValue Src1,
     IMPLEMENT_BINARY_OPERATOR(+, Float);
     IMPLEMENT_BINARY_OPERATOR(+, Double);
   default:
-    cerr << "Unhandled type for FAdd instruction: " << *Ty << "\n";
+    dbgs() << "Unhandled type for FAdd instruction: " << *Ty << "\n";
     llvm_unreachable(0);
   }
 }
@@ -68,7 +67,7 @@ static void executeFSubInst(GenericValue &Dest, GenericValue Src1,
     IMPLEMENT_BINARY_OPERATOR(-, Float);
     IMPLEMENT_BINARY_OPERATOR(-, Double);
   default:
-    cerr << "Unhandled type for FSub instruction: " << *Ty << "\n";
+    dbgs() << "Unhandled type for FSub instruction: " << *Ty << "\n";
     llvm_unreachable(0);
   }
 }
@@ -79,7 +78,7 @@ static void executeFMulInst(GenericValue &Dest, GenericValue Src1,
     IMPLEMENT_BINARY_OPERATOR(*, Float);
     IMPLEMENT_BINARY_OPERATOR(*, Double);
   default:
-    cerr << "Unhandled type for FMul instruction: " << *Ty << "\n";
+    dbgs() << "Unhandled type for FMul instruction: " << *Ty << "\n";
     llvm_unreachable(0);
   }
 }
@@ -90,7 +89,7 @@ static void executeFDivInst(GenericValue &Dest, GenericValue Src1,
     IMPLEMENT_BINARY_OPERATOR(/, Float);
     IMPLEMENT_BINARY_OPERATOR(/, Double);
   default:
-    cerr << "Unhandled type for FDiv instruction: " << *Ty << "\n";
+    dbgs() << "Unhandled type for FDiv instruction: " << *Ty << "\n";
     llvm_unreachable(0);
   }
 }
@@ -105,7 +104,7 @@ static void executeFRemInst(GenericValue &Dest, GenericValue Src1,
     Dest.DoubleVal = fmod(Src1.DoubleVal, Src2.DoubleVal);
     break;
   default:
-    cerr << "Unhandled type for Rem instruction: " << *Ty << "\n";
+    dbgs() << "Unhandled type for Rem instruction: " << *Ty << "\n";
     llvm_unreachable(0);
   }
 }
@@ -132,7 +131,7 @@ static GenericValue executeICMP_EQ(GenericValue Src1, GenericValue Src2,
     IMPLEMENT_INTEGER_ICMP(eq,Ty);
     IMPLEMENT_POINTER_ICMP(==);
   default:
-    cerr << "Unhandled type for ICMP_EQ predicate: " << *Ty << "\n";
+    dbgs() << "Unhandled type for ICMP_EQ predicate: " << *Ty << "\n";
     llvm_unreachable(0);
   }
   return Dest;
@@ -145,7 +144,7 @@ static GenericValue executeICMP_NE(GenericValue Src1, GenericValue Src2,
     IMPLEMENT_INTEGER_ICMP(ne,Ty);
     IMPLEMENT_POINTER_ICMP(!=);
   default:
-    cerr << "Unhandled type for ICMP_NE predicate: " << *Ty << "\n";
+    dbgs() << "Unhandled type for ICMP_NE predicate: " << *Ty << "\n";
     llvm_unreachable(0);
   }
   return Dest;
@@ -158,7 +157,7 @@ static GenericValue executeICMP_ULT(GenericValue Src1, GenericValue Src2,
     IMPLEMENT_INTEGER_ICMP(ult,Ty);
     IMPLEMENT_POINTER_ICMP(<);
   default:
-    cerr << "Unhandled type for ICMP_ULT predicate: " << *Ty << "\n";
+    dbgs() << "Unhandled type for ICMP_ULT predicate: " << *Ty << "\n";
     llvm_unreachable(0);
   }
   return Dest;
@@ -171,7 +170,7 @@ static GenericValue executeICMP_SLT(GenericValue Src1, GenericValue Src2,
     IMPLEMENT_INTEGER_ICMP(slt,Ty);
     IMPLEMENT_POINTER_ICMP(<);
   default:
-    cerr << "Unhandled type for ICMP_SLT predicate: " << *Ty << "\n";
+    dbgs() << "Unhandled type for ICMP_SLT predicate: " << *Ty << "\n";
     llvm_unreachable(0);
   }
   return Dest;
@@ -184,7 +183,7 @@ static GenericValue executeICMP_UGT(GenericValue Src1, GenericValue Src2,
     IMPLEMENT_INTEGER_ICMP(ugt,Ty);
     IMPLEMENT_POINTER_ICMP(>);
   default:
-    cerr << "Unhandled type for ICMP_UGT predicate: " << *Ty << "\n";
+    dbgs() << "Unhandled type for ICMP_UGT predicate: " << *Ty << "\n";
     llvm_unreachable(0);
   }
   return Dest;
@@ -197,7 +196,7 @@ static GenericValue executeICMP_SGT(GenericValue Src1, GenericValue Src2,
     IMPLEMENT_INTEGER_ICMP(sgt,Ty);
     IMPLEMENT_POINTER_ICMP(>);
   default:
-    cerr << "Unhandled type for ICMP_SGT predicate: " << *Ty << "\n";
+    dbgs() << "Unhandled type for ICMP_SGT predicate: " << *Ty << "\n";
     llvm_unreachable(0);
   }
   return Dest;
@@ -210,7 +209,7 @@ static GenericValue executeICMP_ULE(GenericValue Src1, GenericValue Src2,
     IMPLEMENT_INTEGER_ICMP(ule,Ty);
     IMPLEMENT_POINTER_ICMP(<=);
   default:
-    cerr << "Unhandled type for ICMP_ULE predicate: " << *Ty << "\n";
+    dbgs() << "Unhandled type for ICMP_ULE predicate: " << *Ty << "\n";
     llvm_unreachable(0);
   }
   return Dest;
@@ -223,7 +222,7 @@ static GenericValue executeICMP_SLE(GenericValue Src1, GenericValue Src2,
     IMPLEMENT_INTEGER_ICMP(sle,Ty);
     IMPLEMENT_POINTER_ICMP(<=);
   default:
-    cerr << "Unhandled type for ICMP_SLE predicate: " << *Ty << "\n";
+    dbgs() << "Unhandled type for ICMP_SLE predicate: " << *Ty << "\n";
     llvm_unreachable(0);
   }
   return Dest;
@@ -236,7 +235,7 @@ static GenericValue executeICMP_UGE(GenericValue Src1, GenericValue Src2,
     IMPLEMENT_INTEGER_ICMP(uge,Ty);
     IMPLEMENT_POINTER_ICMP(>=);
   default:
-    cerr << "Unhandled type for ICMP_UGE predicate: " << *Ty << "\n";
+    dbgs() << "Unhandled type for ICMP_UGE predicate: " << *Ty << "\n";
     llvm_unreachable(0);
   }
   return Dest;
@@ -249,7 +248,7 @@ static GenericValue executeICMP_SGE(GenericValue Src1, GenericValue Src2,
     IMPLEMENT_INTEGER_ICMP(sge,Ty);
     IMPLEMENT_POINTER_ICMP(>=);
   default:
-    cerr << "Unhandled type for ICMP_SGE predicate: " << *Ty << "\n";
+    dbgs() << "Unhandled type for ICMP_SGE predicate: " << *Ty << "\n";
     llvm_unreachable(0);
   }
   return Dest;
@@ -274,7 +273,7 @@ void Interpreter::visitICmpInst(ICmpInst &I) {
   case ICmpInst::ICMP_UGE: R = executeICMP_UGE(Src1, Src2, Ty); break;
   case ICmpInst::ICMP_SGE: R = executeICMP_SGE(Src1, Src2, Ty); break;
   default:
-    cerr << "Don't know how to handle this ICmp predicate!\n-->" << I;
+    dbgs() << "Don't know how to handle this ICmp predicate!\n-->" << I;
     llvm_unreachable(0);
   }
  
@@ -293,7 +292,7 @@ static GenericValue executeFCMP_OEQ(GenericValue Src1, GenericValue Src2,
     IMPLEMENT_FCMP(==, Float);
     IMPLEMENT_FCMP(==, Double);
   default:
-    cerr << "Unhandled type for FCmp EQ instruction: " << *Ty << "\n";
+    dbgs() << "Unhandled type for FCmp EQ instruction: " << *Ty << "\n";
     llvm_unreachable(0);
   }
   return Dest;
@@ -307,7 +306,7 @@ static GenericValue executeFCMP_ONE(GenericValue Src1, GenericValue Src2,
     IMPLEMENT_FCMP(!=, Double);
 
   default:
-    cerr << "Unhandled type for FCmp NE instruction: " << *Ty << "\n";
+    dbgs() << "Unhandled type for FCmp NE instruction: " << *Ty << "\n";
     llvm_unreachable(0);
   }
   return Dest;
@@ -320,7 +319,7 @@ static GenericValue executeFCMP_OLE(GenericValue Src1, GenericValue Src2,
     IMPLEMENT_FCMP(<=, Float);
     IMPLEMENT_FCMP(<=, Double);
   default:
-    cerr << "Unhandled type for FCmp LE instruction: " << *Ty << "\n";
+    dbgs() << "Unhandled type for FCmp LE instruction: " << *Ty << "\n";
     llvm_unreachable(0);
   }
   return Dest;
@@ -333,7 +332,7 @@ static GenericValue executeFCMP_OGE(GenericValue Src1, GenericValue Src2,
     IMPLEMENT_FCMP(>=, Float);
     IMPLEMENT_FCMP(>=, Double);
   default:
-    cerr << "Unhandled type for FCmp GE instruction: " << *Ty << "\n";
+    dbgs() << "Unhandled type for FCmp GE instruction: " << *Ty << "\n";
     llvm_unreachable(0);
   }
   return Dest;
@@ -346,7 +345,7 @@ static GenericValue executeFCMP_OLT(GenericValue Src1, GenericValue Src2,
     IMPLEMENT_FCMP(<, Float);
     IMPLEMENT_FCMP(<, Double);
   default:
-    cerr << "Unhandled type for FCmp LT instruction: " << *Ty << "\n";
+    dbgs() << "Unhandled type for FCmp LT instruction: " << *Ty << "\n";
     llvm_unreachable(0);
   }
   return Dest;
@@ -359,14 +358,14 @@ static GenericValue executeFCMP_OGT(GenericValue Src1, GenericValue Src2,
     IMPLEMENT_FCMP(>, Float);
     IMPLEMENT_FCMP(>, Double);
   default:
-    cerr << "Unhandled type for FCmp GT instruction: " << *Ty << "\n";
+    dbgs() << "Unhandled type for FCmp GT instruction: " << *Ty << "\n";
     llvm_unreachable(0);
   }
   return Dest;
 }
 
 #define IMPLEMENT_UNORDERED(TY, X,Y)                                     \
-  if (TY == Type::getFloatTy(Ty->getContext())) {                        \
+  if (TY->isFloatTy()) {                                                 \
     if (X.FloatVal != X.FloatVal || Y.FloatVal != Y.FloatVal) {          \
       Dest.IntVal = APInt(1,true);                                       \
       return Dest;                                                       \
@@ -422,7 +421,7 @@ static GenericValue executeFCMP_UGT(GenericValue Src1, GenericValue Src2,
 static GenericValue executeFCMP_ORD(GenericValue Src1, GenericValue Src2,
                                      const Type *Ty) {
   GenericValue Dest;
-  if (Ty == Type::getFloatTy(Ty->getContext()))
+  if (Ty->isFloatTy())
     Dest.IntVal = APInt(1,(Src1.FloatVal == Src1.FloatVal && 
                            Src2.FloatVal == Src2.FloatVal));
   else
@@ -434,7 +433,7 @@ static GenericValue executeFCMP_ORD(GenericValue Src1, GenericValue Src2,
 static GenericValue executeFCMP_UNO(GenericValue Src1, GenericValue Src2,
                                      const Type *Ty) {
   GenericValue Dest;
-  if (Ty == Type::getFloatTy(Ty->getContext()))
+  if (Ty->isFloatTy())
     Dest.IntVal = APInt(1,(Src1.FloatVal != Src1.FloatVal || 
                            Src2.FloatVal != Src2.FloatVal));
   else
@@ -468,7 +467,7 @@ void Interpreter::visitFCmpInst(FCmpInst &I) {
   case FCmpInst::FCMP_UGE:   R = executeFCMP_UGE(Src1, Src2, Ty); break;
   case FCmpInst::FCMP_OGE:   R = executeFCMP_OGE(Src1, Src2, Ty); break;
   default:
-    cerr << "Don't know how to handle this FCmp predicate!\n-->" << I;
+    dbgs() << "Don't know how to handle this FCmp predicate!\n-->" << I;
     llvm_unreachable(0);
   }
  
@@ -514,7 +513,7 @@ static GenericValue executeCmpInst(unsigned predicate, GenericValue Src1,
     return Result;
   }
   default:
-    cerr << "Unhandled Cmp predicate\n";
+    dbgs() << "Unhandled Cmp predicate\n";
     llvm_unreachable(0);
   }
 }
@@ -543,7 +542,7 @@ void Interpreter::visitBinaryOperator(BinaryOperator &I) {
   case Instruction::Or:    R.IntVal = Src1.IntVal | Src2.IntVal; break;
   case Instruction::Xor:   R.IntVal = Src1.IntVal ^ Src2.IntVal; break;
   default:
-    cerr << "Don't know how to handle this binary operator!\n-->" << I;
+    dbgs() << "Don't know how to handle this binary operator!\n-->" << I;
     llvm_unreachable(0);
   }
 
@@ -573,9 +572,9 @@ void Interpreter::exitCalled(GenericValue GV) {
   // runAtExitHandlers() assumes there are no stack frames, but
   // if exit() was called, then it had a stack frame. Blow away
   // the stack before interpreting atexit handlers.
-  ECStack.clear ();
-  runAtExitHandlers ();
-  exit (GV.IntVal.zextOrTrunc(32).getZExtValue());
+  ECStack.clear();
+  runAtExitHandlers();
+  exit(GV.IntVal.zextOrTrunc(32).getZExtValue());
 }
 
 /// Pop the last stack frame off of ECStack and then copy the result
@@ -586,13 +585,13 @@ void Interpreter::exitCalled(GenericValue GV) {
 /// care of switching to the normal destination BB, if we are returning
 /// from an invoke.
 ///
-void Interpreter::popStackAndReturnValueToCaller (const Type *RetTy,
-                                                  GenericValue Result) {
+void Interpreter::popStackAndReturnValueToCaller(const Type *RetTy,
+                                                 GenericValue Result) {
   // Pop the current stack frame.
   ECStack.pop_back();
 
   if (ECStack.empty()) {  // Finished main.  Put result into exit code...
-    if (RetTy && RetTy->isInteger()) {          // Nonvoid return type?
+    if (RetTy && RetTy->isIntegerTy()) {          // Nonvoid return type?
       ExitValue = Result;   // Capture the exit value of the program
     } else {
       memset(&ExitValue.Untyped, 0, sizeof(ExitValue.Untyped));
@@ -603,7 +602,7 @@ void Interpreter::popStackAndReturnValueToCaller (const Type *RetTy,
     ExecutionContext &CallingSF = ECStack.back();
     if (Instruction *I = CallingSF.Caller.getInstruction()) {
       // Save result...
-      if (CallingSF.Caller.getType() != Type::getVoidTy(RetTy->getContext()))
+      if (!CallingSF.Caller.getType()->isVoidTy())
         SetValue(I, Result, CallingSF);
       if (InvokeInst *II = dyn_cast<InvokeInst> (I))
         SwitchToNewBasicBlock (II->getNormalDest (), CallingSF);
@@ -630,15 +629,15 @@ void Interpreter::visitUnwindInst(UnwindInst &I) {
   // Unwind stack
   Instruction *Inst;
   do {
-    ECStack.pop_back ();
-    if (ECStack.empty ())
+    ECStack.pop_back();
+    if (ECStack.empty())
       llvm_report_error("Empty stack during unwind!");
-    Inst = ECStack.back ().Caller.getInstruction ();
-  } while (!(Inst && isa<InvokeInst> (Inst)));
+    Inst = ECStack.back().Caller.getInstruction();
+  } while (!(Inst && isa<InvokeInst>(Inst)));
 
   // Return from invoke
-  ExecutionContext &InvokingSF = ECStack.back ();
-  InvokingSF.Caller = CallSite ();
+  ExecutionContext &InvokingSF = ECStack.back();
+  InvokingSF.Caller = CallSite();
 
   // Go to exceptional destination BB of invoke instruction
   SwitchToNewBasicBlock(cast<InvokeInst>(Inst)->getUnwindDest(), InvokingSF);
@@ -678,6 +677,13 @@ void Interpreter::visitSwitchInst(SwitchInst &I) {
   if (!Dest) Dest = I.getDefaultDest();   // No cases matched: use default
   SwitchToNewBasicBlock(Dest, SF);
 }
+
+void Interpreter::visitIndirectBrInst(IndirectBrInst &I) {
+  ExecutionContext &SF = ECStack.back();
+  void *Dest = GVTOP(getOperandValue(I.getAddress(), SF));
+  SwitchToNewBasicBlock((BasicBlock*)Dest, SF);
+}
+
 
 // SwitchToNewBasicBlock - This method is used to jump to a new basic block.
 // This function handles the actual updating of block and instruction iterators
@@ -721,7 +727,7 @@ void Interpreter::SwitchToNewBasicBlock(BasicBlock *Dest, ExecutionContext &SF){
 //                     Memory Instruction Implementations
 //===----------------------------------------------------------------------===//
 
-void Interpreter::visitAllocationInst(AllocationInst &I) {
+void Interpreter::visitAllocaInst(AllocaInst &I) {
   ExecutionContext &SF = ECStack.back();
 
   const Type *Ty = I.getType()->getElementType();  // Type to be allocated
@@ -738,9 +744,9 @@ void Interpreter::visitAllocationInst(AllocationInst &I) {
   // Allocate enough memory to hold the type...
   void *Memory = malloc(MemToAlloc);
 
-  DOUT << "Allocated Type: " << *Ty << " (" << TypeSize << " bytes) x " 
-       << NumElements << " (Total: " << MemToAlloc << ") at "
-       << uintptr_t(Memory) << '\n';
+  DEBUG(dbgs() << "Allocated Type: " << *Ty << " (" << TypeSize << " bytes) x " 
+               << NumElements << " (Total: " << MemToAlloc << ") at "
+               << uintptr_t(Memory) << '\n');
 
   GenericValue Result = PTOGV(Memory);
   assert(Result.PointerVal != 0 && "Null pointer returned by malloc!");
@@ -750,20 +756,12 @@ void Interpreter::visitAllocationInst(AllocationInst &I) {
     ECStack.back().Allocas.add(Memory);
 }
 
-void Interpreter::visitFreeInst(FreeInst &I) {
-  ExecutionContext &SF = ECStack.back();
-  assert(isa<PointerType>(I.getOperand(0)->getType()) && "Freeing nonptr?");
-  GenericValue Value = getOperandValue(I.getOperand(0), SF);
-  // TODO: Check to make sure memory is allocated
-  free(GVTOP(Value));   // Free memory
-}
-
 // getElementOffset - The workhorse for getelementptr.
 //
 GenericValue Interpreter::executeGEPOperation(Value *Ptr, gep_type_iterator I,
                                               gep_type_iterator E,
                                               ExecutionContext &SF) {
-  assert(isa<PointerType>(Ptr->getType()) &&
+  assert(Ptr->getType()->isPointerTy() &&
          "Cannot getElementOffset of a nonpointer type!");
 
   uint64_t Total = 0;
@@ -796,7 +794,7 @@ GenericValue Interpreter::executeGEPOperation(Value *Ptr, gep_type_iterator I,
 
   GenericValue Result;
   Result.PointerVal = ((char*)getOperandValue(Ptr, SF).PointerVal) + Total;
-  DOUT << "GEP Index " << Total << " bytes.\n";
+  DEBUG(dbgs() << "GEP Index " << Total << " bytes.\n");
   return Result;
 }
 
@@ -814,7 +812,7 @@ void Interpreter::visitLoadInst(LoadInst &I) {
   LoadValueFromMemory(Result, Ptr, I.getType());
   SetValue(&I, Result, SF);
   if (I.isVolatile() && PrintVolatile)
-    cerr << "Volatile load " << I;
+    dbgs() << "Volatile load " << I;
 }
 
 void Interpreter::visitStoreInst(StoreInst &I) {
@@ -824,7 +822,7 @@ void Interpreter::visitStoreInst(StoreInst &I) {
   StoreValueToMemory(Val, (GenericValue *)GVTOP(SRC),
                      I.getOperand(0)->getType());
   if (I.isVolatile() && PrintVolatile)
-    cerr << "Volatile store: " << I;
+    dbgs() << "Volatile store: " << I;
 }
 
 //===----------------------------------------------------------------------===//
@@ -836,7 +834,7 @@ void Interpreter::visitCallSite(CallSite CS) {
 
   // Check to see if this is an intrinsic function call...
   Function *F = CS.getCalledFunction();
-  if (F && F->isDeclaration ())
+  if (F && F->isDeclaration())
     switch (F->getIntrinsicID()) {
     case Intrinsic::not_intrinsic:
       break;
@@ -884,16 +882,6 @@ void Interpreter::visitCallSite(CallSite CS) {
          e = SF.Caller.arg_end(); i != e; ++i, ++pNum) {
     Value *V = *i;
     ArgVals.push_back(getOperandValue(V, SF));
-    // Promote all integral types whose size is < sizeof(i32) into i32.
-    // We do this by zero or sign extending the value as appropriate
-    // according to the parameter attributes
-    const Type *Ty = V->getType();
-    if (Ty->isInteger() && (ArgVals.back().IntVal.getBitWidth() < 32)) {
-      if (CS.paramHasAttr(pNum, Attribute::ZExt))
-        ArgVals.back().IntVal = ArgVals.back().IntVal.zext(32);
-      else if (CS.paramHasAttr(pNum, Attribute::SExt))
-        ArgVals.back().IntVal = ArgVals.back().IntVal.sext(32);
-    }
   }
 
   // To handle indirect calls, we must get the pointer value from the argument
@@ -971,8 +959,7 @@ GenericValue Interpreter::executeZExtInst(Value *SrcVal, const Type *DstTy,
 GenericValue Interpreter::executeFPTruncInst(Value *SrcVal, const Type *DstTy,
                                              ExecutionContext &SF) {
   GenericValue Dest, Src = getOperandValue(SrcVal, SF);
-  assert(SrcVal->getType() == Type::getDoubleTy(SrcVal->getContext()) &&
-         DstTy == Type::getFloatTy(SrcVal->getContext()) &&
+  assert(SrcVal->getType()->isDoubleTy() && DstTy->isFloatTy() &&
          "Invalid FPTrunc instruction");
   Dest.FloatVal = (float) Src.DoubleVal;
   return Dest;
@@ -981,8 +968,7 @@ GenericValue Interpreter::executeFPTruncInst(Value *SrcVal, const Type *DstTy,
 GenericValue Interpreter::executeFPExtInst(Value *SrcVal, const Type *DstTy,
                                            ExecutionContext &SF) {
   GenericValue Dest, Src = getOperandValue(SrcVal, SF);
-  assert(SrcVal->getType() == Type::getFloatTy(SrcVal->getContext()) &&
-         DstTy == Type::getDoubleTy(SrcVal->getContext()) &&
+  assert(SrcVal->getType()->isFloatTy() && DstTy->isDoubleTy() &&
          "Invalid FPTrunc instruction");
   Dest.DoubleVal = (double) Src.FloatVal;
   return Dest;
@@ -993,7 +979,7 @@ GenericValue Interpreter::executeFPToUIInst(Value *SrcVal, const Type *DstTy,
   const Type *SrcTy = SrcVal->getType();
   uint32_t DBitWidth = cast<IntegerType>(DstTy)->getBitWidth();
   GenericValue Dest, Src = getOperandValue(SrcVal, SF);
-  assert(SrcTy->isFloatingPoint() && "Invalid FPToUI instruction");
+  assert(SrcTy->isFloatingPointTy() && "Invalid FPToUI instruction");
 
   if (SrcTy->getTypeID() == Type::FloatTyID)
     Dest.IntVal = APIntOps::RoundFloatToAPInt(Src.FloatVal, DBitWidth);
@@ -1007,7 +993,7 @@ GenericValue Interpreter::executeFPToSIInst(Value *SrcVal, const Type *DstTy,
   const Type *SrcTy = SrcVal->getType();
   uint32_t DBitWidth = cast<IntegerType>(DstTy)->getBitWidth();
   GenericValue Dest, Src = getOperandValue(SrcVal, SF);
-  assert(SrcTy->isFloatingPoint() && "Invalid FPToSI instruction");
+  assert(SrcTy->isFloatingPointTy() && "Invalid FPToSI instruction");
 
   if (SrcTy->getTypeID() == Type::FloatTyID)
     Dest.IntVal = APIntOps::RoundFloatToAPInt(Src.FloatVal, DBitWidth);
@@ -1019,7 +1005,7 @@ GenericValue Interpreter::executeFPToSIInst(Value *SrcVal, const Type *DstTy,
 GenericValue Interpreter::executeUIToFPInst(Value *SrcVal, const Type *DstTy,
                                             ExecutionContext &SF) {
   GenericValue Dest, Src = getOperandValue(SrcVal, SF);
-  assert(DstTy->isFloatingPoint() && "Invalid UIToFP instruction");
+  assert(DstTy->isFloatingPointTy() && "Invalid UIToFP instruction");
 
   if (DstTy->getTypeID() == Type::FloatTyID)
     Dest.FloatVal = APIntOps::RoundAPIntToFloat(Src.IntVal);
@@ -1031,7 +1017,7 @@ GenericValue Interpreter::executeUIToFPInst(Value *SrcVal, const Type *DstTy,
 GenericValue Interpreter::executeSIToFPInst(Value *SrcVal, const Type *DstTy,
                                             ExecutionContext &SF) {
   GenericValue Dest, Src = getOperandValue(SrcVal, SF);
-  assert(DstTy->isFloatingPoint() && "Invalid SIToFP instruction");
+  assert(DstTy->isFloatingPointTy() && "Invalid SIToFP instruction");
 
   if (DstTy->getTypeID() == Type::FloatTyID)
     Dest.FloatVal = APIntOps::RoundSignedAPIntToFloat(Src.IntVal);
@@ -1045,7 +1031,7 @@ GenericValue Interpreter::executePtrToIntInst(Value *SrcVal, const Type *DstTy,
                                               ExecutionContext &SF) {
   uint32_t DBitWidth = cast<IntegerType>(DstTy)->getBitWidth();
   GenericValue Dest, Src = getOperandValue(SrcVal, SF);
-  assert(isa<PointerType>(SrcVal->getType()) && "Invalid PtrToInt instruction");
+  assert(SrcVal->getType()->isPointerTy() && "Invalid PtrToInt instruction");
 
   Dest.IntVal = APInt(DBitWidth, (intptr_t) Src.PointerVal);
   return Dest;
@@ -1054,7 +1040,7 @@ GenericValue Interpreter::executePtrToIntInst(Value *SrcVal, const Type *DstTy,
 GenericValue Interpreter::executeIntToPtrInst(Value *SrcVal, const Type *DstTy,
                                               ExecutionContext &SF) {
   GenericValue Dest, Src = getOperandValue(SrcVal, SF);
-  assert(isa<PointerType>(DstTy) && "Invalid PtrToInt instruction");
+  assert(DstTy->isPointerTy() && "Invalid PtrToInt instruction");
 
   uint32_t PtrSize = TD.getPointerSizeInBits();
   if (PtrSize != Src.IntVal.getBitWidth())
@@ -1069,27 +1055,27 @@ GenericValue Interpreter::executeBitCastInst(Value *SrcVal, const Type *DstTy,
   
   const Type *SrcTy = SrcVal->getType();
   GenericValue Dest, Src = getOperandValue(SrcVal, SF);
-  if (isa<PointerType>(DstTy)) {
-    assert(isa<PointerType>(SrcTy) && "Invalid BitCast");
+  if (DstTy->isPointerTy()) {
+    assert(SrcTy->isPointerTy() && "Invalid BitCast");
     Dest.PointerVal = Src.PointerVal;
-  } else if (DstTy->isInteger()) {
-    if (SrcTy == Type::getFloatTy(SrcVal->getContext())) {
+  } else if (DstTy->isIntegerTy()) {
+    if (SrcTy->isFloatTy()) {
       Dest.IntVal.zext(sizeof(Src.FloatVal) * CHAR_BIT);
       Dest.IntVal.floatToBits(Src.FloatVal);
-    } else if (SrcTy == Type::getDoubleTy(SrcVal->getContext())) {
+    } else if (SrcTy->isDoubleTy()) {
       Dest.IntVal.zext(sizeof(Src.DoubleVal) * CHAR_BIT);
       Dest.IntVal.doubleToBits(Src.DoubleVal);
-    } else if (SrcTy->isInteger()) {
+    } else if (SrcTy->isIntegerTy()) {
       Dest.IntVal = Src.IntVal;
     } else 
       llvm_unreachable("Invalid BitCast");
-  } else if (DstTy == Type::getFloatTy(SrcVal->getContext())) {
-    if (SrcTy->isInteger())
+  } else if (DstTy->isFloatTy()) {
+    if (SrcTy->isIntegerTy())
       Dest.FloatVal = Src.IntVal.bitsToFloat();
     else
       Dest.FloatVal = Src.FloatVal;
-  } else if (DstTy == Type::getDoubleTy(SrcVal->getContext())) {
-    if (SrcTy->isInteger())
+  } else if (DstTy->isDoubleTy()) {
+    if (SrcTy->isIntegerTy())
       Dest.DoubleVal = Src.IntVal.bitsToDouble();
     else
       Dest.DoubleVal = Src.DoubleVal;
@@ -1178,7 +1164,7 @@ void Interpreter::visitVAArgInst(VAArgInst &I) {
     IMPLEMENT_VAARG(Float);
     IMPLEMENT_VAARG(Double);
   default:
-    cerr << "Unhandled dest type for vaarg instruction: " << *Ty << "\n";
+    dbgs() << "Unhandled dest type for vaarg instruction: " << *Ty << "\n";
     llvm_unreachable(0);
   }
 
@@ -1265,7 +1251,7 @@ GenericValue Interpreter::getConstantExprValue (ConstantExpr *CE,
     Dest.IntVal = Op0.IntVal.ashr(Op1.IntVal.getZExtValue());
     break;
   default:
-    cerr << "Unhandled ConstantExpr: " << *CE << "\n";
+    dbgs() << "Unhandled ConstantExpr: " << *CE << "\n";
     llvm_unreachable(0);
     return GenericValue();
   }
@@ -1338,30 +1324,29 @@ void Interpreter::run() {
     // Track the number of dynamic instructions executed.
     ++NumDynamicInsts;
 
-    DOUT << "About to interpret: " << I;
+    DEBUG(dbgs() << "About to interpret: " << I);
     visit(I);   // Dispatch to one of the visit* methods...
 #if 0
     // This is not safe, as visiting the instruction could lower it and free I.
-#ifndef NDEBUG
+DEBUG(
     if (!isa<CallInst>(I) && !isa<InvokeInst>(I) && 
         I.getType() != Type::VoidTy) {
-      DOUT << "  --> ";
+      dbgs() << "  --> ";
       const GenericValue &Val = SF.Values[&I];
       switch (I.getType()->getTypeID()) {
       default: llvm_unreachable("Invalid GenericValue Type");
-      case Type::VoidTyID:    DOUT << "void"; break;
-      case Type::FloatTyID:   DOUT << "float " << Val.FloatVal; break;
-      case Type::DoubleTyID:  DOUT << "double " << Val.DoubleVal; break;
-      case Type::PointerTyID: DOUT << "void* " << intptr_t(Val.PointerVal);
+      case Type::VoidTyID:    dbgs() << "void"; break;
+      case Type::FloatTyID:   dbgs() << "float " << Val.FloatVal; break;
+      case Type::DoubleTyID:  dbgs() << "double " << Val.DoubleVal; break;
+      case Type::PointerTyID: dbgs() << "void* " << intptr_t(Val.PointerVal);
         break;
       case Type::IntegerTyID: 
-        DOUT << "i" << Val.IntVal.getBitWidth() << " "
-        << Val.IntVal.toStringUnsigned(10)
-        << " (0x" << Val.IntVal.toStringUnsigned(16) << ")\n";
+        dbgs() << "i" << Val.IntVal.getBitWidth() << " "
+               << Val.IntVal.toStringUnsigned(10)
+               << " (0x" << Val.IntVal.toStringUnsigned(16) << ")\n";
         break;
       }
-    }
-#endif
+    });
 #endif
   }
 }

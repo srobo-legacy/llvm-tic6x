@@ -25,12 +25,21 @@
 
 namespace llvm {
   class AsmPrinter;
-  class MCAsmParser;
   class Module;
-  class TargetAsmInfo;
+  class MCAssembler;
+  class MCAsmInfo;
+  class MCAsmParser;
+  class MCCodeEmitter;
+  class MCContext;
+  class MCDisassembler;
+  class MCInstPrinter;
+  class MCStreamer;
+  class TargetAsmBackend;
+  class TargetAsmLexer;
   class TargetAsmParser;
   class TargetMachine;
   class formatted_raw_ostream;
+  class raw_ostream;
 
   /// Target - Wrapper for Target specific information.
   ///
@@ -46,17 +55,30 @@ namespace llvm {
 
     typedef unsigned (*TripleMatchQualityFnTy)(const std::string &TT);
 
-    typedef const TargetAsmInfo *(*AsmInfoCtorFnTy)(const Target &T,
-                                                    const StringRef &TT);
+    typedef const MCAsmInfo *(*AsmInfoCtorFnTy)(const Target &T,
+                                                StringRef TT);
     typedef TargetMachine *(*TargetMachineCtorTy)(const Target &T,
                                                   const std::string &TT,
                                                   const std::string &Features);
     typedef AsmPrinter *(*AsmPrinterCtorTy)(formatted_raw_ostream &OS,
                                             TargetMachine &TM,
-                                            const TargetAsmInfo *TAI,
-                                            bool VerboseAsm);
-    typedef TargetAsmParser *(*AsmParserCtorTy)(const Target &T,
-                                                MCAsmParser &P);
+                                            MCContext &Ctx,
+                                            MCStreamer &Streamer,
+                                            const MCAsmInfo *MAI);
+    typedef TargetAsmBackend *(*AsmBackendCtorTy)(const Target &T,
+                                                  MCAssembler &A);
+    typedef TargetAsmLexer *(*AsmLexerCtorTy)(const Target &T,
+                                              const MCAsmInfo &MAI);
+    typedef TargetAsmParser *(*AsmParserCtorTy)(const Target &T,MCAsmParser &P);
+    typedef const MCDisassembler *(*MCDisassemblerCtorTy)(const Target &T);
+    typedef MCInstPrinter *(*MCInstPrinterCtorTy)(const Target &T,
+                                                  unsigned SyntaxVariant,
+                                                  const MCAsmInfo &MAI,
+                                                  raw_ostream &O);
+    typedef MCCodeEmitter *(*CodeEmitterCtorTy)(const Target &T,
+                                                TargetMachine &TM,
+                                                MCContext &Ctx);
+
   private:
     /// Next - The next registered target in the linked list, maintained by the
     /// TargetRegistry.
@@ -76,20 +98,43 @@ namespace llvm {
     bool HasJIT;
 
     AsmInfoCtorFnTy AsmInfoCtorFn;
-    
+
     /// TargetMachineCtorFn - Construction function for this target's
     /// TargetMachine, if registered.
     TargetMachineCtorTy TargetMachineCtorFn;
+
+    /// AsmBackendCtorFn - Construction function for this target's
+    /// TargetAsmBackend, if registered.
+    AsmBackendCtorTy AsmBackendCtorFn;
+
+    /// AsmLexerCtorFn - Construction function for this target's TargetAsmLexer,
+    /// if registered.
+    AsmLexerCtorTy AsmLexerCtorFn;
+
+    /// AsmParserCtorFn - Construction function for this target's
+    /// TargetAsmParser, if registered.
+    AsmParserCtorTy AsmParserCtorFn;
 
     /// AsmPrinterCtorFn - Construction function for this target's AsmPrinter,
     /// if registered.
     AsmPrinterCtorTy AsmPrinterCtorFn;
 
-    /// AsmParserCtorFn - Construction function for this target's AsmParser,
+    /// MCDisassemblerCtorFn - Construction function for this target's
+    /// MCDisassembler, if registered.
+    MCDisassemblerCtorTy MCDisassemblerCtorFn;
+
+    /// MCInstPrinterCtorFn - Construction function for this target's
+    /// MCInstPrinter, if registered.
+    MCInstPrinterCtorTy MCInstPrinterCtorFn;
+
+    /// CodeEmitterCtorFn - Construction function for this target's CodeEmitter,
     /// if registered.
-    AsmParserCtorTy AsmParserCtorFn;
+    CodeEmitterCtorTy CodeEmitterCtorFn;
 
   public:
+    /// @name Target Information
+    /// @{
+
     // getNext - Return the next registered target.
     const Target *getNext() const { return Next; }
 
@@ -99,31 +144,54 @@ namespace llvm {
     /// getShortDescription - Get a short description of the target.
     const char *getShortDescription() const { return ShortDesc; }
 
+    /// @}
+    /// @name Feature Predicates
+    /// @{
+
+    /// hasJIT - Check if this targets supports the just-in-time compilation.
     bool hasJIT() const { return HasJIT; }
 
     /// hasTargetMachine - Check if this target supports code generation.
     bool hasTargetMachine() const { return TargetMachineCtorFn != 0; }
 
-    /// hasAsmPrinter - Check if this target supports .s printing.
-    bool hasAsmPrinter() const { return AsmPrinterCtorFn != 0; }
+    /// hasAsmBackend - Check if this target supports .o generation.
+    bool hasAsmBackend() const { return AsmBackendCtorFn != 0; }
+
+    /// hasAsmLexer - Check if this target supports .s lexing.
+    bool hasAsmLexer() const { return AsmLexerCtorFn != 0; }
 
     /// hasAsmParser - Check if this target supports .s parsing.
     bool hasAsmParser() const { return AsmParserCtorFn != 0; }
 
-    
-    /// createAsmInfo - Create a TargetAsmInfo implementation for the specified
+    /// hasAsmPrinter - Check if this target supports .s printing.
+    bool hasAsmPrinter() const { return AsmPrinterCtorFn != 0; }
+
+    /// hasMCDisassembler - Check if this target has a disassembler.
+    bool hasMCDisassembler() const { return MCDisassemblerCtorFn != 0; }
+
+    /// hasMCInstPrinter - Check if this target has an instruction printer.
+    bool hasMCInstPrinter() const { return MCInstPrinterCtorFn != 0; }
+
+    /// hasCodeEmitter - Check if this target supports instruction encoding.
+    bool hasCodeEmitter() const { return CodeEmitterCtorFn != 0; }
+
+    /// @}
+    /// @name Feature Constructors
+    /// @{
+
+    /// createAsmInfo - Create a MCAsmInfo implementation for the specified
     /// target triple.
     ///
     /// \arg Triple - This argument is used to determine the target machine
     /// feature set; it should always be provided. Generally this should be
     /// either the target triple from the module, or the target triple of the
     /// host if that does not exist.
-    const TargetAsmInfo *createAsmInfo(const StringRef &Triple) const {
+    const MCAsmInfo *createAsmInfo(StringRef Triple) const {
       if (!AsmInfoCtorFn)
         return 0;
       return AsmInfoCtorFn(*this, Triple);
     }
-    
+
     /// createTargetMachine - Create a target specific machine implementation
     /// for the specified \arg Triple.
     ///
@@ -138,12 +206,21 @@ namespace llvm {
       return TargetMachineCtorFn(*this, Triple, Features);
     }
 
-    /// createAsmPrinter - Create a target specific assembly printer pass.
-    AsmPrinter *createAsmPrinter(formatted_raw_ostream &OS, TargetMachine &TM,
-                                 const TargetAsmInfo *TAI, bool Verbose) const {
-      if (!AsmPrinterCtorFn)
+    /// createAsmBackend - Create a target specific assembly parser.
+    ///
+    /// \arg Backend - The target independent assembler object.
+    TargetAsmBackend *createAsmBackend(MCAssembler &Backend) const {
+      if (!AsmBackendCtorFn)
         return 0;
-      return AsmPrinterCtorFn(OS, TM, TAI, Verbose);
+      return AsmBackendCtorFn(*this, Backend);
+    }
+
+    /// createAsmLexer - Create a target specific assembly lexer.
+    ///
+    TargetAsmLexer *createAsmLexer(const MCAsmInfo &MAI) const {
+      if (!AsmLexerCtorFn)
+        return 0;
+      return AsmLexerCtorFn(*this, MAI);
     }
 
     /// createAsmParser - Create a target specific assembly parser.
@@ -155,6 +232,40 @@ namespace llvm {
         return 0;
       return AsmParserCtorFn(*this, Parser);
     }
+
+    /// createAsmPrinter - Create a target specific assembly printer pass.  This
+    /// takes ownership of the MCContext and MCStreamer objects but not the MAI.
+    AsmPrinter *createAsmPrinter(formatted_raw_ostream &OS, TargetMachine &TM,
+                                 MCContext &Ctx, MCStreamer &Streamer,
+                                 const MCAsmInfo *MAI) const {
+      if (!AsmPrinterCtorFn)
+        return 0;
+      return AsmPrinterCtorFn(OS, TM, Ctx, Streamer, MAI);
+    }
+
+    const MCDisassembler *createMCDisassembler() const {
+      if (!MCDisassemblerCtorFn)
+        return 0;
+      return MCDisassemblerCtorFn(*this);
+    }
+
+    MCInstPrinter *createMCInstPrinter(unsigned SyntaxVariant,
+                                       const MCAsmInfo &MAI,
+                                       raw_ostream &O) const {
+      if (!MCInstPrinterCtorFn)
+        return 0;
+      return MCInstPrinterCtorFn(*this, SyntaxVariant, MAI, O);
+    }
+
+
+    /// createCodeEmitter - Create a target specific code emitter.
+    MCCodeEmitter *createCodeEmitter(TargetMachine &TM, MCContext &Ctx) const {
+      if (!CodeEmitterCtorFn)
+        return 0;
+      return CodeEmitterCtorFn(*this, TM, Ctx);
+    }
+
+    /// @}
   };
 
   /// TargetRegistry - Generic interface to target specific features.
@@ -181,8 +292,8 @@ namespace llvm {
         return *this;
       }
       iterator operator++(int) {        // Postincrement
-        iterator tmp = *this; 
-        ++*this; 
+        iterator tmp = *this;
+        ++*this;
         return tmp;
       }
 
@@ -224,7 +335,7 @@ namespace llvm {
 
     /// RegisterTarget - Register the given target. Attempts to register a
     /// target which has already been registered will be ignored.
-    /// 
+    ///
     /// Clients are responsible for ensuring that registration doesn't occur
     /// while another thread is attempting to access the registry. Typically
     /// this is done by initializing all targets at program startup.
@@ -232,7 +343,7 @@ namespace llvm {
     /// @param T - The target being registered.
     /// @param Name - The target name. This should be a static string.
     /// @param ShortDesc - A short target description. This should be a static
-    /// string. 
+    /// string.
     /// @param TQualityFn - The triple match quality computation function for
     /// this target.
     /// @param HasJIT - Whether the target supports JIT code
@@ -243,40 +354,82 @@ namespace llvm {
                                Target::TripleMatchQualityFnTy TQualityFn,
                                bool HasJIT = false);
 
-    /// RegisterAsmInfo - Register a TargetAsmInfo implementation for the
+    /// RegisterAsmInfo - Register a MCAsmInfo implementation for the
     /// given target.
-    /// 
+    ///
     /// Clients are responsible for ensuring that registration doesn't occur
     /// while another thread is attempting to access the registry. Typically
     /// this is done by initializing all targets at program startup.
-    /// 
+    ///
     /// @param T - The target being registered.
-    /// @param Fn - A function to construct a TargetAsmInfo for the target.
+    /// @param Fn - A function to construct a MCAsmInfo for the target.
     static void RegisterAsmInfo(Target &T, Target::AsmInfoCtorFnTy Fn) {
       // Ignore duplicate registration.
       if (!T.AsmInfoCtorFn)
         T.AsmInfoCtorFn = Fn;
     }
-    
+
     /// RegisterTargetMachine - Register a TargetMachine implementation for the
     /// given target.
-    /// 
+    ///
     /// Clients are responsible for ensuring that registration doesn't occur
     /// while another thread is attempting to access the registry. Typically
     /// this is done by initializing all targets at program startup.
-    /// 
+    ///
     /// @param T - The target being registered.
     /// @param Fn - A function to construct a TargetMachine for the target.
-    static void RegisterTargetMachine(Target &T, 
+    static void RegisterTargetMachine(Target &T,
                                       Target::TargetMachineCtorTy Fn) {
       // Ignore duplicate registration.
       if (!T.TargetMachineCtorFn)
         T.TargetMachineCtorFn = Fn;
     }
 
+    /// RegisterAsmBackend - Register a TargetAsmBackend implementation for the
+    /// given target.
+    ///
+    /// Clients are responsible for ensuring that registration doesn't occur
+    /// while another thread is attempting to access the registry. Typically
+    /// this is done by initializing all targets at program startup.
+    ///
+    /// @param T - The target being registered.
+    /// @param Fn - A function to construct an AsmBackend for the target.
+    static void RegisterAsmBackend(Target &T, Target::AsmBackendCtorTy Fn) {
+      if (!T.AsmBackendCtorFn)
+        T.AsmBackendCtorFn = Fn;
+    }
+
+    /// RegisterAsmLexer - Register a TargetAsmLexer implementation for the
+    /// given target.
+    ///
+    /// Clients are responsible for ensuring that registration doesn't occur
+    /// while another thread is attempting to access the registry. Typically
+    /// this is done by initializing all targets at program startup.
+    ///
+    /// @param T - The target being registered.
+    /// @param Fn - A function to construct an AsmLexer for the target.
+    static void RegisterAsmLexer(Target &T, Target::AsmLexerCtorTy Fn) {
+      if (!T.AsmLexerCtorFn)
+        T.AsmLexerCtorFn = Fn;
+    }
+
+    /// RegisterAsmParser - Register a TargetAsmParser implementation for the
+    /// given target.
+    ///
+    /// Clients are responsible for ensuring that registration doesn't occur
+    /// while another thread is attempting to access the registry. Typically
+    /// this is done by initializing all targets at program startup.
+    ///
+    /// @param T - The target being registered.
+    /// @param Fn - A function to construct an AsmParser for the target.
+    static void RegisterAsmParser(Target &T, Target::AsmParserCtorTy Fn) {
+      if (!T.AsmParserCtorFn)
+        T.AsmParserCtorFn = Fn;
+    }
+
     /// RegisterAsmPrinter - Register an AsmPrinter implementation for the given
     /// target.
-    /// 
+    ///
     /// Clients are responsible for ensuring that registration doesn't occur
     /// while another thread is attempting to access the registry. Typically
     /// this is done by initializing all targets at program startup.
@@ -289,18 +442,48 @@ namespace llvm {
         T.AsmPrinterCtorFn = Fn;
     }
 
-    /// RegisterAsmParser - Register a TargetAsmParser implementation for the
-    /// given target.
-    /// 
+    /// RegisterMCDisassembler - Register a MCDisassembler implementation for
+    /// the given target.
+    ///
     /// Clients are responsible for ensuring that registration doesn't occur
     /// while another thread is attempting to access the registry. Typically
     /// this is done by initializing all targets at program startup.
     ///
     /// @param T - The target being registered.
-    /// @param Fn - A function to construct an AsmPrinter for the target.
-    static void RegisterAsmParser(Target &T, Target::AsmParserCtorTy Fn) {
-      if (!T.AsmParserCtorFn)
-        T.AsmParserCtorFn = Fn;
+    /// @param Fn - A function to construct an MCDisassembler for the target.
+    static void RegisterMCDisassembler(Target &T,
+                                       Target::MCDisassemblerCtorTy Fn) {
+      if (!T.MCDisassemblerCtorFn)
+        T.MCDisassemblerCtorFn = Fn;
+    }
+
+    /// RegisterMCInstPrinter - Register a MCInstPrinter implementation for the
+    /// given target.
+    ///
+    /// Clients are responsible for ensuring that registration doesn't occur
+    /// while another thread is attempting to access the registry. Typically
+    /// this is done by initializing all targets at program startup.
+    ///
+    /// @param T - The target being registered.
+    /// @param Fn - A function to construct an MCInstPrinter for the target.
+    static void RegisterMCInstPrinter(Target &T,
+                                      Target::MCInstPrinterCtorTy Fn) {
+      if (!T.MCInstPrinterCtorFn)
+        T.MCInstPrinterCtorFn = Fn;
+    }
+
+    /// RegisterCodeEmitter - Register a MCCodeEmitter implementation for the
+    /// given target.
+    ///
+    /// Clients are responsible for ensuring that registration doesn't occur
+    /// while another thread is attempting to access the registry. Typically
+    /// this is done by initializing all targets at program startup.
+    ///
+    /// @param T - The target being registered.
+    /// @param Fn - A function to construct an MCCodeEmitter for the target.
+    static void RegisterCodeEmitter(Target &T, Target::CodeEmitterCtorTy Fn) {
+      if (!T.CodeEmitterCtorFn)
+        T.CodeEmitterCtorFn = Fn;
     }
 
     /// @}
@@ -328,7 +511,7 @@ namespace llvm {
     }
 
     static unsigned getTripleMatchQuality(const std::string &TT) {
-      if (Triple(TT.c_str()).getArch() == TargetArchType)
+      if (Triple(TT).getArch() == TargetArchType)
         return 20;
       return 0;
     }
@@ -340,18 +523,18 @@ namespace llvm {
   ///
   /// extern "C" void LLVMInitializeFooTarget() {
   ///   extern Target TheFooTarget;
-  ///   RegisterAsmInfo<FooTargetAsmInfo> X(TheFooTarget);
+  ///   RegisterAsmInfo<FooMCAsmInfo> X(TheFooTarget);
   /// }
-  template<class TargetAsmInfoImpl>
+  template<class MCAsmInfoImpl>
   struct RegisterAsmInfo {
     RegisterAsmInfo(Target &T) {
       TargetRegistry::RegisterAsmInfo(T, &Allocator);
     }
   private:
-    static const TargetAsmInfo *Allocator(const Target &T, const StringRef &TT){
-      return new TargetAsmInfoImpl(T, TT);
+    static const MCAsmInfo *Allocator(const Target &T, StringRef TT) {
+      return new MCAsmInfoImpl(T, TT);
     }
-    
+
   };
 
   /// RegisterAsmInfoFn - Helper template for registering a target assembly info
@@ -390,24 +573,42 @@ namespace llvm {
     }
   };
 
-  /// RegisterAsmPrinter - Helper template for registering a target specific
-  /// assembly printer, for use in the target machine initialization
-  /// function. Usage:
+  /// RegisterAsmBackend - Helper template for registering a target specific
+  /// assembler backend. Usage:
   ///
-  /// extern "C" void LLVMInitializeFooAsmPrinter() {
+  /// extern "C" void LLVMInitializeFooAsmBackend() {
   ///   extern Target TheFooTarget;
-  ///   RegisterAsmPrinter<FooAsmPrinter> X(TheFooTarget);
+  ///   RegisterAsmBackend<FooAsmLexer> X(TheFooTarget);
   /// }
-  template<class AsmPrinterImpl>
-  struct RegisterAsmPrinter {
-    RegisterAsmPrinter(Target &T) {
-      TargetRegistry::RegisterAsmPrinter(T, &Allocator);
+  template<class AsmBackendImpl>
+  struct RegisterAsmBackend {
+    RegisterAsmBackend(Target &T) {
+      TargetRegistry::RegisterAsmBackend(T, &Allocator);
     }
 
   private:
-    static AsmPrinter *Allocator(formatted_raw_ostream &OS, TargetMachine &TM,
-                                 const TargetAsmInfo *TAI, bool Verbose) {
-      return new AsmPrinterImpl(OS, TM, TAI, Verbose);
+    static TargetAsmBackend *Allocator(const Target &T, MCAssembler &Backend) {
+      return new AsmBackendImpl(T, Backend);
+    }
+  };
+
+  /// RegisterAsmLexer - Helper template for registering a target specific
+  /// assembly lexer, for use in the target machine initialization
+  /// function. Usage:
+  ///
+  /// extern "C" void LLVMInitializeFooAsmLexer() {
+  ///   extern Target TheFooTarget;
+  ///   RegisterAsmLexer<FooAsmLexer> X(TheFooTarget);
+  /// }
+  template<class AsmLexerImpl>
+  struct RegisterAsmLexer {
+    RegisterAsmLexer(Target &T) {
+      TargetRegistry::RegisterAsmLexer(T, &Allocator);
+    }
+
+  private:
+    static TargetAsmLexer *Allocator(const Target &T, const MCAsmInfo &MAI) {
+      return new AsmLexerImpl(T, MAI);
     }
   };
 
@@ -428,6 +629,49 @@ namespace llvm {
   private:
     static TargetAsmParser *Allocator(const Target &T, MCAsmParser &P) {
       return new AsmParserImpl(T, P);
+    }
+  };
+
+  /// RegisterAsmPrinter - Helper template for registering a target specific
+  /// assembly printer, for use in the target machine initialization
+  /// function. Usage:
+  ///
+  /// extern "C" void LLVMInitializeFooAsmPrinter() {
+  ///   extern Target TheFooTarget;
+  ///   RegisterAsmPrinter<FooAsmPrinter> X(TheFooTarget);
+  /// }
+  template<class AsmPrinterImpl>
+  struct RegisterAsmPrinter {
+    RegisterAsmPrinter(Target &T) {
+      TargetRegistry::RegisterAsmPrinter(T, &Allocator);
+    }
+
+  private:
+    static AsmPrinter *Allocator(formatted_raw_ostream &OS, TargetMachine &TM,
+                                 MCContext &Ctx, MCStreamer &Streamer,
+                                 const MCAsmInfo *MAI) {
+      return new AsmPrinterImpl(OS, TM, Ctx, Streamer, MAI);
+    }
+  };
+
+  /// RegisterCodeEmitter - Helper template for registering a target specific
+  /// machine code emitter, for use in the target initialization
+  /// function. Usage:
+  ///
+  /// extern "C" void LLVMInitializeFooCodeEmitter() {
+  ///   extern Target TheFooTarget;
+  ///   RegisterCodeEmitter<FooCodeEmitter> X(TheFooTarget);
+  /// }
+  template<class CodeEmitterImpl>
+  struct RegisterCodeEmitter {
+    RegisterCodeEmitter(Target &T) {
+      TargetRegistry::RegisterCodeEmitter(T, &Allocator);
+    }
+
+  private:
+    static MCCodeEmitter *Allocator(const Target &T, TargetMachine &TM,
+                                    MCContext &Ctx) {
+      return new CodeEmitterImpl(T, TM, Ctx);
     }
   };
 

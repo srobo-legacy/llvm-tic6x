@@ -49,14 +49,15 @@ struct SystemZRegisterInfo : public SystemZGenRegisterInfo {
   bool hasReservedCallFrame(MachineFunction &MF) const { return true; }
   bool hasFP(const MachineFunction &MF) const;
 
-  int getFrameIndexOffset(MachineFunction &MF, int FI) const;
+  int getFrameIndexOffset(const MachineFunction &MF, int FI) const;
 
   void eliminateCallFramePseudoInstr(MachineFunction &MF,
                                      MachineBasicBlock &MBB,
                                      MachineBasicBlock::iterator I) const;
 
-  void eliminateFrameIndex(MachineBasicBlock::iterator II,
-                           int SPAdj, RegScavenger *RS = NULL) const;
+  unsigned eliminateFrameIndex(MachineBasicBlock::iterator II,
+                               int SPAdj, int *Value = NULL,
+                               RegScavenger *RS = NULL) const;
 
 
   void processFunctionBeforeCalleeSavedScan(MachineFunction &MF,
@@ -67,7 +68,7 @@ struct SystemZRegisterInfo : public SystemZGenRegisterInfo {
 
   // Debug information queries.
   unsigned getRARegister() const;
-  unsigned getFrameRegister(MachineFunction &MF) const;
+  unsigned getFrameRegister(const MachineFunction &MF) const;
 
   // Exception handling queries.
   unsigned getEHExceptionRegister() const;

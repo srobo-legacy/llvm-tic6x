@@ -1,4 +1,4 @@
-; RUN: llvm-as < %s | opt -jump-threading -loop-rotate -instcombine -indvars -loop-unroll -simplifycfg | llvm-dis > %t
+; RUN: opt < %s -jump-threading -loop-rotate -instcombine -indvars -loop-unroll -simplifycfg -S -verify-dom-info -verify-loop-info > %t
 ; RUN: grep {volatile store} %t | count 3
 ; RUN: not grep {br label} %t
 

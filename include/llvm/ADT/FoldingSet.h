@@ -16,10 +16,9 @@
 #ifndef LLVM_ADT_FOLDINGSET_H
 #define LLVM_ADT_FOLDINGSET_H
 
-#include "llvm/Support/DataTypes.h"
+#include "llvm/System/DataTypes.h"
 #include "llvm/ADT/SmallVector.h"
-#include <string>
-#include <iterator>
+#include "llvm/ADT/StringRef.h"
 
 namespace llvm {
   class APFloat;
@@ -227,9 +226,7 @@ public:
   void AddInteger(long long I);
   void AddInteger(unsigned long long I);
   void AddBoolean(bool B) { AddInteger(B ? 1U : 0U); }
-  void AddString(const char* String, const char* End);
-  void AddString(const std::string &String);
-  void AddString(const char* String);
+  void AddString(StringRef String);
 
   template <typename T>
   inline void Add(const T& x) { FoldingSetTrait<T>::Profile(x, *this); }

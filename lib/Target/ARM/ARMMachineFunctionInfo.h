@@ -35,11 +35,6 @@ class ARMFunctionInfo : public MachineFunctionInfo {
   /// 'isThumb'.
   bool hasThumb2;
 
-  /// Align - required alignment.  ARM functions and Thumb functions with
-  /// constant pools require 4-byte alignment; other Thumb functions
-  /// require only 2-byte alignment.
-  unsigned Align;
-
   /// VarArgsRegSaveSize - Size of the register save area for vararg functions.
   ///
   unsigned VarArgsRegSaveSize;
@@ -51,10 +46,6 @@ class ARMFunctionInfo : public MachineFunctionInfo {
   /// LRSpilledForFarJump - True if the LR register has been for spilled to
   /// enable far jump.
   bool LRSpilledForFarJump;
-
-  /// R3IsLiveIn - True if R3 is live in to this function.
-  /// FIXME: Remove when register scavenger for Thumb is done.
-  bool R3IsLiveIn;
 
   /// FramePtrSpillOffset - If HasStackFrame, this records the frame pointer
   /// spill stack offset.
@@ -98,9 +89,8 @@ public:
   ARMFunctionInfo() :
     isThumb(false),
     hasThumb2(false),
-    Align(2U),
     VarArgsRegSaveSize(0), HasStackFrame(false),
-    LRSpilledForFarJump(false), R3IsLiveIn(false),
+    LRSpilledForFarJump(false),
     FramePtrSpillOffset(0), GPRCS1Offset(0), GPRCS2Offset(0), DPRCSOffset(0),
     GPRCS1Size(0), GPRCS2Size(0), DPRCSSize(0),
     GPRCS1Frames(0), GPRCS2Frames(0), DPRCSFrames(0),
@@ -109,9 +99,8 @@ public:
   explicit ARMFunctionInfo(MachineFunction &MF) :
     isThumb(MF.getTarget().getSubtarget<ARMSubtarget>().isThumb()),
     hasThumb2(MF.getTarget().getSubtarget<ARMSubtarget>().hasThumb2()),
-    Align(isThumb ? 1U : 2U),
     VarArgsRegSaveSize(0), HasStackFrame(false),
-    LRSpilledForFarJump(false), R3IsLiveIn(false),
+    LRSpilledForFarJump(false),
     FramePtrSpillOffset(0), GPRCS1Offset(0), GPRCS2Offset(0), DPRCSOffset(0),
     GPRCS1Size(0), GPRCS2Size(0), DPRCSSize(0),
     GPRCS1Frames(32), GPRCS2Frames(32), DPRCSFrames(32),
@@ -122,9 +111,6 @@ public:
   bool isThumb1OnlyFunction() const { return isThumb && !hasThumb2; }
   bool isThumb2Function() const { return isThumb && hasThumb2; }
 
-  unsigned getAlign() const { return Align; }
-  void setAlign(unsigned a) { Align = a; }
-
   unsigned getVarArgsRegSaveSize() const { return VarArgsRegSaveSize; }
   void setVarArgsRegSaveSize(unsigned s) { VarArgsRegSaveSize = s; }
 
@@ -133,10 +119,6 @@ public:
 
   bool isLRSpilledForFarJump() const { return LRSpilledForFarJump; }
   void setLRIsSpilledForFarJump(bool s) { LRSpilledForFarJump = s; }
-
-  // FIXME: Remove when register scavenger for Thumb is done.
-  bool isR3LiveIn() const { return R3IsLiveIn; }
-  void setR3IsLiveIn(bool l) { R3IsLiveIn = l; }
 
   unsigned getFramePtrSpillOffset() const { return FramePtrSpillOffset; }
   void setFramePtrSpillOffset(unsigned o) { FramePtrSpillOffset = o; }

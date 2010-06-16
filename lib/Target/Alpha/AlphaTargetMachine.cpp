@@ -12,7 +12,7 @@
 
 #include "Alpha.h"
 #include "AlphaJITInfo.h"
-#include "AlphaTargetAsmInfo.h"
+#include "AlphaMCAsmInfo.h"
 #include "AlphaTargetMachine.h"
 #include "llvm/PassManager.h"
 #include "llvm/Support/FormattedStream.h"
@@ -22,13 +22,13 @@ using namespace llvm;
 extern "C" void LLVMInitializeAlphaTarget() { 
   // Register the target.
   RegisterTargetMachine<AlphaTargetMachine> X(TheAlphaTarget);
-  RegisterAsmInfo<AlphaTargetAsmInfo> Y(TheAlphaTarget);
+  RegisterAsmInfo<AlphaMCAsmInfo> Y(TheAlphaTarget);
 }
 
 AlphaTargetMachine::AlphaTargetMachine(const Target &T, const std::string &TT,
                                        const std::string &FS)
   : LLVMTargetMachine(T, TT),
-    DataLayout("e-f128:128:128"),
+    DataLayout("e-f128:128:128-n64"),
     FrameInfo(TargetFrameInfo::StackGrowsDown, 16, 0),
     JITInfo(*this),
     Subtarget(TT, FS),
@@ -55,35 +55,7 @@ bool AlphaTargetMachine::addPreEmitPass(PassManagerBase &PM,
 }
 bool AlphaTargetMachine::addCodeEmitter(PassManagerBase &PM,
                                         CodeGenOpt::Level OptLevel,
-                                        MachineCodeEmitter &MCE) {
-  PM.add(createAlphaCodeEmitterPass(*this, MCE));
-  return false;
-}
-bool AlphaTargetMachine::addCodeEmitter(PassManagerBase &PM,
-                                        CodeGenOpt::Level OptLevel,
                                         JITCodeEmitter &JCE) {
   PM.add(createAlphaJITCodeEmitterPass(*this, JCE));
   return false;
 }
-bool AlphaTargetMachine::addCodeEmitter(PassManagerBase &PM,
-                                        CodeGenOpt::Level OptLevel,
-                                        ObjectCodeEmitter &OCE) {
-  PM.add(createAlphaObjectCodeEmitterPass(*this, OCE));
-  return false;
-}
-bool AlphaTargetMachine::addSimpleCodeEmitter(PassManagerBase &PM,
-                                              CodeGenOpt::Level OptLevel,
-                                              MachineCodeEmitter &MCE) {
-  return addCodeEmitter(PM, OptLevel, MCE);
-}
-bool AlphaTargetMachine::addSimpleCodeEmitter(PassManagerBase &PM,
-                                              CodeGenOpt::Level OptLevel,
-                                              JITCodeEmitter &JCE) {
-  return addCodeEmitter(PM, OptLevel, JCE);
-}
-bool AlphaTargetMachine::addSimpleCodeEmitter(PassManagerBase &PM,
-                                              CodeGenOpt::Level OptLevel,
-                                              ObjectCodeEmitter &OCE) {
-  return addCodeEmitter(PM, OptLevel, OCE);
-}
-

@@ -13,11 +13,16 @@
 
 #include "DIE.h"
 #include "DwarfPrinter.h"
+#include "llvm/ADT/Twine.h"
 #include "llvm/CodeGen/AsmPrinter.h"
-#include "llvm/Target/TargetAsmInfo.h"
+#include "llvm/MC/MCAsmInfo.h"
+#include "llvm/MC/MCStreamer.h"
+#include "llvm/MC/MCSymbol.h"
 #include "llvm/Target/TargetData.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
-#include <ostream>
+#include "llvm/Support/Format.h"
+#include "llvm/Support/FormattedStream.h"
 using namespace llvm;
 
 //===----------------------------------------------------------------------===//
@@ -48,52 +53,54 @@ void DIEAbbrev::Profile(FoldingSetNodeID &ID) const {
 
 /// Emit - Print the abbreviation using the specified asm printer.
 ///
-void DIEAbbrev::Emit(const AsmPrinter *Asm) const {
+void DIEAbbrev::Emit(const DwarfPrinter *DP) const {
   // Emit its Dwarf tag type.
-  Asm->EmitULEB128Bytes(Tag);
-  Asm->EOL(dwarf::TagString(Tag));
+  // FIXME: Doing work even in non-asm-verbose runs.
+  DP->EmitULEB128(Tag, dwarf::TagString(Tag));
 
   // Emit whether it has children DIEs.
-  Asm->EmitULEB128Bytes(ChildrenFlag);
-  Asm->EOL(dwarf::ChildrenString(ChildrenFlag));
+  // FIXME: Doing work even in non-asm-verbose runs.
+  DP->EmitULEB128(ChildrenFlag, dwarf::ChildrenString(ChildrenFlag));
 
   // For each attribute description.
   for (unsigned i = 0, N = Data.size(); i < N; ++i) {
     const DIEAbbrevData &AttrData = Data[i];
 
     // Emit attribute type.
-    Asm->EmitULEB128Bytes(AttrData.getAttribute());
-    Asm->EOL(dwarf::AttributeString(AttrData.getAttribute()));
+    // FIXME: Doing work even in non-asm-verbose runs.
+    DP->EmitULEB128(AttrData.getAttribute(),
+                    dwarf::AttributeString(AttrData.getAttribute()));
 
     // Emit form type.
-    Asm->EmitULEB128Bytes(AttrData.getForm());
-    Asm->EOL(dwarf::FormEncodingString(AttrData.getForm()));
+    // FIXME: Doing work even in non-asm-verbose runs.
+    DP->EmitULEB128(AttrData.getForm(),
+                    dwarf::FormEncodingString(AttrData.getForm()));
   }
 
   // Mark end of abbreviation.
-  Asm->EmitULEB128Bytes(0); Asm->EOL("EOM(1)");
-  Asm->EmitULEB128Bytes(0); Asm->EOL("EOM(2)");
+  DP->EmitULEB128(0, "EOM(1)");
+  DP->EmitULEB128(0, "EOM(2)");
 }
 
 #ifndef NDEBUG
-void DIEAbbrev::print(std::ostream &O) {
+void DIEAbbrev::print(raw_ostream &O) {
   O << "Abbreviation @"
-    << std::hex << (intptr_t)this << std::dec
+    << format("0x%lx", (long)(intptr_t)this)
     << "  "
     << dwarf::TagString(Tag)
     << " "
     << dwarf::ChildrenString(ChildrenFlag)
-    << "\n";
+    << '\n';
 
   for (unsigned i = 0, N = Data.size(); i < N; ++i) {
     O << "  "
       << dwarf::AttributeString(Data[i].getAttribute())
       << "  "
       << dwarf::FormEncodingString(Data[i].getForm())
-      << "\n";
+      << '\n';
   }
 }
-void DIEAbbrev::dump() { print(cerr); }
+void DIEAbbrev::dump() { print(dbgs()); }
 #endif
 
 //===----------------------------------------------------------------------===//
@@ -105,28 +112,16 @@ DIE::~DIE() {
     delete Children[i];
 }
 
-/// AddSiblingOffset - Add a sibling offset field to the front of the DIE.
+/// addSiblingOffset - Add a sibling offset field to the front of the DIE.
 ///
-void DIE::AddSiblingOffset() {
+void DIE::addSiblingOffset() {
   DIEInteger *DI = new DIEInteger(0);
   Values.insert(Values.begin(), DI);
   Abbrev.AddFirstAttribute(dwarf::DW_AT_sibling, dwarf::DW_FORM_ref4);
 }
 
-/// Profile - Used to gather unique data for the value folding set.
-///
-void DIE::Profile(FoldingSetNodeID &ID) {
-  Abbrev.Profile(ID);
-
-  for (unsigned i = 0, N = Children.size(); i < N; ++i)
-    ID.AddPointer(Children[i]);
-
-  for (unsigned j = 0, M = Values.size(); j < M; ++j)
-    ID.AddPointer(Values[j]);
-}
-
 #ifndef NDEBUG
-void DIE::print(std::ostream &O, unsigned IncIndent) {
+void DIE::print(raw_ostream &O, unsigned IncIndent) {
   IndentCount += IncIndent;
   const std::string Indent(IndentCount, ' ');
   bool isBlock = Abbrev.getTag() == 0;
@@ -134,7 +129,7 @@ void DIE::print(std::ostream &O, unsigned IncIndent) {
   if (!isBlock) {
     O << Indent
       << "Die: "
-      << "0x" << std::hex << (intptr_t)this << std::dec
+      << format("0x%lx", (long)(intptr_t)this)
       << ", Offset: " << Offset
       << ", Size: " << Size
       << "\n";
@@ -176,14 +171,14 @@ void DIE::print(std::ostream &O, unsigned IncIndent) {
 }
 
 void DIE::dump() {
-  print(cerr);
+  print(dbgs());
 }
 #endif
 
 
 #ifndef NDEBUG
 void DIEValue::dump() {
-  print(cerr);
+  print(dbgs());
 }
 #endif
 
@@ -193,22 +188,24 @@ void DIEValue::dump() {
 
 /// EmitValue - Emit integer of appropriate size.
 ///
-void DIEInteger::EmitValue(Dwarf *D, unsigned Form) const {
+void DIEInteger::EmitValue(DwarfPrinter *D, unsigned Form) const {
   const AsmPrinter *Asm = D->getAsm();
+  unsigned Size = ~0U;
   switch (Form) {
   case dwarf::DW_FORM_flag:  // Fall thru
   case dwarf::DW_FORM_ref1:  // Fall thru
-  case dwarf::DW_FORM_data1: Asm->EmitInt8(Integer);         break;
+  case dwarf::DW_FORM_data1: Size = 1; break;
   case dwarf::DW_FORM_ref2:  // Fall thru
-  case dwarf::DW_FORM_data2: Asm->EmitInt16(Integer);        break;
+  case dwarf::DW_FORM_data2: Size = 2; break;
   case dwarf::DW_FORM_ref4:  // Fall thru
-  case dwarf::DW_FORM_data4: Asm->EmitInt32(Integer);        break;
+  case dwarf::DW_FORM_data4: Size = 4; break;
   case dwarf::DW_FORM_ref8:  // Fall thru
-  case dwarf::DW_FORM_data8: Asm->EmitInt64(Integer);        break;
-  case dwarf::DW_FORM_udata: Asm->EmitULEB128Bytes(Integer); break;
-  case dwarf::DW_FORM_sdata: Asm->EmitSLEB128Bytes(Integer); break;
+  case dwarf::DW_FORM_data8: Size = 8; break;
+  case dwarf::DW_FORM_udata: D->EmitULEB128(Integer); return;
+  case dwarf::DW_FORM_sdata: D->EmitSLEB128(Integer, ""); return;
   default: llvm_unreachable("DIE Value form not supported yet");
   }
+  Asm->OutStreamer.EmitIntValue(Integer, Size, 0/*addrspace*/);
 }
 
 /// SizeOf - Determine size of integer value in bytes.
@@ -224,27 +221,17 @@ unsigned DIEInteger::SizeOf(const TargetData *TD, unsigned Form) const {
   case dwarf::DW_FORM_data4: return sizeof(int32_t);
   case dwarf::DW_FORM_ref8:  // Fall thru
   case dwarf::DW_FORM_data8: return sizeof(int64_t);
-  case dwarf::DW_FORM_udata: return TargetAsmInfo::getULEB128Size(Integer);
-  case dwarf::DW_FORM_sdata: return TargetAsmInfo::getSLEB128Size(Integer);
+  case dwarf::DW_FORM_udata: return MCAsmInfo::getULEB128Size(Integer);
+  case dwarf::DW_FORM_sdata: return MCAsmInfo::getSLEB128Size(Integer);
   default: llvm_unreachable("DIE Value form not supported yet"); break;
   }
   return 0;
 }
 
-/// Profile - Used to gather unique data for the value folding set.
-///
-void DIEInteger::Profile(FoldingSetNodeID &ID, unsigned Int) {
-  ID.AddInteger(isInteger);
-  ID.AddInteger(Int);
-}
-void DIEInteger::Profile(FoldingSetNodeID &ID) {
-  Profile(ID, Integer);
-}
-
 #ifndef NDEBUG
-void DIEInteger::print(std::ostream &O) {
+void DIEInteger::print(raw_ostream &O) {
   O << "Int: " << (int64_t)Integer
-    << "  0x" << std::hex << Integer << std::dec;
+    << format("  0x%llx", (unsigned long long)Integer);
 }
 #endif
 
@@ -254,22 +241,14 @@ void DIEInteger::print(std::ostream &O) {
 
 /// EmitValue - Emit string value.
 ///
-void DIEString::EmitValue(Dwarf *D, unsigned Form) const {
-  D->getAsm()->EmitString(Str);
-}
-
-/// Profile - Used to gather unique data for the value folding set.
-///
-void DIEString::Profile(FoldingSetNodeID &ID, const std::string &Str) {
-  ID.AddInteger(isString);
-  ID.AddString(Str);
-}
-void DIEString::Profile(FoldingSetNodeID &ID) {
-  Profile(ID, Str);
+void DIEString::EmitValue(DwarfPrinter *D, unsigned Form) const {
+  D->getAsm()->OutStreamer.EmitBytes(Str, /*addrspace*/0);
+  // Emit nul terminator.
+  D->getAsm()->OutStreamer.EmitIntValue(0, 1, /*addrspace*/0);
 }
 
 #ifndef NDEBUG
-void DIEString::print(std::ostream &O) {
+void DIEString::print(raw_ostream &O) {
   O << "Str: \"" << Str << "\"";
 }
 #endif
@@ -280,7 +259,7 @@ void DIEString::print(std::ostream &O) {
 
 /// EmitValue - Emit label value.
 ///
-void DIEDwarfLabel::EmitValue(Dwarf *D, unsigned Form) const {
+void DIEDwarfLabel::EmitValue(DwarfPrinter *D, unsigned Form) const {
   bool IsSmall = Form == dwarf::DW_FORM_data4;
   D->EmitReference(Label, false, IsSmall);
 }
@@ -292,18 +271,8 @@ unsigned DIEDwarfLabel::SizeOf(const TargetData *TD, unsigned Form) const {
   return TD->getPointerSize();
 }
 
-/// Profile - Used to gather unique data for the value folding set.
-///
-void DIEDwarfLabel::Profile(FoldingSetNodeID &ID, const DWLabel &Label) {
-  ID.AddInteger(isLabel);
-  Label.Profile(ID);
-}
-void DIEDwarfLabel::Profile(FoldingSetNodeID &ID) {
-  Profile(ID, Label);
-}
-
 #ifndef NDEBUG
-void DIEDwarfLabel::print(std::ostream &O) {
+void DIEDwarfLabel::print(raw_ostream &O) {
   O << "Lbl: ";
   Label.print(O);
 }
@@ -315,9 +284,9 @@ void DIEDwarfLabel::print(std::ostream &O) {
 
 /// EmitValue - Emit label value.
 ///
-void DIEObjectLabel::EmitValue(Dwarf *D, unsigned Form) const {
+void DIEObjectLabel::EmitValue(DwarfPrinter *D, unsigned Form) const {
   bool IsSmall = Form == dwarf::DW_FORM_data4;
-  D->EmitReference(Label, false, IsSmall);
+  D->EmitReference(Sym, false, IsSmall);
 }
 
 /// SizeOf - Determine size of label value in bytes.
@@ -327,19 +296,9 @@ unsigned DIEObjectLabel::SizeOf(const TargetData *TD, unsigned Form) const {
   return TD->getPointerSize();
 }
 
-/// Profile - Used to gather unique data for the value folding set.
-///
-void DIEObjectLabel::Profile(FoldingSetNodeID &ID, const std::string &Label) {
-  ID.AddInteger(isAsIsLabel);
-  ID.AddString(Label);
-}
-void DIEObjectLabel::Profile(FoldingSetNodeID &ID) {
-  Profile(ID, Label.c_str());
-}
-
 #ifndef NDEBUG
-void DIEObjectLabel::print(std::ostream &O) {
-  O << "Obj: " << Label;
+void DIEObjectLabel::print(raw_ostream &O) {
+  O << "Obj: " << Sym->getName();
 }
 #endif
 
@@ -349,11 +308,12 @@ void DIEObjectLabel::print(std::ostream &O) {
 
 /// EmitValue - Emit delta value.
 ///
-void DIESectionOffset::EmitValue(Dwarf *D, unsigned Form) const {
+void DIESectionOffset::EmitValue(DwarfPrinter *D, unsigned Form) const {
   bool IsSmall = Form == dwarf::DW_FORM_data4;
   D->EmitSectionOffset(Label.getTag(), Section.getTag(),
                        Label.getNumber(), Section.getNumber(),
                        IsSmall, IsEH, UseSet);
+  D->getAsm()->O << '\n'; // FIXME: Necesssary?
 }
 
 /// SizeOf - Determine size of delta value in bytes.
@@ -363,22 +323,8 @@ unsigned DIESectionOffset::SizeOf(const TargetData *TD, unsigned Form) const {
   return TD->getPointerSize();
 }
 
-/// Profile - Used to gather unique data for the value folding set.
-///
-void DIESectionOffset::Profile(FoldingSetNodeID &ID, const DWLabel &Label,
-                               const DWLabel &Section) {
-  ID.AddInteger(isSectionOffset);
-  Label.Profile(ID);
-  Section.Profile(ID);
-  // IsEH and UseSet are specific to the Label/Section that we will emit the
-  // offset for; so Label/Section are enough for uniqueness.
-}
-void DIESectionOffset::Profile(FoldingSetNodeID &ID) {
-  Profile(ID, Label, Section);
-}
-
 #ifndef NDEBUG
-void DIESectionOffset::print(std::ostream &O) {
+void DIESectionOffset::print(raw_ostream &O) {
   O << "Off: ";
   Label.print(O);
   O << "-";
@@ -393,7 +339,7 @@ void DIESectionOffset::print(std::ostream &O) {
 
 /// EmitValue - Emit delta value.
 ///
-void DIEDelta::EmitValue(Dwarf *D, unsigned Form) const {
+void DIEDelta::EmitValue(DwarfPrinter *D, unsigned Form) const {
   bool IsSmall = Form == dwarf::DW_FORM_data4;
   D->EmitDifference(LabelHi, LabelLo, IsSmall);
 }
@@ -405,20 +351,8 @@ unsigned DIEDelta::SizeOf(const TargetData *TD, unsigned Form) const {
   return TD->getPointerSize();
 }
 
-/// Profile - Used to gather unique data for the value folding set.
-///
-void DIEDelta::Profile(FoldingSetNodeID &ID, const DWLabel &LabelHi,
-                       const DWLabel &LabelLo) {
-  ID.AddInteger(isDelta);
-  LabelHi.Profile(ID);
-  LabelLo.Profile(ID);
-}
-void DIEDelta::Profile(FoldingSetNodeID &ID) {
-  Profile(ID, LabelHi, LabelLo);
-}
-
 #ifndef NDEBUG
-void DIEDelta::print(std::ostream &O) {
+void DIEDelta::print(raw_ostream &O) {
   O << "Del: ";
   LabelHi.print(O);
   O << "-";
@@ -432,28 +366,13 @@ void DIEDelta::print(std::ostream &O) {
 
 /// EmitValue - Emit debug information entry offset.
 ///
-void DIEEntry::EmitValue(Dwarf *D, unsigned Form) const {
+void DIEEntry::EmitValue(DwarfPrinter *D, unsigned Form) const {
   D->getAsm()->EmitInt32(Entry->getOffset());
 }
 
-/// Profile - Used to gather unique data for the value folding set.
-///
-void DIEEntry::Profile(FoldingSetNodeID &ID, DIE *Entry) {
-  ID.AddInteger(isEntry);
-  ID.AddPointer(Entry);
-}
-void DIEEntry::Profile(FoldingSetNodeID &ID) {
-  ID.AddInteger(isEntry);
-
-  if (Entry)
-    ID.AddPointer(Entry);
-  else
-    ID.AddPointer(this);
-}
-
 #ifndef NDEBUG
-void DIEEntry::print(std::ostream &O) {
-  O << "Die: 0x" << std::hex << (intptr_t)Entry << std::dec;
+void DIEEntry::print(raw_ostream &O) {
+  O << format("Die: 0x%lx", (long)(intptr_t)Entry);
 }
 #endif
 
@@ -475,19 +394,19 @@ unsigned DIEBlock::ComputeSize(const TargetData *TD) {
 
 /// EmitValue - Emit block data.
 ///
-void DIEBlock::EmitValue(Dwarf *D, unsigned Form) const {
+void DIEBlock::EmitValue(DwarfPrinter *D, unsigned Form) const {
   const AsmPrinter *Asm = D->getAsm();
   switch (Form) {
   case dwarf::DW_FORM_block1: Asm->EmitInt8(Size);         break;
   case dwarf::DW_FORM_block2: Asm->EmitInt16(Size);        break;
   case dwarf::DW_FORM_block4: Asm->EmitInt32(Size);        break;
-  case dwarf::DW_FORM_block:  Asm->EmitULEB128Bytes(Size); break;
+  case dwarf::DW_FORM_block:  D->EmitULEB128(Size); break;
   default: llvm_unreachable("Improper form for block");         break;
   }
 
   const SmallVector<DIEAbbrevData, 8> &AbbrevData = Abbrev.getData();
   for (unsigned i = 0, N = Values.size(); i < N; ++i) {
-    Asm->EOL();
+    Asm->O << '\n';
     Values[i]->EmitValue(D, AbbrevData[i].getForm());
   }
 }
@@ -499,19 +418,14 @@ unsigned DIEBlock::SizeOf(const TargetData *TD, unsigned Form) const {
   case dwarf::DW_FORM_block1: return Size + sizeof(int8_t);
   case dwarf::DW_FORM_block2: return Size + sizeof(int16_t);
   case dwarf::DW_FORM_block4: return Size + sizeof(int32_t);
-  case dwarf::DW_FORM_block: return Size + TargetAsmInfo::getULEB128Size(Size);
+  case dwarf::DW_FORM_block: return Size + MCAsmInfo::getULEB128Size(Size);
   default: llvm_unreachable("Improper form for block"); break;
   }
   return 0;
 }
 
-void DIEBlock::Profile(FoldingSetNodeID &ID) {
-  ID.AddInteger(isBlock);
-  DIE::Profile(ID);
-}
-
 #ifndef NDEBUG
-void DIEBlock::print(std::ostream &O) {
+void DIEBlock::print(raw_ostream &O) {
   O << "Blk: ";
   DIE::print(O, 5);
 }

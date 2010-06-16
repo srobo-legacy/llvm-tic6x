@@ -19,9 +19,11 @@
 #define LLVM_FUNCTION_H
 
 #include "llvm/GlobalValue.h"
+#include "llvm/CallingConv.h"
 #include "llvm/BasicBlock.h"
 #include "llvm/Argument.h"
 #include "llvm/Attributes.h"
+#include "llvm/Support/Compiler.h"
 
 namespace llvm {
 
@@ -45,7 +47,7 @@ template<> struct ilist_traits<BasicBlock>
 
   static ValueSymbolTable *getSymTab(Function *ItemParent);
 private:
-  mutable ilist_node<BasicBlock> Sentinel;
+  mutable ilist_half_node<BasicBlock> Sentinel;
 };
 
 template<> struct ilist_traits<Argument>
@@ -62,7 +64,7 @@ template<> struct ilist_traits<Argument>
 
   static ValueSymbolTable *getSymTab(Function *ItemParent);
 private:
-  mutable ilist_node<Argument> Sentinel;
+  mutable ilist_half_node<Argument> Sentinel;
 };
 
 class Function : public GlobalValue,
@@ -85,8 +87,11 @@ private:
   ValueSymbolTable *SymTab;               ///< Symbol table of args/instructions
   AttrListPtr AttributeList;              ///< Parameter attributes
 
+  // HasLazyArguments is stored in Value::SubclassData.
+  /*bool HasLazyArguments;*/
+                   
   // The Calling Convention is stored in Value::SubclassData.
-  /*unsigned CallingConvention;*/
+  /*CallingConv::ID CallingConvention;*/
 
   friend class SymbolTableListTraits<Function, Module>;
 
@@ -97,7 +102,7 @@ private:
   /// needs it.  The hasLazyArguments predicate returns true if the arg list
   /// hasn't been set up yet.
   bool hasLazyArguments() const {
-    return SubclassData & 1;
+    return getSubclassDataFromValue() & 1;
   }
   void CheckLazyArguments() const {
     if (hasLazyArguments())
@@ -147,15 +152,18 @@ public:
   /// The particular intrinsic functions which correspond to this value are
   /// defined in llvm/Intrinsics.h.
   ///
-  unsigned getIntrinsicID() const;
+  unsigned getIntrinsicID() const ATTRIBUTE_READONLY;
   bool isIntrinsic() const { return getIntrinsicID() != 0; }
 
-  /// getCallingConv()/setCallingConv(uint) - These method get and set the
+  /// getCallingConv()/setCallingConv(CC) - These method get and set the
   /// calling convention of this function.  The enum values for the known
   /// calling conventions are defined in CallingConv.h.
-  unsigned getCallingConv() const { return SubclassData >> 1; }
-  void setCallingConv(unsigned CC) {
-    SubclassData = (SubclassData & 1) | (CC << 1);
+  CallingConv::ID getCallingConv() const {
+    return static_cast<CallingConv::ID>(getSubclassDataFromValue() >> 1);
+  }
+  void setCallingConv(CallingConv::ID CC) {
+    setValueSubclassData((getSubclassDataFromValue() & 1) |
+                         (static_cast<unsigned>(CC) << 1));
   }
   
   /// getAttributes - Return the attribute list for this Function.
@@ -403,6 +411,12 @@ public:
   /// hasAddressTaken - returns true if there are any uses of this function
   /// other than direct calls or invokes to it.
   bool hasAddressTaken() const;
+private:
+  // Shadow Value::setValueSubclassData with a private forwarding method so that
+  // subclasses cannot accidentally use it.
+  void setValueSubclassData(unsigned short D) {
+    Value::setValueSubclassData(D);
+  }
 };
 
 inline ValueSymbolTable *

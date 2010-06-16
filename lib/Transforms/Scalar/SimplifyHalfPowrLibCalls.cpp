@@ -22,15 +22,13 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Target/TargetData.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Config/config.h"
 using namespace llvm;
 
 namespace {
   /// This pass optimizes well half_powr function calls.
   ///
-  class VISIBILITY_HIDDEN SimplifyHalfPowrLibCalls : public FunctionPass {
+  class SimplifyHalfPowrLibCalls : public FunctionPass {
     const TargetData *TD;
   public:
     static char ID; // Pass identification
@@ -59,8 +57,9 @@ FunctionPass *llvm::createSimplifyHalfPowrLibCallsPass() {
 /// InlineHalfPowrs - Inline a sequence of adjacent half_powr calls, rearranging
 /// their control flow to better facilitate subsequent optimization.
 Instruction *
-SimplifyHalfPowrLibCalls::InlineHalfPowrs(const std::vector<Instruction *> &HalfPowrs,
-                                        Instruction *InsertPt) {
+SimplifyHalfPowrLibCalls::
+InlineHalfPowrs(const std::vector<Instruction *> &HalfPowrs,
+                Instruction *InsertPt) {
   std::vector<BasicBlock *> Bodies;
   BasicBlock *NewBlock = 0;
 
@@ -69,7 +68,7 @@ SimplifyHalfPowrLibCalls::InlineHalfPowrs(const std::vector<Instruction *> &Half
     Function *Callee = Call->getCalledFunction();
 
     // Minimally sanity-check the CFG of half_powr to ensure that it contains
-    // the the kind of code we expect.  If we're running this pass, we have
+    // the kind of code we expect.  If we're running this pass, we have
     // reason to believe it will be what we expect.
     Function::iterator I = Callee->begin();
     BasicBlock *Prologue = I++;
@@ -89,7 +88,7 @@ SimplifyHalfPowrLibCalls::InlineHalfPowrs(const std::vector<Instruction *> &Half
     if (!isa<ReturnInst>(Body->getTerminator()))
       break;
 
-    Instruction *NextInst = next(BasicBlock::iterator(Call));
+    Instruction *NextInst = llvm::next(BasicBlock::iterator(Call));
 
     // Inline the call, taking care of what code ends up where.
     NewBlock = SplitBlock(NextInst->getParent(), NextInst, this);

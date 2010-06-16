@@ -15,7 +15,6 @@
 
 #include "JIT.h"
 #include "llvm/Module.h"
-#include "llvm/ModuleProvider.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
@@ -25,37 +24,47 @@
 #include "llvm/Target/TargetRegistry.h"
 using namespace llvm;
 
-static cl::opt<std::string>
-MArch("march", cl::desc("Architecture to generate assembly for (see --version)"));
-
-static cl::opt<std::string>
-MCPU("mcpu",
-  cl::desc("Target a specific cpu type (-mcpu=help for details)"),
-  cl::value_desc("cpu-name"),
-  cl::init(""));
-
-static cl::list<std::string>
-MAttrs("mattr",
-  cl::CommaSeparated,
-  cl::desc("Target specific attributes (-mattr=help for details)"),
-  cl::value_desc("a1,+a2,-a3,..."));
-
 /// selectTarget - Pick a target either via -march or by guessing the native
 /// arch.  Add any CPU features specified via -mcpu or -mattr.
-TargetMachine *JIT::selectTarget(ModuleProvider *MP, std::string *ErrorStr) {
-  Triple TheTriple(sys::getHostTriple());
+TargetMachine *JIT::selectTarget(Module *Mod,
+                                 StringRef MArch,
+                                 StringRef MCPU,
+                                 const SmallVectorImpl<std::string>& MAttrs,
+                                 std::string *ErrorStr) {
+  Triple TheTriple(Mod->getTargetTriple());
+  if (TheTriple.getTriple().empty())
+    TheTriple.setTriple(sys::getHostTriple());
 
   // Adjust the triple to match what the user requested.
-  if (!MArch.empty())
-    TheTriple.setArch(Triple::getArchTypeForLLVMName(MArch));
+  const Target *TheTarget = 0;
+  if (!MArch.empty()) {
+    for (TargetRegistry::iterator it = TargetRegistry::begin(),
+           ie = TargetRegistry::end(); it != ie; ++it) {
+      if (MArch == it->getName()) {
+        TheTarget = &*it;
+        break;
+      }
+    }
 
-  std::string Error;
-  const Target *TheTarget =
-    TargetRegistry::lookupTarget(TheTriple.getTriple(), Error);
-  if (TheTarget == 0) {
-    if (ErrorStr)
-      *ErrorStr = Error;
-    return 0;
+    if (!TheTarget) {
+      *ErrorStr = "No available targets are compatible with this -march, "
+        "see -version for the available targets.\n";
+      return 0;
+    }
+
+    // Adjust the triple to match (if known), otherwise stick with the
+    // module/host triple.
+    Triple::ArchType Type = Triple::getArchTypeForLLVMName(MArch);
+    if (Type != Triple::UnknownArch)
+      TheTriple.setArch(Type);
+  } else {
+    std::string Error;
+    TheTarget = TargetRegistry::lookupTarget(TheTriple.getTriple(), Error);
+    if (TheTarget == 0) {
+      if (ErrorStr)
+        *ErrorStr = Error;
+      return 0;
+    }
   }
 
   if (!TheTarget->hasJIT()) {

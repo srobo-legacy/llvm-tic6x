@@ -21,17 +21,19 @@ namespace llvm {
 
 class MSP430TargetMachine;
 
-namespace MSP430 {
-  // MSP430 specific condition code.
-  enum CondCode {
-    COND_E  = 0,  // aka COND_Z
-    COND_NE = 1,  // aka COND_NZ
-    COND_HS = 2,  // aka COND_C
-    COND_LO = 3,  // aka COND_NC
-    COND_GE = 4,
-    COND_L  = 5,
+/// MSP430II - This namespace holds all of the target specific flags that
+/// instruction info tracks.
+///
+namespace MSP430II {
+  enum {
+    SizeShift   = 2,
+    SizeMask    = 7 << SizeShift,
 
-    COND_INVALID
+    SizeUnknown = 0 << SizeShift,
+    SizeSpecial = 1 << SizeShift,
+    Size2Bytes  = 2 << SizeShift,
+    Size4Bytes  = 3 << SizeShift,
+    Size6Bytes  = 4 << SizeShift
   };
 }
 
@@ -73,9 +75,20 @@ public:
                                            MachineBasicBlock::iterator MI,
                                  const std::vector<CalleeSavedInfo> &CSI) const;
 
-  virtual unsigned InsertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
-                                MachineBasicBlock *FBB,
-                             const SmallVectorImpl<MachineOperand> &Cond) const;
+  unsigned GetInstSizeInBytes(const MachineInstr *MI) const;
+
+  // Branch folding goodness
+  bool ReverseBranchCondition(SmallVectorImpl<MachineOperand> &Cond) const;
+  bool isUnpredicatedTerminator(const MachineInstr *MI) const;
+  bool AnalyzeBranch(MachineBasicBlock &MBB,
+                     MachineBasicBlock *&TBB, MachineBasicBlock *&FBB,
+                     SmallVectorImpl<MachineOperand> &Cond,
+                     bool AllowModify) const;
+
+  unsigned RemoveBranch(MachineBasicBlock &MBB) const;
+  unsigned InsertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
+                        MachineBasicBlock *FBB,
+                        const SmallVectorImpl<MachineOperand> &Cond) const;
 
 };
 

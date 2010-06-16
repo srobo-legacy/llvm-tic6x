@@ -16,7 +16,6 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ManagedStatic.h"
-#include "llvm/Support/Streams.h"
 #include "llvm/System/Mutex.h"
 #include "llvm/System/Threading.h"
 #include "llvm/Value.h"
@@ -37,7 +36,6 @@ void LeakDetector::addGarbageObjectImpl(void *Object) {
 
 void LeakDetector::addGarbageObjectImpl(const Value *Object) {
   LLVMContextImpl *pImpl = Object->getContext().pImpl;
-  sys::SmartScopedLock<true> Lock(pImpl->LLVMObjectsLock);
   pImpl->LLVMObjects.addGarbage(Object);
 }
 
@@ -48,7 +46,6 @@ void LeakDetector::removeGarbageObjectImpl(void *Object) {
 
 void LeakDetector::removeGarbageObjectImpl(const Value *Object) {
   LLVMContextImpl *pImpl = Object->getContext().pImpl;
-  sys::SmartScopedLock<true> Lock(pImpl->LLVMObjectsLock);
   pImpl->LLVMObjects.removeGarbage(Object);
 }
 
@@ -56,7 +53,6 @@ void LeakDetector::checkForGarbageImpl(LLVMContext &Context,
                                        const std::string &Message) {
   LLVMContextImpl *pImpl = Context.pImpl;
   sys::SmartScopedLock<true> Lock(*ObjectsLock);
-  sys::SmartScopedLock<true> CLock(pImpl->LLVMObjectsLock);
   
   Objects->setName("GENERIC");
   pImpl->LLVMObjects.setName("LLVM");
@@ -64,8 +60,8 @@ void LeakDetector::checkForGarbageImpl(LLVMContext &Context,
   // use non-short-circuit version so that both checks are performed
   if (Objects->hasGarbage(Message) |
       pImpl->LLVMObjects.hasGarbage(Message))
-    cerr << "\nThis is probably because you removed an object, but didn't "
-         << "delete it.  Please check your code for memory leaks.\n";
+    errs() << "\nThis is probably because you removed an object, but didn't "
+           << "delete it.  Please check your code for memory leaks.\n";
 
   // Clear out results so we don't get duplicate warnings on
   // next call...

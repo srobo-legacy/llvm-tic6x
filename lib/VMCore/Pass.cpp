@@ -16,9 +16,12 @@
 #include "llvm/Pass.h"
 #include "llvm/PassManager.h"
 #include "llvm/Module.h"
-#include "llvm/ModuleProvider.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringMap.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/ManagedStatic.h"
+#include "llvm/Support/PassNameParser.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/System/Atomic.h"
 #include "llvm/System/Mutex.h"
 #include "llvm/System/Threading.h"
@@ -39,13 +42,17 @@ Pass::~Pass() {
 // Force out-of-line virtual method.
 ModulePass::~ModulePass() { }
 
+PassManagerType ModulePass::getPotentialPassManagerType() const {
+  return PMT_ModulePassManager;
+}
+
 bool Pass::mustPreserveAnalysisID(const PassInfo *AnalysisID) const {
   return Resolver->getAnalysisIfAvailable(AnalysisID, true) != 0;
 }
 
 // dumpPassStructure - Implement the -debug-passes=Structure option
 void Pass::dumpPassStructure(unsigned Offset) {
-  cerr << std::string(Offset*2, ' ') << getPassName() << "\n";
+  dbgs().indent(Offset*2) << getPassName() << "\n";
 }
 
 /// getPassName - Return a nice clean name for a pass.  This usually
@@ -58,17 +65,38 @@ const char *Pass::getPassName() const {
   return "Unnamed pass: implement Pass::getPassName()";
 }
 
+void Pass::preparePassManager(PMStack &) {
+  // By default, don't do anything.
+}
+
+PassManagerType Pass::getPotentialPassManagerType() const {
+  // Default implementation.
+  return PMT_Unknown; 
+}
+
+void Pass::getAnalysisUsage(AnalysisUsage &) const {
+  // By default, no analysis results are used, all are invalidated.
+}
+
+void Pass::releaseMemory() {
+  // By default, don't do anything.
+}
+
+void Pass::verifyAnalysis() const {
+  // By default, don't do anything.
+}
+
 // print - Print out the internal state of the pass.  This is called by Analyze
 // to print out the contents of an analysis.  Otherwise it is not necessary to
 // implement this method.
 //
-void Pass::print(std::ostream &O,const Module*) const {
+void Pass::print(raw_ostream &O,const Module*) const {
   O << "Pass::print not implemented for pass: '" << getPassName() << "'!\n";
 }
 
 // dump - call print(cerr);
 void Pass::dump() const {
-  print(*cerr.stream(), 0);
+  print(dbgs(), 0);
 }
 
 //===----------------------------------------------------------------------===//
@@ -76,6 +104,10 @@ void Pass::dump() const {
 //
 // Force out-of-line virtual method.
 ImmutablePass::~ImmutablePass() { }
+
+void ImmutablePass::initializePass() {
+  // By default, don't do anything.
+}
 
 //===----------------------------------------------------------------------===//
 // FunctionPass Implementation
@@ -105,6 +137,20 @@ bool FunctionPass::run(Function &F) {
   return Changed | doFinalization(*F.getParent());
 }
 
+bool FunctionPass::doInitialization(Module &) {
+  // By default, don't do anything.
+  return false;
+}
+
+bool FunctionPass::doFinalization(Module &) {
+  // By default, don't do anything.
+  return false;
+}
+
+PassManagerType FunctionPass::getPotentialPassManagerType() const {
+  return PMT_FunctionPassManager;
+}
+
 //===----------------------------------------------------------------------===//
 // BasicBlockPass Implementation
 //
@@ -119,21 +165,49 @@ bool BasicBlockPass::runOnFunction(Function &F) {
   return Changed | doFinalization(F);
 }
 
+bool BasicBlockPass::doInitialization(Module &) {
+  // By default, don't do anything.
+  return false;
+}
+
+bool BasicBlockPass::doInitialization(Function &) {
+  // By default, don't do anything.
+  return false;
+}
+
+bool BasicBlockPass::doFinalization(Function &) {
+  // By default, don't do anything.
+  return false;
+}
+
+bool BasicBlockPass::doFinalization(Module &) {
+  // By default, don't do anything.
+  return false;
+}
+
+PassManagerType BasicBlockPass::getPotentialPassManagerType() const {
+  return PMT_BasicBlockPassManager; 
+}
+
 //===----------------------------------------------------------------------===//
 // Pass Registration mechanism
 //
 namespace {
 class PassRegistrar {
+  /// Guards the contents of this class.
+  mutable sys::SmartMutex<true> Lock;
+
   /// PassInfoMap - Keep track of the passinfo object for each registered llvm
   /// pass.
   typedef std::map<intptr_t, const PassInfo*> MapType;
   MapType PassInfoMap;
+
+  typedef StringMap<const PassInfo*> StringMapType;
+  StringMapType PassInfoStringMap;
   
   /// AnalysisGroupInfo - Keep track of information for each analysis group.
   struct AnalysisGroupInfo {
-    const PassInfo *DefaultImpl;
     std::set<const PassInfo *> Implementations;
-    AnalysisGroupInfo() : DefaultImpl(0) {}
   };
   
   /// AnalysisGroupInfoMap - Information for each analysis group.
@@ -142,25 +216,37 @@ class PassRegistrar {
 public:
   
   const PassInfo *GetPassInfo(intptr_t TI) const {
+    sys::SmartScopedLock<true> Guard(Lock);
     MapType::const_iterator I = PassInfoMap.find(TI);
     return I != PassInfoMap.end() ? I->second : 0;
   }
   
+  const PassInfo *GetPassInfo(StringRef Arg) const {
+    sys::SmartScopedLock<true> Guard(Lock);
+    StringMapType::const_iterator I = PassInfoStringMap.find(Arg);
+    return I != PassInfoStringMap.end() ? I->second : 0;
+  }
+  
   void RegisterPass(const PassInfo &PI) {
+    sys::SmartScopedLock<true> Guard(Lock);
     bool Inserted =
       PassInfoMap.insert(std::make_pair(PI.getTypeInfo(),&PI)).second;
     assert(Inserted && "Pass registered multiple times!"); Inserted=Inserted;
+    PassInfoStringMap[PI.getPassArgument()] = &PI;
   }
   
   void UnregisterPass(const PassInfo &PI) {
+    sys::SmartScopedLock<true> Guard(Lock);
     MapType::iterator I = PassInfoMap.find(PI.getTypeInfo());
     assert(I != PassInfoMap.end() && "Pass registered but not in map!");
     
     // Remove pass from the map.
     PassInfoMap.erase(I);
+    PassInfoStringMap.erase(PI.getPassArgument());
   }
   
   void EnumerateWith(PassRegistrationListener *L) {
+    sys::SmartScopedLock<true> Guard(Lock);
     for (MapType::const_iterator I = PassInfoMap.begin(),
          E = PassInfoMap.end(); I != E; ++I)
       L->passEnumerate(I->second);
@@ -171,16 +257,16 @@ public:
   void RegisterAnalysisGroup(PassInfo *InterfaceInfo,
                              const PassInfo *ImplementationInfo,
                              bool isDefault) {
+    sys::SmartScopedLock<true> Guard(Lock);
     AnalysisGroupInfo &AGI = AnalysisGroupInfoMap[InterfaceInfo];
     assert(AGI.Implementations.count(ImplementationInfo) == 0 &&
            "Cannot add a pass to the same analysis group more than once!");
     AGI.Implementations.insert(ImplementationInfo);
     if (isDefault) {
-      assert(AGI.DefaultImpl == 0 && InterfaceInfo->getNormalCtor() == 0 &&
+      assert(InterfaceInfo->getNormalCtor() == 0 &&
              "Default implementation for analysis group already specified!");
       assert(ImplementationInfo->getNormalCtor() &&
            "Cannot specify pass as default if it does not have a default ctor");
-      AGI.DefaultImpl = ImplementationInfo;
       InterfaceInfo->setNormalCtor(ImplementationInfo->getNormalCtor());
     }
   }
@@ -229,6 +315,10 @@ const PassInfo *Pass::lookupPassInfo(intptr_t TI) {
   return getPassRegistrar()->GetPassInfo(TI);
 }
 
+const PassInfo *Pass::lookupPassInfo(StringRef Arg) {
+  return getPassRegistrar()->GetPassInfo(Arg);
+}
+
 void PassInfo::registerPass() {
   getPassRegistrar()->RegisterPass(*this);
 
@@ -252,10 +342,10 @@ void PassInfo::unregisterPass() {
 //
 RegisterAGBase::RegisterAGBase(const char *Name, intptr_t InterfaceID,
                                intptr_t PassID, bool isDefault)
-  : PassInfo(Name, InterfaceID),
-    ImplementationInfo(0), isDefaultImplementation(isDefault) {
+  : PassInfo(Name, InterfaceID) {
 
-  InterfaceInfo = const_cast<PassInfo*>(Pass::lookupPassInfo(InterfaceID));
+  PassInfo *InterfaceInfo =
+    const_cast<PassInfo*>(Pass::lookupPassInfo(InterfaceID));
   if (InterfaceInfo == 0) {
     // First reference to Interface, register it now.
     registerPass();
@@ -265,7 +355,7 @@ RegisterAGBase::RegisterAGBase(const char *Name, intptr_t InterfaceID,
          "Trying to join an analysis group that is a normal pass!");
 
   if (PassID) {
-    ImplementationInfo = Pass::lookupPassInfo(PassID);
+    const PassInfo *ImplementationInfo = Pass::lookupPassInfo(PassID);
     assert(ImplementationInfo &&
            "Must register pass before adding to AnalysisGroup!");
 
@@ -312,6 +402,8 @@ PassRegistrationListener::~PassRegistrationListener() {
 void PassRegistrationListener::enumeratePasses() {
   getPassRegistrar()->EnumerateWith(this);
 }
+
+PassNameParser::~PassNameParser() {}
 
 //===----------------------------------------------------------------------===//
 //   AnalysisUsage Class Implementation

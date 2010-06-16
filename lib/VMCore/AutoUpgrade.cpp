@@ -16,8 +16,7 @@
 #include "llvm/Function.h"
 #include "llvm/LLVMContext.h"
 #include "llvm/Module.h"
-#include "llvm/Instructions.h"
-#include "llvm/Intrinsics.h"
+#include "llvm/IntrinsicInst.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <cstring>
@@ -117,6 +116,31 @@ static bool UpgradeIntrinsicFunction1(Function *F, Function *&NewFn) {
                                                     FTy->getParamType(0),
                                                     FTy->getParamType(0),
                                                     (Type *)0));
+      return true;
+    }
+    break;
+
+  case 'e':
+    //  The old llvm.eh.selector.i32 is equivalent to the new llvm.eh.selector.
+    if (Name.compare("llvm.eh.selector.i32") == 0) {
+      F->setName("llvm.eh.selector");
+      NewFn = F;
+      return true;
+    }
+    //  The old llvm.eh.typeid.for.i32 is equivalent to llvm.eh.typeid.for.
+    if (Name.compare("llvm.eh.typeid.for.i32") == 0) {
+      F->setName("llvm.eh.typeid.for");
+      NewFn = F;
+      return true;
+    }
+    //  Convert the old llvm.eh.selector.i64 to a call to llvm.eh.selector.
+    if (Name.compare("llvm.eh.selector.i64") == 0) {
+      NewFn = Intrinsic::getDeclaration(M, Intrinsic::eh_selector);
+      return true;
+    }
+    //  Convert the old llvm.eh.typeid.for.i64 to a call to llvm.eh.typeid.for.
+    if (Name.compare("llvm.eh.typeid.for.i64") == 0) {
+      NewFn = Intrinsic::getDeclaration(M, Intrinsic::eh_typeid_for);
       return true;
     }
     break;
@@ -266,7 +290,7 @@ void llvm::UpgradeIntrinsicCall(CallInst *CI, Function *NewFn) {
       if (isLoadH || isLoadL) {
         Value *Op1 = UndefValue::get(Op0->getType());
         Value *Addr = new BitCastInst(CI->getOperand(2), 
-                                  PointerType::getUnqual(Type::getDoubleTy(C)),
+                                  Type::getDoublePtrTy(C),
                                       "upgraded.", CI);
         Value *Load = new LoadInst(Addr, "upgraded.", false, 8, CI);
         Value *Idx = ConstantInt::get(Type::getInt32Ty(C), 0);
@@ -410,6 +434,27 @@ void llvm::UpgradeIntrinsicCall(CallInst *CI, Function *NewFn) {
     CI->eraseFromParent();
   }
   break;
+  case Intrinsic::eh_selector:
+  case Intrinsic::eh_typeid_for: {
+    // Only the return type changed.
+    SmallVector<Value*, 8> Operands(CI->op_begin() + 1, CI->op_end());
+    CallInst *NewCI = CallInst::Create(NewFn, Operands.begin(), Operands.end(),
+                                       "upgraded." + CI->getName(), CI);
+    NewCI->setTailCall(CI->isTailCall());
+    NewCI->setCallingConv(CI->getCallingConv());
+
+    //  Handle any uses of the old CallInst.
+    if (!CI->use_empty()) {
+      //  Construct an appropriate cast from the new return type to the old.
+      CastInst *RetCast =
+        CastInst::Create(CastInst::getCastOpcode(NewCI, true,
+                                                 F->getReturnType(), true),
+                         NewCI, F->getReturnType(), NewCI->getName(), CI);
+      CI->replaceAllUsesWith(RetCast);
+    }
+    CI->eraseFromParent();
+  }
+  break;
   }
 }
 
@@ -431,6 +476,58 @@ void llvm::UpgradeCallsToIntrinsic(Function* F) {
       }
       // Remove old function, no longer used, from the module.
       F->eraseFromParent();
+    }
+  }
+}
+
+/// This function strips all debug info intrinsics, except for llvm.dbg.declare.
+/// If an llvm.dbg.declare intrinsic is invalid, then this function simply
+/// strips that use.
+void llvm::CheckDebugInfoIntrinsics(Module *M) {
+
+
+  if (Function *FuncStart = M->getFunction("llvm.dbg.func.start")) {
+    while (!FuncStart->use_empty()) {
+      CallInst *CI = cast<CallInst>(FuncStart->use_back());
+      CI->eraseFromParent();
+    }
+    FuncStart->eraseFromParent();
+  }
+  
+  if (Function *StopPoint = M->getFunction("llvm.dbg.stoppoint")) {
+    while (!StopPoint->use_empty()) {
+      CallInst *CI = cast<CallInst>(StopPoint->use_back());
+      CI->eraseFromParent();
+    }
+    StopPoint->eraseFromParent();
+  }
+
+  if (Function *RegionStart = M->getFunction("llvm.dbg.region.start")) {
+    while (!RegionStart->use_empty()) {
+      CallInst *CI = cast<CallInst>(RegionStart->use_back());
+      CI->eraseFromParent();
+    }
+    RegionStart->eraseFromParent();
+  }
+
+  if (Function *RegionEnd = M->getFunction("llvm.dbg.region.end")) {
+    while (!RegionEnd->use_empty()) {
+      CallInst *CI = cast<CallInst>(RegionEnd->use_back());
+      CI->eraseFromParent();
+    }
+    RegionEnd->eraseFromParent();
+  }
+  
+  if (Function *Declare = M->getFunction("llvm.dbg.declare")) {
+    if (!Declare->use_empty()) {
+      DbgDeclareInst *DDI = cast<DbgDeclareInst>(Declare->use_back());
+      if (!isa<MDNode>(DDI->getOperand(1)) ||!isa<MDNode>(DDI->getOperand(2))) {
+        while (!Declare->use_empty()) {
+          CallInst *CI = cast<CallInst>(Declare->use_back());
+          CI->eraseFromParent();
+        }
+        Declare->eraseFromParent();
+      }
     }
   }
 }

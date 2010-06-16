@@ -13,12 +13,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/LLVMContext.h"
+#include "llvm/Metadata.h"
 #include "llvm/Constants.h"
 #include "llvm/Instruction.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "LLVMContextImpl.h"
-#include <set>
-
 using namespace llvm;
 
 static ManagedStatic<LLVMContext> GlobalContext;
@@ -43,26 +42,3 @@ GetElementPtrConstantExpr::GetElementPtrConstantExpr
     OperandList[i+1] = IdxList[i];
 }
 
-bool LLVMContext::RemoveDeadMetadata() {
-  std::vector<const MDNode *> DeadMDNodes;
-  bool Changed = false;
-  while (1) {
-
-    for (LLVMContextImpl::MDNodeMapTy::MapTy::iterator
-           I = pImpl->MDNodes.map_begin(),
-           E = pImpl->MDNodes.map_end(); I != E; ++I) {
-      const MDNode *N = cast<MDNode>(I->second);
-      if (N->use_empty()) 
-        DeadMDNodes.push_back(N);
-    }
-    
-    if (DeadMDNodes.empty())
-      return Changed;
-
-    while (!DeadMDNodes.empty()) {
-      const MDNode *N = DeadMDNodes.back(); DeadMDNodes.pop_back();
-      delete N;
-    }
-  }
-  return Changed;
-}

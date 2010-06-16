@@ -58,7 +58,7 @@ struct constantint_ty {
     if (const ConstantInt *CI = dyn_cast<ConstantInt>(V)) {
       const APInt &CIV = CI->getValue();
       if (Val >= 0)
-        return CIV == Val;
+        return CIV == static_cast<uint64_t>(Val);
       // If Val is negative, and CI is shorter than it, truncate to the right
       // number of bits.  If it is larger, then we have to sign extend.  Just
       // compare their negated values.
@@ -87,6 +87,18 @@ struct zero_ty {
 /// m_Zero() - Match an arbitrary zero/null constant.
 inline zero_ty m_Zero() { return zero_ty(); }
 
+struct one_ty {
+  template<typename ITy>
+  bool match(ITy *V) {
+    if (const ConstantInt *C = dyn_cast<ConstantInt>(V))
+      return C->isOne();
+    return false;
+  }
+};
+
+/// m_One() - Match a an integer 1.
+inline one_ty m_One() { return one_ty(); }
+  
 
 template<typename Class>
 struct bind_ty {
@@ -411,7 +423,7 @@ m_Select(const Cond &C, const LHS &L, const RHS &R) {
 }
 
 /// m_SelectCst - This matches a select of two constants, e.g.:
-///    m_SelectCst(m_Value(V), -1, 0)
+///    m_SelectCst<-1, 0>(m_Value(V))
 template<int64_t L, int64_t R, typename Cond>
 inline SelectClass_match<Cond, constantint_ty<L>, constantint_ty<R> >
 m_SelectCst(const Cond &C) {
@@ -425,7 +437,7 @@ m_SelectCst(const Cond &C) {
 // Matchers for CastInst classes
 //
 
-template<typename Op_t, typename Class>
+template<typename Op_t, unsigned Opcode>
 struct CastClass_match {
   Op_t Op;
 
@@ -433,17 +445,42 @@ struct CastClass_match {
 
   template<typename OpTy>
   bool match(OpTy *V) {
-    if (Class *I = dyn_cast<Class>(V))
-      return Op.match(I->getOperand(0));
+    if (CastInst *I = dyn_cast<CastInst>(V))
+      return I->getOpcode() == Opcode && Op.match(I->getOperand(0));
+    if (ConstantExpr *CE = dyn_cast<ConstantExpr>(V))
+      return CE->getOpcode() == Opcode && Op.match(CE->getOperand(0));
     return false;
   }
 };
 
-template<typename Class, typename OpTy>
-inline CastClass_match<OpTy, Class> m_Cast(const OpTy &Op) {
-  return CastClass_match<OpTy, Class>(Op);
+/// m_PtrToInt
+template<typename OpTy>
+inline CastClass_match<OpTy, Instruction::PtrToInt>
+m_PtrToInt(const OpTy &Op) {
+  return CastClass_match<OpTy, Instruction::PtrToInt>(Op);
 }
 
+/// m_Trunc
+template<typename OpTy>
+inline CastClass_match<OpTy, Instruction::Trunc>
+m_Trunc(const OpTy &Op) {
+  return CastClass_match<OpTy, Instruction::Trunc>(Op);
+}
+
+/// m_SExt
+template<typename OpTy>
+inline CastClass_match<OpTy, Instruction::SExt>
+m_SExt(const OpTy &Op) {
+  return CastClass_match<OpTy, Instruction::SExt>(Op);
+}
+
+/// m_ZExt
+template<typename OpTy>
+inline CastClass_match<OpTy, Instruction::ZExt>
+m_ZExt(const OpTy &Op) {
+  return CastClass_match<OpTy, Instruction::ZExt>(Op);
+}
+  
 
 //===----------------------------------------------------------------------===//
 // Matchers for unary operators

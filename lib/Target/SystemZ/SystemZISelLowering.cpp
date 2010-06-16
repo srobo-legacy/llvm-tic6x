@@ -30,10 +30,12 @@
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/PseudoSourceValue.h"
 #include "llvm/CodeGen/SelectionDAGISel.h"
+#include "llvm/CodeGen/TargetLoweringObjectFileImpl.h"
 #include "llvm/CodeGen/ValueTypes.h"
 #include "llvm/Target/TargetOptions.h"
-#include "llvm/Target/TargetLoweringObjectFile.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/VectorExtras.h"
 using namespace llvm;
 
@@ -52,11 +54,6 @@ SystemZTargetLowering::SystemZTargetLowering(SystemZTargetMachine &tm) :
   if (!UseSoftFloat) {
     addRegisterClass(MVT::f32, SystemZ::FP32RegisterClass);
     addRegisterClass(MVT::f64, SystemZ::FP64RegisterClass);
-
-    addLegalFPImmediate(APFloat(+0.0));  // lzer
-    addLegalFPImmediate(APFloat(+0.0f)); // lzdr
-    addLegalFPImmediate(APFloat(-0.0));  // lzer + lner
-    addLegalFPImmediate(APFloat(-0.0f)); // lzdr + lndr
   }
 
   // Compute derived properties from the register classes
@@ -79,7 +76,13 @@ SystemZTargetLowering::SystemZTargetLowering(SystemZTargetMachine &tm) :
   setLoadExtAction(ISD::EXTLOAD,  MVT::f64, Expand);
 
   setStackPointerRegisterToSaveRestore(SystemZ::R15D);
-  setSchedulingPreference(SchedulingForLatency);
+
+  // TODO: It may be better to default to latency-oriented scheduling, however
+  // LLVM's current latency-oriented scheduler can't handle physreg definitions
+  // such as SystemZ has with PSW, so set this to the register-pressure
+  // scheduler, because it can.
+  setSchedulingPreference(SchedulingForRegPressure);
+
   setBooleanContents(ZeroOrOneBooleanContent);
 
   setOperationAction(ISD::BR_JT,            MVT::Other, Expand);
@@ -168,6 +171,17 @@ SDValue SystemZTargetLowering::LowerOperation(SDValue Op, SelectionDAG &DAG) {
   }
 }
 
+bool SystemZTargetLowering::isFPImmLegal(const APFloat &Imm, EVT VT) const {
+  if (UseSoftFloat || (VT != MVT::f32 && VT != MVT::f64))
+    return false;
+
+  // +0.0  lzer
+  // +0.0f lzdr
+  // -0.0  lzer + lner
+  // -0.0f lzdr + lndr
+  return Imm.isZero() || Imm.isNegZero();
+}
+
 //===----------------------------------------------------------------------===//
 //                       SystemZ Inline Assembly Support
 //===----------------------------------------------------------------------===//
@@ -216,7 +230,7 @@ getRegForInlineAsmConstraint(const std::string &Constraint,
 
 SDValue
 SystemZTargetLowering::LowerFormalArguments(SDValue Chain,
-                                            unsigned CallConv,
+                                            CallingConv::ID CallConv,
                                             bool isVarArg,
                                             const SmallVectorImpl<ISD::InputArg>
                                               &Ins,
@@ -235,12 +249,14 @@ SystemZTargetLowering::LowerFormalArguments(SDValue Chain,
 
 SDValue
 SystemZTargetLowering::LowerCall(SDValue Chain, SDValue Callee,
-                                 unsigned CallConv, bool isVarArg,
-                                 bool isTailCall,
+                                 CallingConv::ID CallConv, bool isVarArg,
+                                 bool &isTailCall,
                                  const SmallVectorImpl<ISD::OutputArg> &Outs,
                                  const SmallVectorImpl<ISD::InputArg> &Ins,
                                  DebugLoc dl, SelectionDAG &DAG,
                                  SmallVectorImpl<SDValue> &InVals) {
+  // SystemZ target does not yet support tail call optimization.
+  isTailCall = false;
 
   switch (CallConv) {
   default:
@@ -258,7 +274,7 @@ SystemZTargetLowering::LowerCall(SDValue Chain, SDValue Callee,
 // FIXME: varargs
 SDValue
 SystemZTargetLowering::LowerCCCArguments(SDValue Chain,
-                                         unsigned CallConv,
+                                         CallingConv::ID CallConv,
                                          bool isVarArg,
                                          const SmallVectorImpl<ISD::InputArg>
                                            &Ins,
@@ -289,7 +305,7 @@ SystemZTargetLowering::LowerCCCArguments(SDValue Chain,
       switch (LocVT.getSimpleVT().SimpleTy) {
       default:
 #ifndef NDEBUG
-        cerr << "LowerFormalArguments Unhandled argument type: "
+        errs() << "LowerFormalArguments Unhandled argument type: "
              << LocVT.getSimpleVT().SimpleTy
              << "\n";
 #endif
@@ -315,13 +331,14 @@ SystemZTargetLowering::LowerCCCArguments(SDValue Chain,
       // Create the nodes corresponding to a load from this parameter slot.
       // Create the frame index object for this incoming parameter...
       int FI = MFI->CreateFixedObject(LocVT.getSizeInBits()/8,
-                                      VA.getLocMemOffset());
+                                      VA.getLocMemOffset(), true, false);
 
       // Create the SelectionDAG nodes corresponding to a load
       // from this parameter
       SDValue FIN = DAG.getFrameIndex(FI, getPointerTy());
       ArgValue = DAG.getLoad(LocVT, dl, Chain, FIN,
-                             PseudoSourceValue::getFixedStack(FI), 0);
+                             PseudoSourceValue::getFixedStack(FI), 0,
+                             false, false, 0);
     }
 
     // If this is an 8/16/32-bit value, it is really passed promoted to 64
@@ -348,7 +365,7 @@ SystemZTargetLowering::LowerCCCArguments(SDValue Chain,
 /// TODO: sret.
 SDValue
 SystemZTargetLowering::LowerCCCCallTo(SDValue Chain, SDValue Callee,
-                                      unsigned CallConv, bool isVarArg,
+                                      CallingConv::ID CallConv, bool isVarArg,
                                       bool isTailCall,
                                       const SmallVectorImpl<ISD::OutputArg>
                                         &Outs,
@@ -419,7 +436,8 @@ SystemZTargetLowering::LowerCCCCallTo(SDValue Chain, SDValue Callee,
                                    DAG.getIntPtrConstant(Offset));
 
       MemOpChains.push_back(DAG.getStore(Chain, dl, Arg, PtrOff,
-                                         PseudoSourceValue::getStack(), Offset));
+                                         PseudoSourceValue::getStack(), Offset,
+                                         false, false, 0));
     }
   }
 
@@ -483,7 +501,7 @@ SystemZTargetLowering::LowerCCCCallTo(SDValue Chain, SDValue Callee,
 ///
 SDValue
 SystemZTargetLowering::LowerCallResult(SDValue Chain, SDValue InFlag,
-                                       unsigned CallConv, bool isVarArg,
+                                       CallingConv::ID CallConv, bool isVarArg,
                                        const SmallVectorImpl<ISD::InputArg>
                                          &Ins,
                                        DebugLoc dl, SelectionDAG &DAG,
@@ -527,7 +545,7 @@ SystemZTargetLowering::LowerCallResult(SDValue Chain, SDValue InFlag,
 
 SDValue
 SystemZTargetLowering::LowerReturn(SDValue Chain,
-                                   unsigned CallConv, bool isVarArg,
+                                   CallingConv::ID CallConv, bool isVarArg,
                                    const SmallVectorImpl<ISD::OutputArg> &Outs,
                                    DebugLoc dl, SelectionDAG &DAG) {
 
@@ -656,7 +674,7 @@ SDValue SystemZTargetLowering::EmitCmp(SDValue LHS, SDValue RHS,
 
   DebugLoc dl = LHS.getDebugLoc();
   return DAG.getNode((isUnsigned ? SystemZISD::UCMP : SystemZISD::CMP),
-                     dl, MVT::Flag, LHS, RHS);
+                     dl, MVT::i64, LHS, RHS);
 }
 
 
@@ -722,7 +740,7 @@ SDValue SystemZTargetLowering::LowerGlobalAddress(SDValue Op,
 
   if (ExtraLoadRequired)
     Result = DAG.getLoad(getPointerTy(), dl, DAG.getEntryNode(), Result,
-                         PseudoSourceValue::getGOT(), 0);
+                         PseudoSourceValue::getGOT(), 0, false, false, 0);
 
   // If there was a non-zero offset that we didn't fold, create an explicit
   // addition for it.
@@ -777,7 +795,8 @@ const char *SystemZTargetLowering::getTargetNodeName(unsigned Opcode) const {
 
 MachineBasicBlock*
 SystemZTargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
-                                                   MachineBasicBlock *BB) const {
+                                                   MachineBasicBlock *BB,
+                   DenseMap<MachineBasicBlock*, MachineBasicBlock*> *EM) const {
   const SystemZInstrInfo &TII = *TM.getInstrInfo();
   DebugLoc dl = MI->getDebugLoc();
   assert((MI->getOpcode() == SystemZ::Select32  ||
@@ -808,6 +827,10 @@ SystemZTargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
   BuildMI(BB, dl, TII.getBrCond(CC)).addMBB(copy1MBB);
   F->insert(I, copy0MBB);
   F->insert(I, copy1MBB);
+  // Inform sdisel of the edge changes.
+  for (MachineBasicBlock::succ_iterator SI = BB->succ_begin(), 
+         SE = BB->succ_end(); SI != SE; ++SI)
+    EM->insert(std::make_pair(*SI, copy1MBB));
   // Update machine-CFG edges by transferring all successors of the current
   // block to the new block which will contain the Phi node for the select.
   copy1MBB->transferSuccessors(BB);

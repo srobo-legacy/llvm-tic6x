@@ -1,6 +1,5 @@
-; RUN: llvm-as < %s | \
-; RUN:   llc -mtriple=x86_64-pc-linux -relocation-model=pic -o %t1 -f
-; RUN: grep {call	__fixunsxfti@PLT} %t1
+; RUN: llc < %s -mtriple=x86_64-pc-linux -relocation-model=pic -o %t1
+; RUN: grep {callq	__fixunsxfti@PLT} %t1
 
 define i128 @f(x86_fp80 %a) nounwind {
 entry:

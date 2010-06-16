@@ -9,7 +9,7 @@
 
 #include "gtest/gtest.h"
 #include "llvm/ADT/StringMap.h"
-#include "llvm/Support/DataTypes.h"
+#include "llvm/System/DataTypes.h"
 using namespace llvm;
 
 namespace {
@@ -191,6 +191,7 @@ TEST_F(StringMapTest, StringMapEntryTest) {
           testKeyFirst, testKeyFirst + testKeyLength, 1u);
   EXPECT_STREQ(testKey, entry->first());
   EXPECT_EQ(1u, entry->second);
+  free(entry);
 }
 
 // Test insert() method.

@@ -18,10 +18,12 @@
 
 #define DEBUG_TYPE "oprofile-jit-event-listener"
 #include "llvm/Function.h"
+#include "llvm/Metadata.h"
 #include "llvm/Analysis/DebugInfo.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/ExecutionEngine/JITEventListener.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/ValueHandle.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/System/Errno.h"
 #include "llvm/Config/config.h"
@@ -43,16 +45,16 @@ public:
   virtual void NotifyFunctionEmitted(const Function &F,
                                      void *FnStart, size_t FnSize,
                                      const EmittedFunctionDetails &Details);
-  virtual void NotifyFreeingMachineCode(const Function &F, void *OldPtr);
+  virtual void NotifyFreeingMachineCode(void *OldPtr);
 };
 
 OProfileJITEventListener::OProfileJITEventListener()
     : Agent(op_open_agent()) {
   if (Agent == NULL) {
     const std::string err_str = sys::StrError();
-    DOUT << "Failed to connect to OProfile agent: " << err_str << "\n";
+    DEBUG(dbgs() << "Failed to connect to OProfile agent: " << err_str << "\n");
   } else {
-    DOUT << "Connected to OProfile agent.\n";
+    DEBUG(dbgs() << "Connected to OProfile agent.\n");
   }
 }
 
@@ -60,34 +62,27 @@ OProfileJITEventListener::~OProfileJITEventListener() {
   if (Agent != NULL) {
     if (op_close_agent(Agent) == -1) {
       const std::string err_str = sys::StrError();
-      DOUT << "Failed to disconnect from OProfile agent: " << err_str << "\n";
+      DEBUG(dbgs() << "Failed to disconnect from OProfile agent: "
+                   << err_str << "\n");
     } else {
-      DOUT << "Disconnected from OProfile agent.\n";
+      DEBUG(dbgs() << "Disconnected from OProfile agent.\n");
     }
   }
 }
 
 class FilenameCache {
-  // Holds the filename of each CompileUnit, so that we can pass the
-  // pointer into oprofile.  These char*s are freed in the destructor.
-  DenseMap<GlobalVariable*, char*> Filenames;
-  // Used as the scratch space in DICompileUnit::getFilename().
-  std::string TempFilename;
+  // Holds the filename of each Scope, so that we can pass a null-terminated
+  // string into oprofile.  Use an AssertingVH rather than a ValueMap because we
+  // shouldn't be modifying any MDNodes while this map is alive.
+  DenseMap<AssertingVH<MDNode>, std::string> Filenames;
 
  public:
-  const char* getFilename(GlobalVariable *CompileUnit) {
-    char *&Filename = Filenames[CompileUnit];
-    if (Filename == NULL) {
-      DICompileUnit CU(CompileUnit);
-      Filename = strdup(CU.getFilename(TempFilename).c_str());
+  const char *getFilename(DIScope Scope) {
+    std::string &Filename = Filenames[Scope.getNode()];
+    if (Filename.empty()) {
+      Filename = Scope.getFilename();
     }
-    return Filename;
-  }
-  ~FilenameCache() {
-    for (DenseMap<GlobalVariable*, char*>::iterator
-             I = Filenames.begin(), E = Filenames.end(); I != E;++I) {
-      free(I->second);
-    }
+    return Filename.c_str();
   }
 };
 
@@ -96,11 +91,11 @@ static debug_line_info LineStartToOProfileFormat(
     uintptr_t Address, DebugLoc Loc) {
   debug_line_info Result;
   Result.vma = Address;
-  const DebugLocTuple& tuple = MF.getDebugLocTuple(Loc);
-  Result.lineno = tuple.Line;
-  Result.filename = Filenames.getFilename(tuple.CompileUnit);
-  DOUT << "Mapping " << reinterpret_cast<void*>(Result.vma) << " to "
-       << Result.filename << ":" << Result.lineno << "\n";
+  DILocation DILoc = MF.getDILocation(Loc);
+  Result.lineno = DILoc.getLineNumber();
+  Result.filename = Filenames.getFilename(DILoc.getScope());
+  DEBUG(dbgs() << "Mapping " << reinterpret_cast<void*>(Result.vma) << " to "
+               << Result.filename << ":" << Result.lineno << "\n");
   return Result;
 }
 
@@ -112,7 +107,7 @@ void OProfileJITEventListener::NotifyFunctionEmitted(
   if (op_write_native_code(Agent, F.getName().data(),
                            reinterpret_cast<uint64_t>(FnStart),
                            FnStart, FnSize) == -1) {
-    DEBUG(errs() << "Failed to tell OProfile about native function " 
+    DEBUG(dbgs() << "Failed to tell OProfile about native function " 
           << F.getName() << " at [" 
           << FnStart << "-" << ((char*)FnStart + FnSize) << "]\n");
     return;
@@ -140,7 +135,7 @@ void OProfileJITEventListener::NotifyFunctionEmitted(
   if (!LineInfo.empty()) {
     if (op_write_debug_line_info(Agent, FnStart,
                                  LineInfo.size(), &*LineInfo.begin()) == -1) {
-      DEBUG(errs() 
+      DEBUG(dbgs() 
             << "Failed to tell OProfile about line numbers for native function "
             << F.getName() << " at [" 
             << FnStart << "-" << ((char*)FnStart + FnSize) << "]\n");
@@ -148,13 +143,13 @@ void OProfileJITEventListener::NotifyFunctionEmitted(
   }
 }
 
-// Removes the to-be-deleted function from the symbol table.
-void OProfileJITEventListener::NotifyFreeingMachineCode(
-    const Function &F, void *FnStart) {
+// Removes the being-deleted function from the symbol table.
+void OProfileJITEventListener::NotifyFreeingMachineCode(void *FnStart) {
   assert(FnStart && "Invalid function pointer");
   if (op_unload_native_code(Agent, reinterpret_cast<uint64_t>(FnStart)) == -1) {
-    DEBUG(errs() << "Failed to tell OProfile about unload of native function "
-                 << F.getName() << " at " << FnStart << "\n");
+    DEBUG(dbgs()
+          << "Failed to tell OProfile about unload of native function at "
+          << FnStart << "\n");
   }
 }
 

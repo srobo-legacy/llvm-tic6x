@@ -21,8 +21,8 @@
 #include "llvm/LLVMContext.h"
 #include "llvm/Pass.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/Debug.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 using namespace llvm;
@@ -31,7 +31,7 @@ namespace {
   /// LowerSwitch Pass - Replace all SwitchInst instructions with chained branch
   /// instructions.  Note that this cannot be a BasicBlock pass because it
   /// modifies the CFG!
-  class VISIBILITY_HIDDEN LowerSwitch : public FunctionPass {
+  class LowerSwitch : public FunctionPass {
   public:
     static char ID; // Pass identification, replacement for typeid
     LowerSwitch() : FunctionPass(&ID) {} 
@@ -43,7 +43,6 @@ namespace {
       AU.addPreserved<UnifyFunctionExitNodes>();
       AU.addPreservedID(PromoteMemoryToRegisterID);
       AU.addPreservedID(LowerInvokePassID);
-      AU.addPreservedID(LowerAllocationsID);
     }
 
     struct CaseRange {
@@ -138,12 +137,12 @@ BasicBlock* LowerSwitch::switchConvert(CaseItr Begin, CaseItr End,
 
   unsigned Mid = Size / 2;
   std::vector<CaseRange> LHS(Begin, Begin + Mid);
-  DEBUG(errs() << "LHS: " << LHS << "\n");
+  DEBUG(dbgs() << "LHS: " << LHS << "\n");
   std::vector<CaseRange> RHS(Begin + Mid, End);
-  DEBUG(errs() << "RHS: " << RHS << "\n");
+  DEBUG(dbgs() << "RHS: " << RHS << "\n");
 
   CaseRange& Pivot = *(Begin + Mid);
-  DEBUG(errs() << "Pivot ==> " 
+  DEBUG(dbgs() << "Pivot ==> " 
                << cast<ConstantInt>(Pivot.Low)->getValue() << " -"
                << cast<ConstantInt>(Pivot.High)->getValue() << "\n");
 
@@ -159,7 +158,7 @@ BasicBlock* LowerSwitch::switchConvert(CaseItr Begin, CaseItr End,
   Function::iterator FI = OrigBlock;
   F->getBasicBlockList().insert(++FI, NewNode);
 
-  ICmpInst* Comp = new ICmpInst(Default->getContext(), ICmpInst::ICMP_SLT,
+  ICmpInst* Comp = new ICmpInst(ICmpInst::ICMP_SLT,
                                 Val, Pivot.Low, "Pivot");
   NewNode->getInstList().push_back(Comp);
   BranchInst::Create(LBranch, RBranch, Comp, NewNode);
@@ -245,7 +244,7 @@ unsigned LowerSwitch::Clusterify(CaseVector& Cases, SwitchInst *SI) {
 
   // Merge case into clusters
   if (Cases.size()>=2)
-    for (CaseItr I=Cases.begin(), J=next(Cases.begin()); J!=Cases.end(); ) {
+    for (CaseItr I=Cases.begin(), J=llvm::next(Cases.begin()); J!=Cases.end(); ) {
       int64_t nextValue = cast<ConstantInt>(J->Low)->getSExtValue();
       int64_t currentValue = cast<ConstantInt>(I->High)->getSExtValue();
       BasicBlock* nextBB = J->BB;
@@ -307,9 +306,9 @@ void LowerSwitch::processSwitchInst(SwitchInst *SI) {
   CaseVector Cases;
   unsigned numCmps = Clusterify(Cases, SI);
 
-  DEBUG(errs() << "Clusterify finished. Total clusters: " << Cases.size()
+  DEBUG(dbgs() << "Clusterify finished. Total clusters: " << Cases.size()
                << ". Total compares: " << numCmps << "\n");
-  DEBUG(errs() << "Cases: " << Cases << "\n");
+  DEBUG(dbgs() << "Cases: " << Cases << "\n");
   (void)numCmps;
   
   BasicBlock* SwitchBlock = switchConvert(Cases.begin(), Cases.end(), Val,

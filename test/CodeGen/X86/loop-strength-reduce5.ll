@@ -1,9 +1,9 @@
-; RUN: llvm-as < %s | llc -march=x86 | grep inc | count 1
+; RUN: llc < %s -march=x86 | grep inc | count 1
 
 @X = weak global i16 0		; <i16*> [#uses=1]
 @Y = weak global i16 0		; <i16*> [#uses=1]
 
-define void @foo(i32 %N) {
+define void @foo(i32 %N) nounwind {
 entry:
 	%tmp1019 = icmp sgt i32 %N, 0		; <i1> [#uses=1]
 	br i1 %tmp1019, label %bb, label %return

@@ -27,9 +27,9 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/Format.h"
 #include "llvm/System/Signals.h"
 #include <algorithm>
-#include <iostream>
 #include <iomanip>
 #include <map>
 #include <set>
@@ -172,32 +172,32 @@ bool ProfileInfoPrinterPass::runOnModule(Module &M) {
   for (unsigned i = 0, e = FunctionCounts.size(); i != e; ++i)
     TotalExecutions += FunctionCounts[i].second;
 
-  std::cout << "===" << std::string(73, '-') << "===\n"
-            << "LLVM profiling output for execution";
-  if (PIL.getNumExecutions() != 1) std::cout << "s";
-  std::cout << ":\n";
+  outs() << "===" << std::string(73, '-') << "===\n"
+         << "LLVM profiling output for execution";
+  if (PIL.getNumExecutions() != 1) outs() << "s";
+  outs() << ":\n";
 
   for (unsigned i = 0, e = PIL.getNumExecutions(); i != e; ++i) {
-    std::cout << "  ";
-    if (e != 1) std::cout << i+1 << ". ";
-    std::cout << PIL.getExecution(i) << "\n";
+    outs() << "  ";
+    if (e != 1) outs() << i+1 << ". ";
+    outs() << PIL.getExecution(i) << "\n";
   }
 
-  std::cout << "\n===" << std::string(73, '-') << "===\n";
-  std::cout << "Function execution frequencies:\n\n";
+  outs() << "\n===" << std::string(73, '-') << "===\n";
+  outs() << "Function execution frequencies:\n\n";
 
   // Print out the function frequencies...
-  std::cout << " ##   Frequency\n";
+  outs() << " ##   Frequency\n";
   for (unsigned i = 0, e = FunctionCounts.size(); i != e; ++i) {
     if (FunctionCounts[i].second == 0) {
-      std::cout << "\n  NOTE: " << e-i << " function" <<
-             (e-i-1 ? "s were" : " was") << " never executed!\n";
+      outs() << "\n  NOTE: " << e-i << " function" 
+        << (e-i-1 ? "s were" : " was") << " never executed!\n";
       break;
     }
 
-    std::cout << std::setw(3) << i+1 << ". " 
-      << std::setw(5) << FunctionCounts[i].second << "/"
-      << TotalExecutions << " "
+    outs() << format("%3d", i+1) << ". "
+      << format("%5.2g", FunctionCounts[i].second) << "/"
+      << format("%g", TotalExecutions) << " "
       << FunctionCounts[i].first->getNameStr() << "\n";
   }
 
@@ -211,39 +211,38 @@ bool ProfileInfoPrinterPass::runOnModule(Module &M) {
   sort(Counts.begin(), Counts.end(),
        PairSecondSortReverse<BasicBlock*>());
   
-  std::cout << "\n===" << std::string(73, '-') << "===\n";
-  std::cout << "Top 20 most frequently executed basic blocks:\n\n";
+  outs() << "\n===" << std::string(73, '-') << "===\n";
+  outs() << "Top 20 most frequently executed basic blocks:\n\n";
   
   // Print out the function frequencies...
-  std::cout <<" ##      %% \tFrequency\n";
+  outs() <<" ##      %% \tFrequency\n";
   unsigned BlocksToPrint = Counts.size();
   if (BlocksToPrint > 20) BlocksToPrint = 20;
   for (unsigned i = 0; i != BlocksToPrint; ++i) {
     if (Counts[i].second == 0) break;
     Function *F = Counts[i].first->getParent();
-    std::cout << std::setw(3) << i+1 << ". " 
-              << std::setw(5) << std::setprecision(3) 
-              << Counts[i].second/(double)TotalExecutions*100 << "% "
-              << std::setw(5) << Counts[i].second << "/"
-              << TotalExecutions << "\t"
-              << F->getNameStr() << "() - "
-              << Counts[i].first->getNameStr() << "\n";
+    outs() << format("%3d", i+1) << ". " 
+      << format("%5g", Counts[i].second/(double)TotalExecutions*100) << "% "
+      << format("%5.0f", Counts[i].second) << "/"
+      << format("%g", TotalExecutions) << "\t"
+      << F->getNameStr() << "() - "
+       << Counts[i].first->getNameStr() << "\n";
     FunctionsToPrint.insert(F);
   }
 
   if (PrintAnnotatedLLVM || PrintAllCode) {
-    std::cout << "\n===" << std::string(73, '-') << "===\n";
-    std::cout << "Annotated LLVM code for the module:\n\n";
+    outs() << "\n===" << std::string(73, '-') << "===\n";
+    outs() << "Annotated LLVM code for the module:\n\n";
   
     ProfileAnnotator PA(PI);
 
     if (FunctionsToPrint.empty() || PrintAllCode)
-      M.print(std::cout, &PA);
+      M.print(outs(), &PA);
     else
       // Print just a subset of the functions.
       for (std::set<Function*>::iterator I = FunctionsToPrint.begin(),
              E = FunctionsToPrint.end(); I != E; ++I)
-        (*I)->print(std::cout, &PA);
+        (*I)->print(outs(), &PA);
   }
 
   return false;
@@ -256,41 +255,34 @@ int main(int argc, char **argv) {
 
   LLVMContext &Context = getGlobalContext();
   llvm_shutdown_obj Y;  // Call llvm_shutdown() on exit.
-  try {
-    cl::ParseCommandLineOptions(argc, argv, "llvm profile dump decoder\n");
-
-    // Read in the bitcode file...
-    std::string ErrorMessage;
-    Module *M = 0;
-    if (MemoryBuffer *Buffer = MemoryBuffer::getFileOrSTDIN(BitcodeFile,
-                                                            &ErrorMessage)) {
-      M = ParseBitcodeFile(Buffer, Context, &ErrorMessage);
-      delete Buffer;
-    }
-    if (M == 0) {
-      errs() << argv[0] << ": " << BitcodeFile << ": "
-        << ErrorMessage << "\n";
-      return 1;
-    }
-
-    // Read the profiling information. This is redundant since we load it again
-    // using the standard profile info provider pass, but for now this gives us
-    // access to additional information not exposed via the ProfileInfo
-    // interface.
-    ProfileInfoLoader PIL(argv[0], ProfileDataFile, *M);
-
-    // Run the printer pass.
-    PassManager PassMgr;
-    PassMgr.add(createProfileLoaderPass(ProfileDataFile));
-    PassMgr.add(new ProfileInfoPrinterPass(PIL));
-    PassMgr.run(*M);
-
-    return 0;
-  } catch (const std::string& msg) {
-    errs() << argv[0] << ": " << msg << "\n";
-  } catch (...) {
-    errs() << argv[0] << ": Unexpected unknown exception occurred.\n";
-  }
   
-  return 1;
+  cl::ParseCommandLineOptions(argc, argv, "llvm profile dump decoder\n");
+
+  // Read in the bitcode file...
+  std::string ErrorMessage;
+  Module *M = 0;
+  if (MemoryBuffer *Buffer = MemoryBuffer::getFileOrSTDIN(BitcodeFile,
+                                                          &ErrorMessage)) {
+    M = ParseBitcodeFile(Buffer, Context, &ErrorMessage);
+    delete Buffer;
+  }
+  if (M == 0) {
+    errs() << argv[0] << ": " << BitcodeFile << ": "
+      << ErrorMessage << "\n";
+    return 1;
+  }
+
+  // Read the profiling information. This is redundant since we load it again
+  // using the standard profile info provider pass, but for now this gives us
+  // access to additional information not exposed via the ProfileInfo
+  // interface.
+  ProfileInfoLoader PIL(argv[0], ProfileDataFile, *M);
+
+  // Run the printer pass.
+  PassManager PassMgr;
+  PassMgr.add(createProfileLoaderPass(ProfileDataFile));
+  PassMgr.add(new ProfileInfoPrinterPass(PIL));
+  PassMgr.run(*M);
+
+  return 0;
 }

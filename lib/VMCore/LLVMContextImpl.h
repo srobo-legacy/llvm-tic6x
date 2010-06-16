@@ -1,4 +1,4 @@
-//===----------------- LLVMContextImpl.h - Implementation ------*- C++ -*--===//
+//===-- LLVMContextImpl.h - The LLVMContextImpl opaque class --------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -19,15 +19,16 @@
 #include "LeaksContext.h"
 #include "TypesContext.h"
 #include "llvm/LLVMContext.h"
+#include "llvm/Metadata.h"
 #include "llvm/Constants.h"
 #include "llvm/DerivedTypes.h"
-#include "llvm/System/Mutex.h"
-#include "llvm/System/RWMutex.h"
 #include "llvm/Assembly/Writer.h"
+#include "llvm/Support/ValueHandle.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/FoldingSet.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringMap.h"
 #include <vector>
 
@@ -63,7 +64,6 @@ struct DenseMapAPIntKeyInfo {
   static bool isEqual(const KeyTy &LHS, const KeyTy &RHS) {
     return LHS == RHS;
   }
-  static bool isPod() { return false; }
 };
 
 struct DenseMapAPFloatKeyInfo {
@@ -90,13 +90,10 @@ struct DenseMapAPFloatKeyInfo {
   static bool isEqual(const KeyTy &LHS, const KeyTy &RHS) {
     return LHS == RHS;
   }
-  static bool isPod() { return false; }
 };
 
 class LLVMContextImpl {
 public:
-  sys::SmartRWMutex<true> ConstantsLock;
-  
   typedef DenseMap<DenseMapAPIntKeyInfo::KeyTy, ConstantInt*, 
                          DenseMapAPIntKeyInfo> IntMapTy;
   IntMapTy IntConstants;
@@ -107,45 +104,52 @@ public:
   
   StringMap<MDString*> MDStringCache;
   
-  ValueMap<char, Type, ConstantAggregateZero> AggZeroConstants;
-
-  typedef ValueMap<std::vector<Value*>, Type, MDNode, true /*largekey*/> 
-  MDNodeMapTy;
-
-  MDNodeMapTy MDNodes;
+  FoldingSet<MDNode> MDNodeSet;
   
-  typedef ValueMap<std::vector<Constant*>, ArrayType, 
+  ConstantUniqueMap<char, Type, ConstantAggregateZero> AggZeroConstants;
+
+  typedef ConstantUniqueMap<std::vector<Constant*>, ArrayType,
     ConstantArray, true /*largekey*/> ArrayConstantsTy;
   ArrayConstantsTy ArrayConstants;
   
-  typedef ValueMap<std::vector<Constant*>, StructType,
-                   ConstantStruct, true /*largekey*/> StructConstantsTy;
+  typedef ConstantUniqueMap<std::vector<Constant*>, StructType,
+    ConstantStruct, true /*largekey*/> StructConstantsTy;
   StructConstantsTy StructConstants;
   
-  typedef ValueMap<std::vector<Constant*>, VectorType,
-                   ConstantVector> VectorConstantsTy;
+  typedef ConstantUniqueMap<Constant*, UnionType, ConstantUnion>
+      UnionConstantsTy;
+  UnionConstantsTy UnionConstants;
+  
+  typedef ConstantUniqueMap<std::vector<Constant*>, VectorType,
+                            ConstantVector> VectorConstantsTy;
   VectorConstantsTy VectorConstants;
   
-  ValueMap<char, PointerType, ConstantPointerNull> NullPtrConstants;
+  ConstantUniqueMap<char, PointerType, ConstantPointerNull> NullPtrConstants;
   
-  ValueMap<char, Type, UndefValue> UndefValueConstants;
+  ConstantUniqueMap<char, Type, UndefValue> UndefValueConstants;
   
-  ValueMap<ExprMapKeyType, Type, ConstantExpr> ExprConstants;
+  DenseMap<std::pair<Function*, BasicBlock*> , BlockAddress*> BlockAddresses;
+  ConstantUniqueMap<ExprMapKeyType, Type, ConstantExpr> ExprConstants;
   
   ConstantInt *TheTrueVal;
   ConstantInt *TheFalseVal;
   
-  // Lock used for guarding access to the leak detector
-  sys::SmartMutex<true> LLVMObjectsLock;
   LeakDetectorImpl<Value> LLVMObjects;
   
-  // Lock used for guarding access to the type maps.
-  sys::SmartMutex<true> TypeMapLock;
-  
-  // Recursive lock used for guarding access to AbstractTypeUsers.
-  // NOTE: The true template parameter means this will no-op when we're not in
-  // multithreaded mode.
-  sys::SmartMutex<true> AbstractTypeUsersLock;
+  // Basic type instances.
+  const Type VoidTy;
+  const Type LabelTy;
+  const Type FloatTy;
+  const Type DoubleTy;
+  const Type MetadataTy;
+  const Type X86_FP80Ty;
+  const Type FP128Ty;
+  const Type PPC_FP128Ty;
+  const IntegerType Int1Ty;
+  const IntegerType Int8Ty;
+  const IntegerType Int16Ty;
+  const IntegerType Int32Ty;
+  const IntegerType Int64Ty;
 
   // Concrete/Abstract TypeDescriptions - We lazily calculate type descriptions
   // for types as they are needed.  Because resolution of types must invalidate
@@ -159,65 +163,94 @@ public:
   TypeMap<PointerValType, PointerType> PointerTypes;
   TypeMap<FunctionValType, FunctionType> FunctionTypes;
   TypeMap<StructValType, StructType> StructTypes;
+  TypeMap<UnionValType, UnionType> UnionTypes;
   TypeMap<IntegerValType, IntegerType> IntegerTypes;
-  
-  const Type *VoidTy;
-  const Type *LabelTy;
-  const Type *FloatTy;
-  const Type *DoubleTy;
-  const Type *MetadataTy;
-  const Type *X86_FP80Ty;
-  const Type *FP128Ty;
-  const Type *PPC_FP128Ty;
-  
-  const IntegerType *Int1Ty;
-  const IntegerType *Int8Ty;
-  const IntegerType *Int16Ty;
-  const IntegerType *Int32Ty;
-  const IntegerType *Int64Ty;
-  
+
+  // Opaque types are not structurally uniqued, so don't use TypeMap.
+  typedef SmallPtrSet<const OpaqueType*, 8> OpaqueTypesTy;
+  OpaqueTypesTy OpaqueTypes;
+
+  /// Used as an abstract type that will never be resolved.
+  OpaqueType *const AlwaysOpaqueTy;
+
+
   /// ValueHandles - This map keeps track of all of the value handles that are
   /// watching a Value*.  The Value::HasValueHandle bit is used to know
   // whether or not a value has an entry in this map.
   typedef DenseMap<Value*, ValueHandleBase*> ValueHandlesTy;
   ValueHandlesTy ValueHandles;
   
-  LLVMContextImpl(LLVMContext &C) : TheTrueVal(0), TheFalseVal(0),
-    VoidTy(new Type(C, Type::VoidTyID)),
-    LabelTy(new Type(C, Type::LabelTyID)),
-    FloatTy(new Type(C, Type::FloatTyID)),
-    DoubleTy(new Type(C, Type::DoubleTyID)),
-    MetadataTy(new Type(C, Type::MetadataTyID)),
-    X86_FP80Ty(new Type(C, Type::X86_FP80TyID)),
-    FP128Ty(new Type(C, Type::FP128TyID)),
-    PPC_FP128Ty(new Type(C, Type::PPC_FP128TyID)),
-    Int1Ty(new IntegerType(C, 1)),
-    Int8Ty(new IntegerType(C, 8)),
-    Int16Ty(new IntegerType(C, 16)),
-    Int32Ty(new IntegerType(C, 32)),
-    Int64Ty(new IntegerType(C, 64)) { }
+  /// CustomMDKindNames - Map to hold the metadata string to ID mapping.
+  StringMap<unsigned> CustomMDKindNames;
   
+  typedef std::pair<unsigned, TrackingVH<MDNode> > MDPairTy;
+  typedef SmallVector<MDPairTy, 2> MDMapTy;
+
+  /// MetadataStore - Collection of per-instruction metadata used in this
+  /// context.
+  DenseMap<const Instruction *, MDMapTy> MetadataStore;
+  
+  
+  LLVMContextImpl(LLVMContext &C) : TheTrueVal(0), TheFalseVal(0),
+    VoidTy(C, Type::VoidTyID),
+    LabelTy(C, Type::LabelTyID),
+    FloatTy(C, Type::FloatTyID),
+    DoubleTy(C, Type::DoubleTyID),
+    MetadataTy(C, Type::MetadataTyID),
+    X86_FP80Ty(C, Type::X86_FP80TyID),
+    FP128Ty(C, Type::FP128TyID),
+    PPC_FP128Ty(C, Type::PPC_FP128TyID),
+    Int1Ty(C, 1),
+    Int8Ty(C, 8),
+    Int16Ty(C, 16),
+    Int32Ty(C, 32),
+    Int64Ty(C, 64),
+    AlwaysOpaqueTy(new OpaqueType(C)) {
+    // Make sure the AlwaysOpaqueTy stays alive as long as the Context.
+    AlwaysOpaqueTy->addRef();
+    OpaqueTypes.insert(AlwaysOpaqueTy);
+  }
+
   ~LLVMContextImpl() {
-    // In principle, we should delete the member types here.  However,
-    // this causes destruction order issues with the types in the TypeMaps.
-    // For now, just leak this, which is at least not a regression from the
-    // previous behavior, though still undesirable.
-#if 0
-    delete VoidTy;
-    delete LabelTy;
-    delete FloatTy;
-    delete DoubleTy;
-    delete MetadataTy;
-    delete X86_FP80Ty;
-    delete FP128Ty;
-    delete PPC_FP128Ty;
-    
-    delete Int1Ty;
-    delete Int8Ty;
-    delete Int16Ty;
-    delete Int32Ty;
-    delete Int64Ty;
-#endif
+    ExprConstants.freeConstants();
+    ArrayConstants.freeConstants();
+    StructConstants.freeConstants();
+    VectorConstants.freeConstants();
+    AggZeroConstants.freeConstants();
+    NullPtrConstants.freeConstants();
+    UndefValueConstants.freeConstants();
+    for (IntMapTy::iterator I = IntConstants.begin(), E = IntConstants.end(); 
+         I != E; ++I) {
+      if (I->second->use_empty())
+        delete I->second;
+    }
+    for (FPMapTy::iterator I = FPConstants.begin(), E = FPConstants.end(); 
+         I != E; ++I) {
+      if (I->second->use_empty())
+        delete I->second;
+    }
+    AlwaysOpaqueTy->dropRef();
+    for (OpaqueTypesTy::iterator I = OpaqueTypes.begin(), E = OpaqueTypes.end();
+        I != E; ++I) {
+      (*I)->AbstractTypeUsers.clear();
+      delete *I;
+    }
+    // Destroy MDNode operands first.
+    for (FoldingSetIterator<MDNode> I = MDNodeSet.begin(), E = MDNodeSet.end();
+         I != E;) {
+      MDNode *N = &(*I);
+      ++I;
+      N->replaceAllOperandsWithNull();
+    }
+    while (!MDNodeSet.empty()) {
+      MDNode *N = &(*MDNodeSet.begin());
+      N->destroy();
+    }
+    // Destroy MDStrings.
+    for (StringMap<MDString*>::iterator I = MDStringCache.begin(),
+           E = MDStringCache.end(); I != E; ++I) {
+      delete I->second;
+    }
   }
 };
 

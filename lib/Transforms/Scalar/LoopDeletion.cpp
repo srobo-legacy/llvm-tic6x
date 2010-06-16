@@ -15,19 +15,17 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "loop-delete"
-
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Analysis/LoopPass.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/SmallVector.h"
-
 using namespace llvm;
 
 STATISTIC(NumDeleted, "Number of loops deleted");
 
 namespace {
-  class VISIBILITY_HIDDEN LoopDeletion : public LoopPass {
+  class LoopDeletion : public LoopPass {
   public:
     static char ID; // Pass ID, replacement for typeid
     LoopDeletion() : LoopPass(&ID) {}
@@ -35,8 +33,6 @@ namespace {
     // Possibly eliminate loop L if it is dead.
     bool runOnLoop(Loop* L, LPPassManager& LPM);
     
-    bool SingleDominatingExit(Loop* L,
-                              SmallVector<BasicBlock*, 4>& exitingBlocks);
     bool IsLoopDead(Loop* L, SmallVector<BasicBlock*, 4>& exitingBlocks,
                     SmallVector<BasicBlock*, 4>& exitBlocks,
                     bool &Changed, BasicBlock *Preheader);
@@ -63,25 +59,6 @@ static RegisterPass<LoopDeletion> X("loop-deletion", "Delete dead loops");
 
 Pass* llvm::createLoopDeletionPass() {
   return new LoopDeletion();
-}
-
-/// SingleDominatingExit - Checks that there is only a single blocks that 
-/// branches out of the loop, and that it also g the latch block.  Loops
-/// with multiple or non-latch-dominating exiting blocks could be dead, but we'd
-/// have to do more extensive analysis to make sure, for instance, that the 
-/// control flow logic involved was or could be made loop-invariant.
-bool LoopDeletion::SingleDominatingExit(Loop* L,
-                                   SmallVector<BasicBlock*, 4>& exitingBlocks) {
-  
-  if (exitingBlocks.size() != 1)
-    return false;
-  
-  BasicBlock* latch = L->getLoopLatch();
-  if (!latch)
-    return false;
-  
-  DominatorTree& DT = getAnalysis<DominatorTree>();
-  return DT.dominates(exitingBlocks[0], latch);
 }
 
 /// IsLoopDead - Determined if a loop is dead.  This assumes that we've already
@@ -138,6 +115,10 @@ bool LoopDeletion::runOnLoop(Loop* L, LPPassManager& LPM) {
   if (!preheader)
     return false;
   
+  // If LoopSimplify form is not available, stay out of trouble.
+  if (!L->hasDedicatedExits())
+    return false;
+
   // We can't remove loops that contain subloops.  If the subloops were dead,
   // they would already have been removed in earlier executions of this pass.
   if (L->begin() != L->end())
@@ -156,9 +137,8 @@ bool LoopDeletion::runOnLoop(Loop* L, LPPassManager& LPM) {
   if (exitBlocks.size() != 1)
     return false;
   
-  // Loops with multiple exits or exits that don't dominate the latch
-  // are too complicated to handle correctly.
-  if (!SingleDominatingExit(L, exitingBlocks))
+  // Loops with multiple exits are too complicated to handle correctly.
+  if (exitingBlocks.size() != 1)
     return false;
   
   // Finally, we have to check that the loop really is dead.
@@ -169,7 +149,7 @@ bool LoopDeletion::runOnLoop(Loop* L, LPPassManager& LPM) {
   // Don't remove loops for which we can't solve the trip count.
   // They could be infinite, in which case we'd be changing program behavior.
   ScalarEvolution& SE = getAnalysis<ScalarEvolution>();
-  const SCEV *S = SE.getBackedgeTakenCount(L);
+  const SCEV *S = SE.getMaxBackedgeTakenCount(L);
   if (isa<SCEVCouldNotCompute>(S))
     return Changed;
   
@@ -185,7 +165,7 @@ bool LoopDeletion::runOnLoop(Loop* L, LPPassManager& LPM) {
   // Tell ScalarEvolution that the loop is deleted. Do this before
   // deleting the loop so that ScalarEvolution can look at the loop
   // to determine what it needs to clean up.
-  SE.forgetLoopBackedgeTakenCount(L);
+  SE.forgetLoop(L);
 
   // Connect the preheader directly to the exit block.
   TerminatorInst* TI = preheader->getTerminator();

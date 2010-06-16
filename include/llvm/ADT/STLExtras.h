@@ -18,9 +18,10 @@
 #define LLVM_ADT_STLEXTRAS_H
 
 #include <cstddef> // for std::size_t
+#include <cstdlib> // for qsort
 #include <functional>
+#include <iterator>
 #include <utility> // for std::pair
-#include "llvm/ADT/iterator.h"
 
 namespace llvm {
 
@@ -270,6 +271,14 @@ static inline void array_pod_sort(IteratorTy Start, IteratorTy End) {
         get_array_pad_sort_comparator(*Start));
 }
 
+template<class IteratorTy>
+static inline void array_pod_sort(IteratorTy Start, IteratorTy End,
+                                  int (*Compare)(const void*, const void*)) {
+  // Don't dereference start iterator of empty sequence.
+  if (Start == End) return;
+  qsort(&*Start, End-Start, sizeof(*Start), Compare);
+}
+  
 } // End llvm namespace
 
 #endif

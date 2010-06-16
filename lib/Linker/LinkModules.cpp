@@ -25,11 +25,11 @@
 #include "llvm/ValueSymbolTable.h"
 #include "llvm/Instructions.h"
 #include "llvm/Assembly/Writer.h"
-#include "llvm/Support/Streams.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/System/Path.h"
 #include "llvm/ADT/DenseMap.h"
-#include <sstream>
 using namespace llvm;
 
 // Error - Simple wrapper function to conditionally assign to E and return true.
@@ -145,7 +145,7 @@ protected:
 
   // for debugging...
   virtual void dump() const {
-    cerr << "AbstractTypeSet!\n";
+    dbgs() << "AbstractTypeSet!\n";
   }
 };
 }
@@ -159,7 +159,7 @@ static bool RecursiveResolveTypesI(const Type *DstTy, const Type *SrcTy,
   if (DstTy == SrcTy) return false;       // If already equal, noop
 
   // If we found our opaque type, resolve it now!
-  if (isa<OpaqueType>(DstTy) || isa<OpaqueType>(SrcTy))
+  if (DstTy->isOpaqueTy() || SrcTy->isOpaqueTy())
     return ResolveTypes(DstTy, SrcTy);
 
   // Two types cannot be resolved together if they are of different primitive
@@ -338,11 +338,11 @@ static bool LinkTypes(Module *Dest, const Module *Src, std::string *Err) {
 static void PrintMap(const std::map<const Value*, Value*> &M) {
   for (std::map<const Value*, Value*>::const_iterator I = M.begin(), E =M.end();
        I != E; ++I) {
-    cerr << " Fr: " << (void*)I->first << " ";
+    dbgs() << " Fr: " << (void*)I->first << " ";
     I->first->dump();
-    cerr << " To: " << (void*)I->second << " ";
+    dbgs() << " To: " << (void*)I->second << " ";
     I->second->dump();
-    cerr << "\n";
+    dbgs() << "\n";
   }
 }
 #endif
@@ -350,8 +350,7 @@ static void PrintMap(const std::map<const Value*, Value*> &M) {
 
 // RemapOperand - Use ValueMap to convert constants from one module to another.
 static Value *RemapOperand(const Value *In,
-                           std::map<const Value*, Value*> &ValueMap,
-                           LLVMContext &Context) {
+                           std::map<const Value*, Value*> &ValueMap) {
   std::map<const Value*,Value*>::const_iterator I = ValueMap.find(In);
   if (I != ValueMap.end())
     return I->second;
@@ -366,44 +365,47 @@ static Value *RemapOperand(const Value *In,
     if (const ConstantArray *CPA = dyn_cast<ConstantArray>(CPV)) {
       std::vector<Constant*> Operands(CPA->getNumOperands());
       for (unsigned i = 0, e = CPA->getNumOperands(); i != e; ++i)
-        Operands[i] =cast<Constant>(RemapOperand(CPA->getOperand(i), ValueMap, 
-                                                 Context));
-      Result =
-          ConstantArray::get(cast<ArrayType>(CPA->getType()), Operands);
+        Operands[i] =cast<Constant>(RemapOperand(CPA->getOperand(i), ValueMap));
+      Result = ConstantArray::get(cast<ArrayType>(CPA->getType()), Operands);
     } else if (const ConstantStruct *CPS = dyn_cast<ConstantStruct>(CPV)) {
       std::vector<Constant*> Operands(CPS->getNumOperands());
       for (unsigned i = 0, e = CPS->getNumOperands(); i != e; ++i)
-        Operands[i] =cast<Constant>(RemapOperand(CPS->getOperand(i), ValueMap,
-                                                 Context));
-      Result =
-         ConstantStruct::get(cast<StructType>(CPS->getType()), Operands);
+        Operands[i] =cast<Constant>(RemapOperand(CPS->getOperand(i), ValueMap));
+      Result = ConstantStruct::get(cast<StructType>(CPS->getType()), Operands);
     } else if (isa<ConstantPointerNull>(CPV) || isa<UndefValue>(CPV)) {
       Result = const_cast<Constant*>(CPV);
     } else if (const ConstantVector *CP = dyn_cast<ConstantVector>(CPV)) {
       std::vector<Constant*> Operands(CP->getNumOperands());
       for (unsigned i = 0, e = CP->getNumOperands(); i != e; ++i)
-        Operands[i] = cast<Constant>(RemapOperand(CP->getOperand(i), ValueMap,
-                                     Context));
+        Operands[i] = cast<Constant>(RemapOperand(CP->getOperand(i), ValueMap));
       Result = ConstantVector::get(Operands);
     } else if (const ConstantExpr *CE = dyn_cast<ConstantExpr>(CPV)) {
       std::vector<Constant*> Ops;
       for (unsigned i = 0, e = CE->getNumOperands(); i != e; ++i)
-        Ops.push_back(cast<Constant>(RemapOperand(CE->getOperand(i),ValueMap,
-                                     Context)));
+        Ops.push_back(cast<Constant>(RemapOperand(CE->getOperand(i),ValueMap)));
       Result = CE->getWithOperands(Ops);
+    } else if (const BlockAddress *CE = dyn_cast<BlockAddress>(CPV)) {
+      Result = BlockAddress::get(
+                 cast<Function>(RemapOperand(CE->getFunction(), ValueMap)),
+                                 CE->getBasicBlock());
     } else {
       assert(!isa<GlobalValue>(CPV) && "Unmapped global?");
       llvm_unreachable("Unknown type of derived type constant value!");
     }
-  } else if (const MDNode *N = dyn_cast<MDNode>(In)) {
-    std::vector<Value*> Elems;
-    for (unsigned i = 0, e = N->getNumElements(); i !=e; ++i)
-      Elems.push_back(RemapOperand(N->getElement(i), ValueMap, Context));
-    if (!Elems.empty())
-      Result = MDNode::get(Context, &Elems[0], Elems.size());
-  } else if (const MDString *MDS = dyn_cast<MDString>(In)) {
-    Result = MDString::get(Context, MDS->getString());
-  } else if (isa<InlineAsm>(In)) {
+  } else if (const MDNode *MD = dyn_cast<MDNode>(In)) {
+    if (MD->isFunctionLocal()) {
+      SmallVector<Value*, 4> Elts;
+      for (unsigned i = 0, e = MD->getNumOperands(); i != e; ++i) {
+        if (MD->getOperand(i))
+          Elts.push_back(RemapOperand(MD->getOperand(i), ValueMap));
+        else
+          Elts.push_back(NULL);
+      }
+      Result = MDNode::get(In->getContext(), Elts.data(), MD->getNumOperands());
+    } else {
+      Result = const_cast<Value*>(In);
+    }
+  } else if (isa<MDString>(In) || isa<InlineAsm>(In) || isa<Instruction>(In)) {
     Result = const_cast<Value*>(In);
   }
 
@@ -414,10 +416,10 @@ static Value *RemapOperand(const Value *In,
   }
 
 #ifndef NDEBUG
-  cerr << "LinkModules ValueMap: \n";
+  dbgs() << "LinkModules ValueMap: \n";
   PrintMap(ValueMap);
 
-  cerr << "Couldn't remap value: " << (void*)In << " " << *In << "\n";
+  dbgs() << "Couldn't remap value: " << (void*)In << " " << *In << "\n";
   llvm_unreachable("Couldn't remap value!");
 #endif
   return 0;
@@ -548,8 +550,8 @@ static void LinkNamedMDNodes(Module *Dest, Module *Src) {
       NamedMDNode::Create(SrcNMD, Dest);
     else {
       // Add Src elements into Dest node.
-      for (unsigned i = 0, e = SrcNMD->getNumElements(); i != e; ++i) 
-        DestNMD->addElement(SrcNMD->getElement(i));
+      for (unsigned i = 0, e = SrcNMD->getNumOperands(); i != e; ++i) 
+        DestNMD->addOperand(SrcNMD->getOperand(i));
     }
   }
 }
@@ -674,7 +676,6 @@ static bool LinkGlobals(Module *Dest, const Module *Src,
         Var->eraseFromParent();
       else
         cast<Function>(DGV)->eraseFromParent();
-      DGV = NewDGV;
 
       // If the symbol table renamed the global, but it is an externally visible
       // symbol, DGV must be an existing global with internal linkage.  Rename.
@@ -865,9 +866,14 @@ static bool LinkAlias(Module *Dest, const Module *Src,
     } else {
       // No linking to be performed, simply create an identical version of the
       // alias over in the dest module...
-
+      Constant *Aliasee = DAliasee;
+      // Fixup aliases to bitcasts.  Note that aliases to GEPs are still broken
+      // by this, but aliases to GEPs are broken to a lot of other things, so
+      // it's less important.
+      if (SGA->getType() != DAliasee->getType())
+        Aliasee = ConstantExpr::getBitCast(DAliasee, SGA->getType());
       NewGA = new GlobalAlias(SGA->getType(), SGA->getLinkage(),
-                              SGA->getName(), DAliasee, Dest);
+                              SGA->getName(), Aliasee, Dest);
       CopyGVAttributes(NewGA, SGA);
 
       // Proceed to 'common' steps
@@ -903,8 +909,7 @@ static bool LinkGlobalInits(Module *Dest, const Module *Src,
     if (SGV->hasInitializer()) {      // Only process initialized GV's
       // Figure out what the initializer looks like in the dest module...
       Constant *SInit =
-        cast<Constant>(RemapOperand(SGV->getInitializer(), ValueMap,
-                       Dest->getContext()));
+        cast<Constant>(RemapOperand(SGV->getInitializer(), ValueMap));
       // Grab destination global variable or alias.
       GlobalValue *DGV = cast<GlobalValue>(ValueMap[SGV]->stripPointerCasts());
 
@@ -1091,7 +1096,7 @@ static bool LinkFunctionBody(Function *Dest, Function *Src,
       for (Instruction::op_iterator OI = I->op_begin(), OE = I->op_end();
            OI != OE; ++OI)
         if (!isa<Instruction>(*OI) && !isa<BasicBlock>(*OI))
-          *OI = RemapOperand(*OI, ValueMap, Dest->getContext());
+          *OI = RemapOperand(*OI, ValueMap);
 
   // There is no need to map the arguments anymore.
   for (Function::arg_iterator I = Src->arg_begin(), E = Src->arg_end();
@@ -1234,9 +1239,15 @@ static bool LinkAppendingVars(Module *M,
 static bool ResolveAliases(Module *Dest) {
   for (Module::alias_iterator I = Dest->alias_begin(), E = Dest->alias_end();
        I != E; ++I)
-    if (const GlobalValue *GV = I->resolveAliasedGlobal())
-      if (GV != I && !GV->isDeclaration())
-        I->replaceAllUsesWith(const_cast<GlobalValue*>(GV));
+    // We can't sue resolveGlobalAlias here because we need to preserve
+    // bitcasts and GEPs.
+    if (const Constant *C = I->getAliasee()) {
+      while (dyn_cast<GlobalAlias>(C))
+        C = cast<GlobalAlias>(C)->getAliasee();
+      const GlobalValue *GV = dyn_cast<GlobalValue>(C);
+      if (C != I && !(GV && GV->isDeclaration()))
+        I->replaceAllUsesWith(const_cast<Constant*>(C));
+    }
 
   return false;
 }
@@ -1280,10 +1291,10 @@ Linker::LinkModules(Module *Dest, Module *Src, std::string *ErrorMsg) {
 
   if (!Src->getDataLayout().empty() && !Dest->getDataLayout().empty() &&
       Src->getDataLayout() != Dest->getDataLayout())
-    cerr << "WARNING: Linking two modules of different data layouts!\n";
+    errs() << "WARNING: Linking two modules of different data layouts!\n";
   if (!Src->getTargetTriple().empty() &&
       Dest->getTargetTriple() != Src->getTargetTriple())
-    cerr << "WARNING: Linking two modules of different target triples!\n";
+    errs() << "WARNING: Linking two modules of different target triples!\n";
 
   // Append the module inline asm string.
   if (!Src->getModuleInlineAsm().empty()) {

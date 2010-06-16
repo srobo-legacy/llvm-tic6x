@@ -19,9 +19,16 @@ namespace {
 TEST(TypeBuilderTest, Void) {
   EXPECT_EQ(Type::getVoidTy(getGlobalContext()), (TypeBuilder<void, true>::get(getGlobalContext())));
   EXPECT_EQ(Type::getVoidTy(getGlobalContext()), (TypeBuilder<void, false>::get(getGlobalContext())));
-  // Special case for C compatibility:
-  EXPECT_EQ(PointerType::getUnqual(Type::getInt8Ty(getGlobalContext())),
+  // Special cases for C compatibility:
+  EXPECT_EQ(Type::getInt8PtrTy(getGlobalContext()),
             (TypeBuilder<void*, false>::get(getGlobalContext())));
+  EXPECT_EQ(Type::getInt8PtrTy(getGlobalContext()),
+            (TypeBuilder<const void*, false>::get(getGlobalContext())));
+  EXPECT_EQ(Type::getInt8PtrTy(getGlobalContext()),
+            (TypeBuilder<volatile void*, false>::get(getGlobalContext())));
+  EXPECT_EQ(Type::getInt8PtrTy(getGlobalContext()),
+            (TypeBuilder<const volatile void*, false>::get(
+              getGlobalContext())));
 }
 
 TEST(TypeBuilderTest, HostIntegers) {
@@ -64,21 +71,21 @@ TEST(TypeBuilderTest, Float) {
 }
 
 TEST(TypeBuilderTest, Derived) {
-  EXPECT_EQ(PointerType::getUnqual(PointerType::getUnqual(Type::getInt8Ty(getGlobalContext()))),
+  EXPECT_EQ(PointerType::getUnqual(Type::getInt8PtrTy(getGlobalContext())),
             (TypeBuilder<int8_t**, false>::get(getGlobalContext())));
   EXPECT_EQ(ArrayType::get(Type::getInt8Ty(getGlobalContext()), 7),
             (TypeBuilder<int8_t[7], false>::get(getGlobalContext())));
   EXPECT_EQ(ArrayType::get(Type::getInt8Ty(getGlobalContext()), 0),
             (TypeBuilder<int8_t[], false>::get(getGlobalContext())));
 
-  EXPECT_EQ(PointerType::getUnqual(PointerType::getUnqual(Type::getInt8Ty(getGlobalContext()))),
+  EXPECT_EQ(PointerType::getUnqual(Type::getInt8PtrTy(getGlobalContext())),
             (TypeBuilder<types::i<8>**, false>::get(getGlobalContext())));
   EXPECT_EQ(ArrayType::get(Type::getInt8Ty(getGlobalContext()), 7),
             (TypeBuilder<types::i<8>[7], false>::get(getGlobalContext())));
   EXPECT_EQ(ArrayType::get(Type::getInt8Ty(getGlobalContext()), 0),
             (TypeBuilder<types::i<8>[], false>::get(getGlobalContext())));
 
-  EXPECT_EQ(PointerType::getUnqual(PointerType::getUnqual(Type::getInt8Ty(getGlobalContext()))),
+  EXPECT_EQ(PointerType::getUnqual(Type::getInt8PtrTy(getGlobalContext())),
             (TypeBuilder<types::i<8>**, true>::get(getGlobalContext())));
   EXPECT_EQ(ArrayType::get(Type::getInt8Ty(getGlobalContext()), 7),
             (TypeBuilder<types::i<8>[7], true>::get(getGlobalContext())));
@@ -107,7 +114,7 @@ TEST(TypeBuilderTest, Derived) {
   EXPECT_EQ(Type::getInt8Ty(getGlobalContext()),
             (TypeBuilder<const volatile types::i<8>, true>::get(getGlobalContext())));
 
-  EXPECT_EQ(PointerType::getUnqual(Type::getInt8Ty(getGlobalContext())),
+  EXPECT_EQ(Type::getInt8PtrTy(getGlobalContext()),
             (TypeBuilder<const volatile int8_t*const volatile, false>::get(getGlobalContext())));
 }
 
@@ -145,6 +152,18 @@ TEST(TypeBuilderTest, Functions) {
   EXPECT_EQ(FunctionType::get(Type::getInt8Ty(getGlobalContext()), params, true),
             (TypeBuilder<int8_t(int32_t*, char*, char, char, char, ...),
                          false>::get(getGlobalContext())));
+}
+
+TEST(TypeBuilderTest, Context) {
+  // We used to cache TypeBuilder results in static local variables.  This
+  // produced the same type for different contexts, which of course broke
+  // things.
+  LLVMContext context1;
+  EXPECT_EQ(&context1,
+            &(TypeBuilder<types::i<1>, true>::get(context1))->getContext());
+  LLVMContext context2;
+  EXPECT_EQ(&context2,
+            &(TypeBuilder<types::i<1>, true>::get(context2))->getContext());
 }
 
 class MyType {

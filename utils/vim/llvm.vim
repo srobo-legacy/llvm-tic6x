@@ -1,7 +1,7 @@
 " Vim syntax file
 " Language:   llvm
 " Maintainer: The LLVM team, http://llvm.org/
-" Updated:    2003-06-02
+" Version:      $Revision$
 
 if version < 600
   syntax clear
@@ -34,7 +34,7 @@ syn keyword llvmStatement phi call select shl lshr ashr va_arg
 syn keyword llvmStatement trunc zext sext
 syn keyword llvmStatement fptrunc fpext fptoui fptosi uitofp sitofp
 syn keyword llvmStatement ptrtoint inttoptr bitcast
-syn keyword llvmStatement ret br switch invoke unwind unreachable
+syn keyword llvmStatement ret br indirectbr switch invoke unwind unreachable
 syn keyword llvmStatement malloc alloca free load store getelementptr
 syn keyword llvmStatement extractelement insertelement shufflevector
 syn keyword llvmStatement extractvalue insertvalue
@@ -51,11 +51,13 @@ syn keyword llvmKeyword volatile fastcc coldcc cc ccc
 syn keyword llvmKeyword x86_stdcallcc x86_fastcallcc
 syn keyword llvmKeyword signext zeroext inreg sret nounwind noreturn
 syn keyword llvmKeyword nocapture byval nest readnone readonly noalias
-syn keyword llvmKeyword noinline alwaysinline optsize ssp sspreq
-syn keyword llvmKeyword noredzone noimplicitfloat naked
+syn keyword llvmKeyword inlinehint noinline alwaysinline optsize ssp sspreq
+syn keyword llvmKeyword noredzone noimplicitfloat naked alignstack
 syn keyword llvmKeyword module asm align tail to
 syn keyword llvmKeyword addrspace section alias sideeffect c gc
 syn keyword llvmKeyword target datalayout triple
+syn keyword llvmKeyword blockaddress
+syn keyword llvmKeyword union
 
 " Obsolete keywords.
 syn keyword llvmError  uninitialized implementation
@@ -70,7 +72,8 @@ syn keyword llvmBoolean true false
 syn keyword llvmConstant zeroinitializer undef null
 syn match   llvmComment /;.*$/
 syn region  llvmString start=/"/ skip=/\\"/ end=/"/
-syn match   llvmLabel /[\-a-zA-Z\$._0-9]*:/
+syn match   llvmLabel /[-a-zA-Z$._][-a-zA-Z$._0-9]*:/
+syn match   llvmIdentifier /[%@][-a-zA-Z$._][-a-zA-Z$._0-9]*/
 
 " Syntax-highlight dejagnu test commands.
 syn match  llvmSpecialComment /;\s*RUN:.*$/
@@ -100,6 +103,7 @@ if version >= 508 || !exists("did_c_syn_inits")
   HiLink llvmConstant Constant
   HiLink llvmSpecialComment SpecialComment
   HiLink llvmError Error
+  HiLink llvmIdentifier Identifier
 
   delcommand HiLink
 endif

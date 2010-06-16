@@ -21,6 +21,9 @@
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PrettyStackTrace.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/SystemUtils.h"
+#include "llvm/Support/IRReader.h"
 #include "llvm/System/Signals.h"
 #include "llvm/System/Path.h"
 #include <memory>
@@ -34,7 +37,12 @@ static cl::opt<std::string>
 OutputFilename("o", cl::desc("Override output filename"), cl::init("-"),
                cl::value_desc("filename"));
 
-static cl::opt<bool> Force("f", cl::desc("Overwrite output files"));
+static cl::opt<bool>
+Force("f", cl::desc("Enable binary output on terminals"));
+
+static cl::opt<bool>
+OutputAssembly("S",
+         cl::desc("Write output as LLVM assembly"), cl::Hidden);
 
 static cl::opt<bool>
 Verbose("v", cl::desc("Print information about actions taken"));
@@ -45,7 +53,8 @@ DumpAsm("d", cl::desc("Print assembly as linked"), cl::Hidden);
 // LoadFile - Read the specified bitcode file in and return it.  This routine
 // searches the link path for the specified file to try to find it...
 //
-static inline std::auto_ptr<Module> LoadFile(const std::string &FN, 
+static inline std::auto_ptr<Module> LoadFile(const char *argv0,
+                                             const std::string &FN, 
                                              LLVMContext& Context) {
   sys::Path Filename;
   if (!Filename.set(FN)) {
@@ -53,24 +62,17 @@ static inline std::auto_ptr<Module> LoadFile(const std::string &FN,
     return std::auto_ptr<Module>();
   }
 
-  std::string ErrorMessage;
+  SMDiagnostic Err;
   if (Filename.exists()) {
     if (Verbose) errs() << "Loading '" << Filename.c_str() << "'\n";
     Module* Result = 0;
     
-    const std::string &FNStr = Filename.toString();
-    if (MemoryBuffer *Buffer = MemoryBuffer::getFileOrSTDIN(FNStr,
-                                                            &ErrorMessage)) {
-      Result = ParseBitcodeFile(Buffer, Context, &ErrorMessage);
-      delete Buffer;
-    }
+    const std::string &FNStr = Filename.str();
+    Result = ParseIRFile(FNStr, Err, Context);
     if (Result) return std::auto_ptr<Module>(Result);   // Load successful!
 
-    if (Verbose) {
-      errs() << "Error opening bitcode file: '" << Filename.c_str() << "'";
-      if (ErrorMessage.size()) errs() << ": " << ErrorMessage;
-      errs() << "\n";
-    }
+    if (Verbose)
+      Err.Print(argv0, errs());
   } else {
     errs() << "Bitcode file: '" << Filename.c_str() << "' does not exist.\n";
   }
@@ -90,7 +92,8 @@ int main(int argc, char **argv) {
   unsigned BaseArg = 0;
   std::string ErrorMessage;
 
-  std::auto_ptr<Module> Composite(LoadFile(InputFilenames[BaseArg], Context));
+  std::auto_ptr<Module> Composite(LoadFile(argv[0],
+                                           InputFilenames[BaseArg], Context));
   if (Composite.get() == 0) {
     errs() << argv[0] << ": error loading file '"
            << InputFilenames[BaseArg] << "'\n";
@@ -98,7 +101,8 @@ int main(int argc, char **argv) {
   }
 
   for (unsigned i = BaseArg+1; i < InputFilenames.size(); ++i) {
-    std::auto_ptr<Module> M(LoadFile(InputFilenames[i], Context));
+    std::auto_ptr<Module> M(LoadFile(argv[0],
+                                     InputFilenames[i], Context));
     if (M.get() == 0) {
       errs() << argv[0] << ": error loading file '" <<InputFilenames[i]<< "'\n";
       return 1;
@@ -116,35 +120,32 @@ int main(int argc, char **argv) {
   // TODO: Iterate over the -l list and link in any modules containing
   // global symbols that have not been resolved so far.
 
-  if (DumpAsm) errs() << "Here's the assembly:\n" << *Composite.get();
+  if (DumpAsm) errs() << "Here's the assembly:\n" << *Composite;
 
-  // FIXME: outs() is not binary!
-  raw_ostream *Out = &outs();  // Default to printing to stdout...
-  if (OutputFilename != "-") {
-    std::string ErrorInfo;
-    Out = new raw_fd_ostream(OutputFilename.c_str(), /*Binary=*/true,
-                             Force, ErrorInfo);
-    if (!ErrorInfo.empty()) {
-      errs() << ErrorInfo << '\n';
-      if (!Force)
-        errs() << "Use -f command line argument to force output\n";
-      delete Out;
-      return 1;
-    }
+  std::string ErrorInfo;
+  std::auto_ptr<raw_ostream> 
+  Out(new raw_fd_ostream(OutputFilename.c_str(), ErrorInfo,
+                         raw_fd_ostream::F_Binary));
+  if (!ErrorInfo.empty()) {
+    errs() << ErrorInfo << '\n';
+    return 1;
+  }
 
     // Make sure that the Out file gets unlinked from the disk if we get a
     // SIGINT
+  if (OutputFilename != "-")
     sys::RemoveFileOnSignal(sys::Path(OutputFilename));
-  }
 
-  if (verifyModule(*Composite.get())) {
+  if (verifyModule(*Composite)) {
     errs() << argv[0] << ": linked module is broken!\n";
     return 1;
   }
 
   if (Verbose) errs() << "Writing bitcode...\n";
-  WriteBitcodeToFile(Composite.get(), *Out);
+  if (OutputAssembly) {
+    *Out << *Composite;
+  } else if (Force || !CheckBitcodeOutputToConsole(*Out, true))
+    WriteBitcodeToFile(Composite.get(), *Out);
 
-  if (Out != &outs()) delete Out;
   return 0;
 }

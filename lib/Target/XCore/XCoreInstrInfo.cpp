@@ -116,30 +116,6 @@ XCoreInstrInfo::isStoreToStackSlot(const MachineInstr *MI,
   return 0;
 }
 
-/// isInvariantLoad - Return true if the specified instruction (which is marked
-/// mayLoad) is loading from a location whose value is invariant across the
-/// function.  For example, loading a value from the constant pool or from
-/// from the argument area of a function if it does not change.  This should
-/// only return true of *all* loads the instruction does are invariant (if it
-/// does multiple loads).
-bool
-XCoreInstrInfo::isInvariantLoad(const MachineInstr *MI) const {
-  // Loads from constants pools and loads from invariant argument slots are
-  // invariant
-  int Opcode = MI->getOpcode();
-  if (Opcode == XCore::LDWCP_ru6 || Opcode == XCore::LDWCP_lru6) {
-    return MI->getOperand(1).isCPI();
-  }
-  int FrameIndex;
-  if (isLoadFromStackSlot(MI, FrameIndex)) {
-    const MachineFrameInfo &MFI =
-      *MI->getParent()->getParent()->getFrameInfo();
-    return MFI.isFixedObjectIndex(FrameIndex) &&
-           MFI.isImmutableObjectIndex(FrameIndex);
-  }
-  return false;
-}
-
 //===----------------------------------------------------------------------===//
 // Branch Analysis
 //===----------------------------------------------------------------------===//
@@ -167,6 +143,11 @@ static inline bool IsBRF(unsigned BrOpc) {
 
 static inline bool IsCondBranch(unsigned BrOpc) {
   return IsBRF(BrOpc) || IsBRT(BrOpc);
+}
+
+static inline bool IsBR_JT(unsigned BrOpc) {
+  return BrOpc == XCore::BR_JT
+      || BrOpc == XCore::BR_JT32;
 }
 
 /// GetCondFromBranchOpc - Return the XCore CC that matches 
@@ -293,6 +274,14 @@ XCoreInstrInfo::AnalyzeBranch(MachineBasicBlock &MBB, MachineBasicBlock *&TBB,
     if (AllowModify)
       I->eraseFromParent();
     return false;
+  }
+
+  // Likewise if it ends with a branch table followed by an unconditional branch.
+  if (IsBR_JT(SecondLastInst->getOpcode()) && IsBRU(LastInst->getOpcode())) {
+    I = LastInst;
+    if (AllowModify)
+      I->eraseFromParent();
+    return true;
   }
 
   // Otherwise, can't handle this.
@@ -475,26 +464,6 @@ bool XCoreInstrInfo::restoreCalleeSavedRegisters(MachineBasicBlock &MBB,
     }
   }
   return true;
-}
-
-/// BlockHasNoFallThrough - Analyse if MachineBasicBlock does not
-/// fall-through into its successor block.
-bool XCoreInstrInfo::
-BlockHasNoFallThrough(const MachineBasicBlock &MBB) const 
-{
-  if (MBB.empty()) return false;
-  
-  switch (MBB.back().getOpcode()) {
-  case XCore::RETSP_u6:     // Return.
-  case XCore::RETSP_lu6:
-  case XCore::BAU_1r:       // Indirect branch.
-  case XCore::BRFU_u6:      // Uncond branch.
-  case XCore::BRFU_lu6:
-  case XCore::BRBU_u6:
-  case XCore::BRBU_lu6:
-    return true;
-  default: return false;
-  }
 }
 
 /// ReverseBranchCondition - Return the inverse opcode of the 

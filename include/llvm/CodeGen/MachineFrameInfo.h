@@ -15,13 +15,15 @@
 #define LLVM_CODEGEN_MACHINEFRAMEINFO_H
 
 #include "llvm/ADT/BitVector.h"
-#include "llvm/ADT/DenseSet.h"
-#include "llvm/Support/DataTypes.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/System/DataTypes.h"
 #include <cassert>
-#include <iosfwd>
+#include <limits>
 #include <vector>
 
 namespace llvm {
+class raw_ostream;
 class TargetData;
 class TargetRegisterClass;
 class Type;
@@ -86,6 +88,10 @@ class MachineFrameInfo {
 
   // StackObject - Represent a single object allocated on the stack.
   struct StackObject {
+    // SPOffset - The offset of this object from the stack pointer on entry to
+    // the function.  This field has no meaning for a variable sized element.
+    int64_t SPOffset;
+    
     // The size of this object on the stack. 0 means a variable sized object,
     // ~0ULL means a dead object.
     uint64_t Size;
@@ -98,12 +104,14 @@ class MachineFrameInfo {
     // default, fixed objects are immutable unless marked otherwise.
     bool isImmutable;
 
-    // SPOffset - The offset of this object from the stack pointer on entry to
-    // the function.  This field has no meaning for a variable sized element.
-    int64_t SPOffset;
-    
-    StackObject(uint64_t Sz, unsigned Al, int64_t SP = 0, bool IM = false)
-      : Size(Sz), Alignment(Al), isImmutable(IM), SPOffset(SP) {}
+    // isSpillSlot - If true, the stack object is used as spill slot. It
+    // cannot alias any other memory objects.
+    bool isSpillSlot;
+
+    StackObject(uint64_t Sz, unsigned Al, int64_t SP, bool IM,
+                bool isSS)
+      : SPOffset(SP), Size(Sz), Alignment(Al), isImmutable(IM),
+        isSpillSlot(isSS) {}
   };
 
   /// Objects - The list of stack objects allocated...
@@ -133,11 +141,14 @@ class MachineFrameInfo {
   uint64_t StackSize;
   
   /// OffsetAdjustment - The amount that a frame offset needs to be adjusted to
-  /// have the actual offset from the stack/frame pointer.  The calculation is 
-  /// MFI->getObjectOffset(Index) + StackSize - TFI.getOffsetOfLocalArea() +
-  /// OffsetAdjustment.  If OffsetAdjustment is zero (default) then offsets are
-  /// away from TOS. If OffsetAdjustment == StackSize then offsets are toward
-  /// TOS.
+  /// have the actual offset from the stack/frame pointer.  The exact usage of
+  /// this is target-dependent, but it is typically used to adjust between
+  /// SP-relative and FP-relative offsets.  E.G., if objects are accessed via
+  /// SP then OffsetAdjustment is zero; if FP is used, OffsetAdjustment is set
+  /// to the distance between the initial SP and the value in FP.  For many
+  /// targets, this value is only used when generating debug info (via
+  /// TargetRegisterInfo::getFrameIndexOffset); when generating code, the
+  /// corresponding adjustments are performed directly.
   int OffsetAdjustment;
   
   /// MaxAlignment - The prolog/epilog code inserter may process objects 
@@ -173,6 +184,10 @@ class MachineFrameInfo {
   /// CSIValid - Has CSInfo been set yet?
   bool CSIValid;
 
+  /// SpillObjects - A vector indicating which frame indices refer to
+  /// spill slots.
+  SmallVector<bool, 8> SpillObjects;
+
   /// MMI - This field is set (via setMachineModuleInfo) by a module info
   /// consumer (ex. DwarfWriter) to indicate that frame layout information
   /// should be acquired.  Typically, it's the responsibility of the target's
@@ -183,6 +198,7 @@ class MachineFrameInfo {
   /// TargetFrameInfo - Target information about frame layout.
   ///
   const TargetFrameInfo &TFI;
+
 public:
   explicit MachineFrameInfo(const TargetFrameInfo &tfi) : TFI(tfi) {
     StackSize = NumFixedObjects = OffsetAdjustment = MaxAlignment = 0;
@@ -260,6 +276,7 @@ public:
     assert(unsigned(ObjectIdx+NumFixedObjects) < Objects.size() &&
            "Invalid Object Idx!");
     Objects[ObjectIdx+NumFixedObjects].Alignment = Align;
+    MaxAlignment = std::max(MaxAlignment, Align);
   }
 
   /// getObjectOffset - Return the assigned stack offset of the specified object
@@ -311,7 +328,7 @@ public:
   /// setMaxAlignment - Set the preferred alignment.
   ///
   void setMaxAlignment(unsigned Align) { MaxAlignment = Align; }
-  
+
   /// hasCalls - Return true if the current function has no function calls.
   /// This is only valid during or after prolog/epilog code emission.
   ///
@@ -332,7 +349,7 @@ public:
   /// index with a negative value.
   ///
   int CreateFixedObject(uint64_t Size, int64_t SPOffset,
-                        bool Immutable = true);
+                        bool Immutable, bool isSS);
   
   
   /// isFixedObjectIndex - Returns true if the specified index corresponds to a
@@ -349,6 +366,14 @@ public:
     return Objects[ObjectIdx+NumFixedObjects].isImmutable;
   }
 
+  /// isSpillSlotObjectIndex - Returns true if the specified index corresponds
+  /// to a spill slot..
+  bool isSpillSlotObjectIndex(int ObjectIdx) const {
+    assert(unsigned(ObjectIdx+NumFixedObjects) < Objects.size() &&
+           "Invalid Object Idx!");
+    return Objects[ObjectIdx+NumFixedObjects].isSpillSlot;;
+  }
+
   /// isDeadObjectIndex - Returns true if the specified index corresponds to
   /// a dead object.
   bool isDeadObjectIndex(int ObjectIdx) const {
@@ -357,13 +382,27 @@ public:
     return Objects[ObjectIdx+NumFixedObjects].Size == ~0ULL;
   }
 
-  /// CreateStackObject - Create a new statically sized stack object, returning
-  /// a nonnegative identifier to represent it.
+  /// CreateStackObject - Create a new statically sized stack object,
+  /// returning a nonnegative identifier to represent it.
   ///
-  int CreateStackObject(uint64_t Size, unsigned Alignment) {
+  int CreateStackObject(uint64_t Size, unsigned Alignment, bool isSS) {
     assert(Size != 0 && "Cannot allocate zero size stack objects!");
-    Objects.push_back(StackObject(Size, Alignment));
-    return (int)Objects.size()-NumFixedObjects-1;
+    Objects.push_back(StackObject(Size, Alignment, 0, false, isSS));
+    int Index = (int)Objects.size()-NumFixedObjects-1;
+    assert(Index >= 0 && "Bad frame index!");
+    MaxAlignment = std::max(MaxAlignment, Alignment);
+    return Index;
+  }
+
+  /// CreateSpillStackObject - Create a new statically sized stack
+  /// object that represents a spill slot, returning a nonnegative
+  /// identifier to represent it.
+  ///
+  int CreateSpillStackObject(uint64_t Size, unsigned Alignment) {
+    CreateStackObject(Size, Alignment, true);
+    int Index = (int)Objects.size()-NumFixedObjects-1;
+    MaxAlignment = std::max(MaxAlignment, Alignment);
+    return Index;
   }
 
   /// RemoveStackObject - Remove or mark dead a statically sized stack object.
@@ -380,10 +419,10 @@ public:
   ///
   int CreateVariableSizedObject() {
     HasVarSizedObjects = true;
-    Objects.push_back(StackObject(0, 1));
+    Objects.push_back(StackObject(0, 1, 0, false, false));
     return (int)Objects.size()-NumFixedObjects-1;
   }
-  
+
   /// getCalleeSavedInfo - Returns a reference to call saved info vector for the
   /// current function.
   const std::vector<CalleeSavedInfo> &getCalleeSavedInfo() const {
@@ -423,7 +462,7 @@ public:
   /// print - Used by the MachineFunction printer to print information about
   /// stack objects.  Implemented in MachineFunction.cpp
   ///
-  void print(const MachineFunction &MF, std::ostream &OS) const;
+  void print(const MachineFunction &MF, raw_ostream &OS) const;
 
   /// dump - Print the function to stderr.
   void dump(const MachineFunction &MF) const;

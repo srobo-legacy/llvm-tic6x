@@ -1,4 +1,4 @@
-//===-- Thumb2ITBlockPass.cpp - Insert Thumb IT blocks -----------*- C++ -*-===//
+//===-- Thumb2ITBlockPass.cpp - Insert Thumb IT blocks ----------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -14,14 +14,13 @@
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
-#include "llvm/Support/Compiler.h"
 #include "llvm/ADT/Statistic.h"
 using namespace llvm;
 
 STATISTIC(NumITs,     "Number of IT blocks inserted");
 
 namespace {
-  struct VISIBILITY_HIDDEN Thumb2ITBlockPass : public MachineFunctionPass {
+  struct Thumb2ITBlockPass : public MachineFunctionPass {
     static char ID;
     Thumb2ITBlockPass() : MachineFunctionPass(&ID) {}
 
@@ -40,12 +39,11 @@ namespace {
   char Thumb2ITBlockPass::ID = 0;
 }
 
-static ARMCC::CondCodes getPredicate(const MachineInstr *MI,
-                                     const Thumb2InstrInfo *TII) {
+static ARMCC::CondCodes getPredicate(const MachineInstr *MI, unsigned &PredReg){
   unsigned Opc = MI->getOpcode();
   if (Opc == ARM::tBcc || Opc == ARM::t2Bcc)
     return ARMCC::AL;
-  return TII->getPredicate(MI);
+  return llvm::getInstrPredicate(MI, PredReg);
 }
 
 bool Thumb2ITBlockPass::InsertITBlocks(MachineBasicBlock &MBB) {
@@ -54,14 +52,16 @@ bool Thumb2ITBlockPass::InsertITBlocks(MachineBasicBlock &MBB) {
   MachineBasicBlock::iterator MBBI = MBB.begin(), E = MBB.end();
   while (MBBI != E) {
     MachineInstr *MI = &*MBBI;
-    ARMCC::CondCodes CC = getPredicate(MI, TII);
+    DebugLoc dl = MI->getDebugLoc();
+    unsigned PredReg = 0;
+    ARMCC::CondCodes CC = getPredicate(MI, PredReg);
+
     if (CC == ARMCC::AL) {
       ++MBBI;
       continue;
     }
 
     // Insert an IT instruction.
-    DebugLoc dl = MI->getDebugLoc();
     MachineInstrBuilder MIB = BuildMI(MBB, MBBI, dl, TII->get(ARM::t2IT))
       .addImm(CC);
     ++MBBI;
@@ -69,8 +69,15 @@ bool Thumb2ITBlockPass::InsertITBlocks(MachineBasicBlock &MBB) {
     // Finalize IT mask.
     ARMCC::CondCodes OCC = ARMCC::getOppositeCondition(CC);
     unsigned Mask = 0, Pos = 3;
-    while (MBBI != E && Pos) {
-      ARMCC::CondCodes NCC = getPredicate(&*MBBI, TII);
+    // Branches, including tricky ones like LDM_RET, need to end an IT
+    // block so check the instruction we just put in the block.
+    while (MBBI != E && Pos &&
+           (!MI->getDesc().isBranch() && !MI->getDesc().isReturn())) {
+      MachineInstr *NMI = &*MBBI;
+      MI = NMI;
+      DebugLoc ndl = NMI->getDebugLoc();
+      unsigned NPredReg = 0;
+      ARMCC::CondCodes NCC = getPredicate(NMI, NPredReg);
       if (NCC == OCC) {
         Mask |= (1 << Pos);
       } else if (NCC != CC)

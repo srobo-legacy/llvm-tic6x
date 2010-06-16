@@ -15,6 +15,7 @@
 #include "InstrInfoEmitter.h"
 #include "CodeGenTarget.h"
 #include "Record.h"
+#include "llvm/ADT/StringExtras.h"
 #include <algorithm>
 using namespace llvm;
 
@@ -117,7 +118,20 @@ InstrInfoEmitter::GetOperandInfo(const CodeGenInstruction &Inst) {
         Res += "|(1<<TOI::OptionalDef)";
 
       // Fill in constraint info.
-      Res += ", " + Inst.OperandList[i].Constraints[j];
+      Res += ", ";
+      
+      const CodeGenInstruction::ConstraintInfo &Constraint =
+        Inst.OperandList[i].Constraints[j];
+      if (Constraint.isNone())
+        Res += "0";
+      else if (Constraint.isEarlyClobber())
+        Res += "(1 << TOI::EARLY_CLOBBER)";
+      else {
+        assert(Constraint.isTied());
+        Res += "((" + utostr(Constraint.getTiedOperand()) +
+                    " << 16) | (1 << TOI::TIED_TO))";
+      }
+        
       Result.push_back(Res);
     }
   }
@@ -274,11 +288,12 @@ void InstrInfoEmitter::emitRecord(const CodeGenInstruction &Inst, unsigned Num,
   if (Inst.isReMaterializable) OS << "|(1<<TID::Rematerializable)";
   if (Inst.isNotDuplicable)    OS << "|(1<<TID::NotDuplicable)";
   if (Inst.hasOptionalDef)     OS << "|(1<<TID::HasOptionalDef)";
-  if (Inst.usesCustomDAGSchedInserter)
-    OS << "|(1<<TID::UsesCustomDAGSchedInserter)";
+  if (Inst.usesCustomInserter) OS << "|(1<<TID::UsesCustomInserter)";
   if (Inst.isVariadic)         OS << "|(1<<TID::Variadic)";
   if (Inst.hasSideEffects)     OS << "|(1<<TID::UnmodeledSideEffects)";
   if (Inst.isAsCheapAsAMove)   OS << "|(1<<TID::CheapAsAMove)";
+  if (Inst.hasExtraSrcRegAllocReq) OS << "|(1<<TID::ExtraSrcRegAllocReq)";
+  if (Inst.hasExtraDefRegAllocReq) OS << "|(1<<TID::ExtraDefRegAllocReq)";
   OS << ", 0";
 
   // Emit all of the target-specific flags...
@@ -338,12 +353,13 @@ void InstrInfoEmitter::emitShiftedValue(Record *R, StringInit *Val,
         R->getName() != "DBG_LABEL" &&
         R->getName() != "EH_LABEL" &&
         R->getName() != "GC_LABEL" &&
-        R->getName() != "DECLARE" &&
+        R->getName() != "KILL" &&
         R->getName() != "EXTRACT_SUBREG" &&
         R->getName() != "INSERT_SUBREG" &&
         R->getName() != "IMPLICIT_DEF" &&
         R->getName() != "SUBREG_TO_REG" &&
-        R->getName() != "COPY_TO_REGCLASS")
+        R->getName() != "COPY_TO_REGCLASS" &&
+        R->getName() != "DBG_VALUE")
       throw R->getName() + " doesn't have a field named '" + 
             Val->getValue() + "'!";
     return;

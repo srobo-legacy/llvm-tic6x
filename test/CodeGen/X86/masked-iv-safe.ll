@@ -1,4 +1,4 @@
-; RUN: llvm-as < %s | llc -march=x86-64 > %t
+; RUN: llc < %s -march=x86-64 > %t
 ; RUN: not grep and %t
 ; RUN: not grep movz %t
 ; RUN: not grep sar %t
@@ -169,7 +169,7 @@ loop:
 	%indvar.i24 = and i64 %indvar, 16777215
 	%t3 = getelementptr double* %d, i64 %indvar.i24
 	%t4 = load double* %t3
-	%t5 = fmul double %t4, 2.3
+	%t5 = fdiv double %t4, 2.3
 	store double %t5, double* %t3
 	%t6 = getelementptr double* %d, i64 %indvar
 	%t7 = load double* %t6
@@ -199,7 +199,7 @@ loop:
 	%indvar.i24 = ashr i64 %s1, 24
 	%t3 = getelementptr double* %d, i64 %indvar.i24
 	%t4 = load double* %t3
-	%t5 = fmul double %t4, 2.3
+	%t5 = fdiv double %t4, 2.3
 	store double %t5, double* %t3
 	%t6 = getelementptr double* %d, i64 %indvar
 	%t7 = load double* %t6
@@ -229,7 +229,7 @@ loop:
 	%indvar.i24 = ashr i64 %s1, 24
 	%t3 = getelementptr double* %d, i64 %indvar.i24
 	%t4 = load double* %t3
-	%t5 = fmul double %t4, 2.3
+	%t5 = fdiv double %t4, 2.3
 	store double %t5, double* %t3
 	%t6 = getelementptr double* %d, i64 %indvar
 	%t7 = load double* %t6

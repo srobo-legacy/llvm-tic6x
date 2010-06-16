@@ -1,4 +1,4 @@
-(* RUN: %ocamlc -warn-error A llvm.cma llvm_target.cma llvm_executionengine.cma %s -o %t 2> /dev/null
+(* RUN: %ocamlopt -warn-error A llvm.cmxa llvm_target.cmxa llvm_executionengine.cmxa %s -o %t
  * RUN: ./%t %t.bc
  *)
 
@@ -64,9 +64,8 @@ let test_executionengine () =
   let m2 = create_module (global_context ()) "test_module2" in
   define_plus m2;
   
-  let ee = ExecutionEngine.create (ModuleProvider.create m) in
-  let mp2 = ModuleProvider.create m2 in
-  ExecutionEngine.add_module_provider mp2 ee;
+  let ee = ExecutionEngine.create m in
+  ExecutionEngine.add_module m2 ee;
   
   (* run_static_ctors *)
   ExecutionEngine.run_static_ctors ee;
@@ -94,8 +93,8 @@ let test_executionengine () =
                                          ee in
   if 4 != GenericValue.as_int res then bomb "plus did not work";
   
-  (* remove_module_provider *)
-  Llvm.dispose_module (ExecutionEngine.remove_module_provider mp2 ee);
+  (* remove_module *)
+  Llvm.dispose_module (ExecutionEngine.remove_module m2 ee);
   
   (* run_static_dtors *)
   ExecutionEngine.run_static_dtors ee;

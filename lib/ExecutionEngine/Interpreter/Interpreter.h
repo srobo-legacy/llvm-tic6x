@@ -17,12 +17,12 @@
 #include "llvm/Function.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
-#include "llvm/Support/InstVisitor.h"
-#include "llvm/Support/CallSite.h"
 #include "llvm/Target/TargetData.h"
-#include "llvm/Support/DataTypes.h"
+#include "llvm/Support/CallSite.h"
+#include "llvm/System/DataTypes.h"
 #include "llvm/Support/ErrorHandling.h"
-
+#include "llvm/Support/InstVisitor.h"
+#include "llvm/Support/raw_ostream.h"
 namespace llvm {
 
 class IntrinsicLowering;
@@ -94,7 +94,7 @@ class Interpreter : public ExecutionEngine, public InstVisitor<Interpreter> {
   std::vector<Function*> AtExitHandlers;
 
 public:
-  explicit Interpreter(ModuleProvider *M);
+  explicit Interpreter(Module *M);
   ~Interpreter();
 
   /// runAtExitHandlers - Run any functions registered by the program's calls to
@@ -108,7 +108,7 @@ public:
   
   /// create - Create an interpreter ExecutionEngine. This can never fail.
   ///
-  static ExecutionEngine *create(ModuleProvider *M, std::string *ErrorStr = 0);
+  static ExecutionEngine *create(Module *M, std::string *ErrorStr = 0);
 
   /// run - Start execution with the specified function and arguments.
   ///
@@ -135,12 +135,12 @@ public:
   void visitReturnInst(ReturnInst &I);
   void visitBranchInst(BranchInst &I);
   void visitSwitchInst(SwitchInst &I);
+  void visitIndirectBrInst(IndirectBrInst &I);
 
   void visitBinaryOperator(BinaryOperator &I);
   void visitICmpInst(ICmpInst &I);
   void visitFCmpInst(FCmpInst &I);
-  void visitAllocationInst(AllocationInst &I);
-  void visitFreeInst(FreeInst &I);
+  void visitAllocaInst(AllocaInst &I);
   void visitLoadInst(LoadInst &I);
   void visitStoreInst(StoreInst &I);
   void visitGetElementPtrInst(GetElementPtrInst &I);
@@ -174,7 +174,7 @@ public:
 
   void visitVAArgInst(VAArgInst &I);
   void visitInstruction(Instruction &I) {
-    cerr << I;
+    errs() << I;
     llvm_unreachable("Instruction not interpretable yet!");
   }
 
@@ -203,6 +203,7 @@ private:  // Helper functions
   void SwitchToNewBasicBlock(BasicBlock *Dest, ExecutionContext &SF);
 
   void *getPointerToFunction(Function *F) { return (void*)F; }
+  void *getPointerToBasicBlock(BasicBlock *BB) { return (void*)BB; }
 
   void initializeExecutionEngine() { }
   void initializeExternalFunctions();

@@ -17,7 +17,9 @@
 #include "llvm/Analysis/LoopInfo.h"
 using namespace llvm;
 
-FunctionPass *llvm::createLiveValuesPass() { return new LiveValues(); }
+namespace llvm {
+  FunctionPass *createLiveValuesPass() { return new LiveValues(); }
+}
 
 char LiveValues::ID = 0;
 static RegisterPass<LiveValues>
@@ -182,7 +184,7 @@ LiveValues::Memo &LiveValues::compute(const Value *V) {
     }
   }
 
-  // If the value was never used outside the the block in which it was
+  // If the value was never used outside the block in which it was
   // defined, it's killed in that block.
   if (!LiveOutOfDefBB)
     M.Killed.insert(DefBB);

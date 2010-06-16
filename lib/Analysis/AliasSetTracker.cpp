@@ -19,10 +19,11 @@
 #include "llvm/Type.h"
 #include "llvm/Target/TargetData.h"
 #include "llvm/Assembly/Writer.h"
-#include "llvm/Support/Compiler.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InstIterator.h"
-#include "llvm/Support/Streams.h"
+#include "llvm/Support/Format.h"
+#include "llvm/Support/raw_ostream.h"
 using namespace llvm;
 
 /// mergeSetIn - Merge the specified alias set into this alias set.
@@ -153,9 +154,6 @@ bool AliasSet::aliasesPointer(const Value *Ptr, unsigned Size,
 
   // Check the call sites list and invoke list...
   if (!CallSites.empty()) {
-    if (AA.hasNoModRefInfoForCalls())
-      return true;
-
     for (unsigned i = 0, e = CallSites.size(); i != e; ++i)
       if (AA.getModRefInfo(CallSites[i], const_cast<Value*>(Ptr), Size)
                    != AliasAnalysis::NoModRef)
@@ -168,9 +166,6 @@ bool AliasSet::aliasesPointer(const Value *Ptr, unsigned Size,
 bool AliasSet::aliasesCallSite(CallSite CS, AliasAnalysis &AA) const {
   if (AA.doesNotAccessMemory(CS))
     return false;
-
-  if (AA.hasNoModRefInfoForCalls())
-    return true;
 
   for (unsigned i = 0, e = CallSites.size(); i != e; ++i)
     if (AA.getModRefInfo(CallSites[i], CS) != AliasAnalysis::NoModRef ||
@@ -296,12 +291,6 @@ bool AliasSetTracker::add(StoreInst *SI) {
   return NewPtr;
 }
 
-bool AliasSetTracker::add(FreeInst *FI) {
-  bool NewPtr;
-  addPointer(FI->getOperand(0), ~0, AliasSet::Mods, NewPtr);
-  return NewPtr;
-}
-
 bool AliasSetTracker::add(VAArgInst *VAAI) {
   bool NewPtr;
   addPointer(VAAI->getOperand(0), ~0, AliasSet::ModRef, NewPtr);
@@ -337,8 +326,6 @@ bool AliasSetTracker::add(Instruction *I) {
     return add(CI);
   else if (InvokeInst *II = dyn_cast<InvokeInst>(I))
     return add(II);
-  else if (FreeInst *FI = dyn_cast<FreeInst>(I))
-    return add(FI);
   else if (VAArgInst *VAAI = dyn_cast<VAArgInst>(I))
     return add(VAAI);
   return true;
@@ -427,13 +414,6 @@ bool AliasSetTracker::remove(StoreInst *SI) {
   return true;
 }
 
-bool AliasSetTracker::remove(FreeInst *FI) {
-  AliasSet *AS = findAliasSetForPointer(FI->getOperand(0), ~0);
-  if (!AS) return false;
-  remove(*AS);
-  return true;
-}
-
 bool AliasSetTracker::remove(VAArgInst *VAAI) {
   AliasSet *AS = findAliasSetForPointer(VAAI->getOperand(0), ~0);
   if (!AS) return false;
@@ -459,8 +439,6 @@ bool AliasSetTracker::remove(Instruction *I) {
     return remove(SI);
   else if (CallInst *CI = dyn_cast<CallInst>(I))
     return remove(CI);
-  else if (FreeInst *FI = dyn_cast<FreeInst>(I))
-    return remove(FI);
   else if (VAArgInst *VAAI = dyn_cast<VAArgInst>(I))
     return remove(VAAI);
   return true;
@@ -531,8 +509,8 @@ void AliasSetTracker::copyValue(Value *From, Value *To) {
 //               AliasSet/AliasSetTracker Printing Support
 //===----------------------------------------------------------------------===//
 
-void AliasSet::print(std::ostream &OS) const {
-  OS << "  AliasSet[" << (void*)this << "," << RefCount << "] ";
+void AliasSet::print(raw_ostream &OS) const {
+  OS << "  AliasSet[" << format("0x%p", (void*)this) << "," << RefCount << "] ";
   OS << (AliasTy == MustAlias ? "must" : "may") << " alias, ";
   switch (AccessTy) {
   case NoModRef: OS << "No access "; break;
@@ -564,7 +542,7 @@ void AliasSet::print(std::ostream &OS) const {
   OS << "\n";
 }
 
-void AliasSetTracker::print(std::ostream &OS) const {
+void AliasSetTracker::print(raw_ostream &OS) const {
   OS << "Alias Set Tracker: " << AliasSets.size() << " alias sets for "
      << PointerMap.size() << " pointer values.\n";
   for (const_iterator I = begin(), E = end(); I != E; ++I)
@@ -572,8 +550,8 @@ void AliasSetTracker::print(std::ostream &OS) const {
   OS << "\n";
 }
 
-void AliasSet::dump() const { print (cerr); }
-void AliasSetTracker::dump() const { print(cerr); }
+void AliasSet::dump() const { print(dbgs()); }
+void AliasSetTracker::dump() const { print(dbgs()); }
 
 //===----------------------------------------------------------------------===//
 //                     ASTCallbackVH Class Implementation
@@ -598,7 +576,7 @@ AliasSetTracker::ASTCallbackVH::operator=(Value *V) {
 //===----------------------------------------------------------------------===//
 
 namespace {
-  class VISIBILITY_HIDDEN AliasSetPrinter : public FunctionPass {
+  class AliasSetPrinter : public FunctionPass {
     AliasSetTracker *Tracker;
   public:
     static char ID; // Pass identification, replacement for typeid
@@ -614,7 +592,7 @@ namespace {
 
       for (inst_iterator I = inst_begin(F), E = inst_end(F); I != E; ++I)
         Tracker->add(&*I);
-      Tracker->print(cerr);
+      Tracker->print(errs());
       delete Tracker;
       return false;
     }

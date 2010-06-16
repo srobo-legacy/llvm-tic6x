@@ -3,6 +3,7 @@ set(LLVM_TARGET_DEFINITIONS X86.td)
 tablegen(X86GenRegisterInfo.h.inc -gen-register-desc-header)
 tablegen(X86GenRegisterNames.inc -gen-register-enums)
 tablegen(X86GenRegisterInfo.inc -gen-register-desc)
+tablegen(X86GenDisassemblerTables.inc -gen-disassembler)
 tablegen(X86GenInstrNames.inc -gen-instr-enums)
 tablegen(X86GenInstrInfo.inc -gen-instr-desc)
 tablegen(X86GenAsmWriter.inc -gen-asm-writer)
@@ -14,7 +15,9 @@ tablegen(X86GenCallingConv.inc -gen-callingconv)
 tablegen(X86GenSubtarget.inc -gen-subtarget)
 
 set(sources
+  X86AsmBackend.cpp
   X86CodeEmitter.cpp
+  X86COFFMachineModuleInfo.cpp
   X86ELFWriterInfo.cpp
   X86FloatingPoint.cpp
   X86FloatingPointRegKill.cpp
@@ -22,10 +25,13 @@ set(sources
   X86ISelLowering.cpp
   X86InstrInfo.cpp
   X86JITInfo.cpp
+  X86MCAsmInfo.cpp
+  X86MCCodeEmitter.cpp 
+  X86MCTargetExpr.cpp
   X86RegisterInfo.cpp
   X86Subtarget.cpp
-  X86TargetAsmInfo.cpp
   X86TargetMachine.cpp
+  X86TargetObjectFile.cpp
   X86FastISel.cpp
   )
 

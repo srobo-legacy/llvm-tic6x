@@ -6,6 +6,7 @@
 # License. See LICENSE.TXT for details.
 #
 ##===----------------------------------------------------------------------===##
+
 LEVEL = ../../..
 LIBRARYNAME = LLVMBlackfinCodeGen
 TARGET = Blackfin
@@ -15,7 +16,7 @@ BUILT_SOURCES = BlackfinGenRegisterInfo.h.inc BlackfinGenRegisterNames.inc \
                 BlackfinGenRegisterInfo.inc BlackfinGenInstrNames.inc \
                 BlackfinGenInstrInfo.inc BlackfinGenAsmWriter.inc \
                 BlackfinGenDAGISel.inc BlackfinGenSubtarget.inc \
-		BlackfinGenCallingConv.inc
+		BlackfinGenCallingConv.inc BlackfinGenIntrinsics.inc
 
 DIRS = AsmPrinter TargetInfo
 

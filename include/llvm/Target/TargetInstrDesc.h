@@ -25,9 +25,10 @@ class TargetRegisterInfo;
 //===----------------------------------------------------------------------===//
   
 namespace TOI {
-  // Operand constraints: only "tied_to" for now.
+  // Operand constraints
   enum OperandConstraint {
-    TIED_TO = 0  // Must be allocated the same register as.
+    TIED_TO = 0,    // Must be allocated the same register as.
+    EARLY_CLOBBER   // Operand is an early clobber register operand
   };
   
   /// OperandFlags - These are flags set on operands, but should be considered
@@ -109,9 +110,11 @@ namespace TID {
     UnmodeledSideEffects,
     Commutable,
     ConvertibleTo3Addr,
-    UsesCustomDAGSchedInserter,
+    UsesCustomInserter,
     Rematerializable,
-    CheapAsAMove
+    CheapAsAMove,
+    ExtraSrcRegAllocReq,
+    ExtraDefRegAllocReq
   };
 }
 
@@ -414,7 +417,7 @@ public:
     return Flags & (1 << TID::ConvertibleTo3Addr);
   }
   
-  /// usesCustomDAGSchedInsertionHook - Return true if this instruction requires
+  /// usesCustomInsertionHook - Return true if this instruction requires
   /// custom insertion support when the DAG scheduler is inserting it into a
   /// machine basic block.  If this is true for the instruction, it basically
   /// means that it is a pseudo instruction used at SelectionDAG time that is 
@@ -422,8 +425,8 @@ public:
   ///
   /// If this is true, the TargetLoweringInfo::InsertAtEndOfBasicBlock method
   /// is used to insert this into the MachineBasicBlock.
-  bool usesCustomDAGSchedInsertionHook() const {
-    return Flags & (1 << TID::UsesCustomDAGSchedInserter);
+  bool usesCustomInsertionHook() const {
+    return Flags & (1 << TID::UsesCustomInserter);
   }
   
   /// isRematerializable - Returns true if this instruction is a candidate for
@@ -442,6 +445,26 @@ public:
   /// are not marking copies from and to the same register class with this flag.
   bool isAsCheapAsAMove() const {
     return Flags & (1 << TID::CheapAsAMove);
+  }
+
+  /// hasExtraSrcRegAllocReq - Returns true if this instruction source operands
+  /// have special register allocation requirements that are not captured by the
+  /// operand register classes. e.g. ARM::STRD's two source registers must be an
+  /// even / odd pair, ARM::STM registers have to be in ascending order.
+  /// Post-register allocation passes should not attempt to change allocations
+  /// for sources of instructions with this flag.
+  bool hasExtraSrcRegAllocReq() const {
+    return Flags & (1 << TID::ExtraSrcRegAllocReq);
+  }
+
+  /// hasExtraDefRegAllocReq - Returns true if this instruction def operands
+  /// have special register allocation requirements that are not captured by the
+  /// operand register classes. e.g. ARM::LDRD's two def registers must be an
+  /// even / odd pair, ARM::LDM registers have to be in ascending order.
+  /// Post-register allocation passes should not attempt to change allocations
+  /// for definitions of instructions with this flag.
+  bool hasExtraDefRegAllocReq() const {
+    return Flags & (1 << TID::ExtraDefRegAllocReq);
   }
 };
 

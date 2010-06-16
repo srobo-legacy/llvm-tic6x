@@ -171,14 +171,6 @@ FunctionPass *createReassociatePass();
 
 //===----------------------------------------------------------------------===//
 //
-// CondPropagationPass - This pass propagates information about conditional
-// expressions through the program, allowing it to eliminate conditional
-// branches in some cases.
-//
-FunctionPass *createCondPropagationPass();
-
-//===----------------------------------------------------------------------===//
-//
 // TailDuplication - Eliminate unconditional branches through controlled code
 // duplication, creating simpler CFG structures.
 //
@@ -220,18 +212,8 @@ extern const PassInfo *const BreakCriticalEdgesID;
 //
 //   AU.addRequiredID(LoopSimplifyID);
 //
-FunctionPass *createLoopSimplifyPass();
+Pass *createLoopSimplifyPass();
 extern const PassInfo *const LoopSimplifyID;
-
-//===----------------------------------------------------------------------===//
-//
-// LowerAllocations - Turn malloc and free instructions into @malloc and @free
-// calls.
-//
-//   AU.addRequiredID(LowerAllocationsID);
-//
-Pass *createLowerAllocationsPass(bool LowerMallocArgToInteger = false);
-extern const PassInfo *const LowerAllocationsID;
 
 //===----------------------------------------------------------------------===//
 //
@@ -278,24 +260,10 @@ extern const PassInfo *const LCSSAID;
 
 //===----------------------------------------------------------------------===//
 //
-// PredicateSimplifier - This pass collapses duplicate variables into one
-// canonical form, and tries to simplify expressions along the way.
-//
-FunctionPass *createPredicateSimplifierPass();
-
-//===----------------------------------------------------------------------===//
-//
-// GVN-PRE - This pass performs global value numbering and partial redundancy
-// elimination.
-//
-FunctionPass *createGVNPREPass();
-
-//===----------------------------------------------------------------------===//
-//
 // GVN - This pass performs global value numbering and redundant load 
 // elimination cotemporaneously.
 //
-FunctionPass *createGVNPass();
+FunctionPass *createGVNPass(bool NoLoads = false);
 
 //===----------------------------------------------------------------------===//
 //
@@ -329,7 +297,6 @@ FunctionPass *createSimplifyHalfPowrLibCallsPass();
 //
 FunctionPass *createCodeGenPreparePass(const TargetLowering *TLI = 0);
 
-  
 //===----------------------------------------------------------------------===//
 //
 // InstructionNamer - Give any unnamed non-void instructions "tmp" names.
@@ -350,6 +317,24 @@ FunctionPass *createSSIPass();
 // Information form.
 //
 FunctionPass *createSSIEverythingPass();
+
+//===----------------------------------------------------------------------===//
+//
+// GEPSplitter - Split complex GEPs into simple ones
+//
+FunctionPass *createGEPSplitterPass();
+
+//===----------------------------------------------------------------------===//
+//
+// SCCVN - Aggressively eliminate redundant scalar values
+//
+FunctionPass *createSCCVNPass();
+
+//===----------------------------------------------------------------------===//
+//
+// ABCD - Elimination of Array Bounds Checks on Demand
+//
+FunctionPass *createABCDPass();
 
 } // End llvm namespace
 

@@ -11,11 +11,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/Instruction.h"
 #include "llvm/Type.h"
 #include "llvm/Instructions.h"
-#include "llvm/Function.h"
 #include "llvm/Constants.h"
-#include "llvm/GlobalVariable.h"
+#include "llvm/Module.h"
 #include "llvm/Support/CallSite.h"
 #include "llvm/Support/LeakDetector.h"
 using namespace llvm;
@@ -49,6 +49,8 @@ Instruction::Instruction(const Type *ty, unsigned it, Use *Ops, unsigned NumOps,
 // Out of line virtual method, so the vtable, etc has a home.
 Instruction::~Instruction() {
   assert(Parent == 0 && "Instruction still linked in the program!");
+  if (hasMetadata())
+    removeAllMetadata();
 }
 
 
@@ -97,6 +99,7 @@ const char *Instruction::getOpcodeName(unsigned OpCode) {
   case Ret:    return "ret";
   case Br:     return "br";
   case Switch: return "switch";
+  case IndirectBr: return "indirectbr";
   case Invoke: return "invoke";
   case Unwind: return "unwind";
   case Unreachable: return "unreachable";
@@ -121,8 +124,6 @@ const char *Instruction::getOpcodeName(unsigned OpCode) {
   case Xor: return "xor";
 
   // Memory instructions...
-  case Malloc:        return "malloc";
-  case Free:          return "free";
   case Alloca:        return "alloca";
   case Load:          return "load";
   case Store:         return "store";
@@ -168,6 +169,14 @@ const char *Instruction::getOpcodeName(unsigned OpCode) {
 /// identical to the current one.  This means that all operands match and any
 /// extra information (e.g. load is volatile) agree.
 bool Instruction::isIdenticalTo(const Instruction *I) const {
+  return isIdenticalToWhenDefined(I) &&
+         SubclassOptionalData == I->SubclassOptionalData;
+}
+
+/// isIdenticalToWhenDefined - This is like isIdenticalTo, except that it
+/// ignores the SubclassOptionalData flags, which specify conditions
+/// under which the instruction's result is undefined.
+bool Instruction::isIdenticalToWhenDefined(const Instruction *I) const {
   if (getOpcode() != I->getOpcode() ||
       getNumOperands() != I->getNumOperands() ||
       getType() != I->getType())
@@ -283,11 +292,11 @@ bool Instruction::isUsedOutsideOfBlock(const BasicBlock *BB) const {
         return true;
       continue;
     }
-    
+
     if (PN->getIncomingBlock(UI) != BB)
       return true;
   }
-  return false;    
+  return false;
 }
 
 /// mayReadFromMemory - Return true if this instruction may read memory.
@@ -295,7 +304,6 @@ bool Instruction::isUsedOutsideOfBlock(const BasicBlock *BB) const {
 bool Instruction::mayReadFromMemory() const {
   switch (getOpcode()) {
   default: return false;
-  case Instruction::Free:
   case Instruction::VAArg:
   case Instruction::Load:
     return true;
@@ -313,7 +321,6 @@ bool Instruction::mayReadFromMemory() const {
 bool Instruction::mayWriteToMemory() const {
   switch (getOpcode()) {
   default: return false;
-  case Instruction::Free:
   case Instruction::Store:
   case Instruction::VAArg:
     return true;
@@ -392,7 +399,9 @@ bool Instruction::isSafeToSpeculativelyExecute() const {
   case Load: {
     if (cast<LoadInst>(this)->isVolatile())
       return false;
-    if (isa<AllocationInst>(getOperand(0)))
+    // Note that it is not safe to speculate into a malloc'd region because
+    // malloc may return null.
+    if (isa<AllocaInst>(getOperand(0)))
       return true;
     if (GlobalVariable *GV = dyn_cast<GlobalVariable>(getOperand(0)))
       return !GV->hasExternalWeakLinkage();
@@ -407,11 +416,9 @@ bool Instruction::isSafeToSpeculativelyExecute() const {
                   // overflow-checking arithmetic, etc.)
   case VAArg:
   case Alloca:
-  case Malloc:
   case Invoke:
   case PHI:
   case Store:
-  case Free:
   case Ret:
   case Br:
   case Switch:
@@ -419,4 +426,19 @@ bool Instruction::isSafeToSpeculativelyExecute() const {
   case Unreachable:
     return false; // Misc instructions which have effects
   }
+}
+
+Instruction *Instruction::clone() const {
+  Instruction *New = clone_impl();
+  New->SubclassOptionalData = SubclassOptionalData;
+  if (!hasMetadata())
+    return New;
+  
+  // Otherwise, enumerate and copy over metadata from the old instruction to the
+  // new one.
+  SmallVector<std::pair<unsigned, MDNode*>, 4> TheMDs;
+  getAllMetadata(TheMDs);
+  for (unsigned i = 0, e = TheMDs.size(); i != e; ++i)
+    New->setMetadata(TheMDs[i].first, TheMDs[i].second);
+  return New;
 }

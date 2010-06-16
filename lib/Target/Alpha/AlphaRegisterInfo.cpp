@@ -151,8 +151,10 @@ eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
 //variable locals
 //<- SP
 
-void AlphaRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
-                                            int SPAdj, RegScavenger *RS) const {
+unsigned
+AlphaRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
+                                       int SPAdj, int *Value,
+                                       RegScavenger *RS) const {
   assert(SPAdj == 0 && "Unexpected");
 
   unsigned i = 0;
@@ -174,16 +176,16 @@ void AlphaRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   // Now add the frame object offset to the offset from the virtual frame index.
   int Offset = MF.getFrameInfo()->getObjectOffset(FrameIndex);
 
-  DOUT << "FI: " << FrameIndex << " Offset: " << Offset << "\n";
+  DEBUG(errs() << "FI: " << FrameIndex << " Offset: " << Offset << "\n");
 
   Offset += MF.getFrameInfo()->getStackSize();
 
-  DOUT << "Corrected Offset " << Offset
-       << " for stack size: " << MF.getFrameInfo()->getStackSize() << "\n";
+  DEBUG(errs() << "Corrected Offset " << Offset
+       << " for stack size: " << MF.getFrameInfo()->getStackSize() << "\n");
 
   if (Offset > IMM_HIGH || Offset < IMM_LOW) {
-    DOUT << "Unconditionally using R28 for evil purposes Offset: "
-         << Offset << "\n";
+    DEBUG(errs() << "Unconditionally using R28 for evil purposes Offset: "
+          << Offset << "\n");
     //so in this case, we need to use a temporary register, and move the
     //original inst off the SP/FP
     //fix up the old:
@@ -197,6 +199,7 @@ void AlphaRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   } else {
     MI.getOperand(i).ChangeToImmediate(Offset);
   }
+  return 0;
 }
 
 
@@ -248,7 +251,7 @@ void AlphaRegisterInfo::emitPrologue(MachineFunction &MF) const {
   } else {
     std::string msg;
     raw_string_ostream Msg(msg); 
-    Msg << "Too big a stack frame at " + NumBytes;
+    Msg << "Too big a stack frame at " << NumBytes;
     llvm_report_error(Msg.str());
   }
 
@@ -300,18 +303,17 @@ void AlphaRegisterInfo::emitEpilogue(MachineFunction &MF,
     } else {
       std::string msg;
       raw_string_ostream Msg(msg); 
-      Msg << "Too big a stack frame at " + NumBytes;
+      Msg << "Too big a stack frame at " << NumBytes;
       llvm_report_error(Msg.str());
     }
   }
 }
 
 unsigned AlphaRegisterInfo::getRARegister() const {
-  llvm_unreachable("What is the return address register");
-  return 0;
+  return Alpha::R26;
 }
 
-unsigned AlphaRegisterInfo::getFrameRegister(MachineFunction &MF) const {
+unsigned AlphaRegisterInfo::getFrameRegister(const MachineFunction &MF) const {
   return hasFP(MF) ? Alpha::R15 : Alpha::R30;
 }
 

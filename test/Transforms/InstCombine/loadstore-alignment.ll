@@ -1,4 +1,5 @@
-; RUN: llvm-as < %s | opt -instcombine | llvm-dis | grep {, align 16} | count 14
+; RUN: opt < %s -instcombine -S | grep {, align 16} | count 14
+target datalayout = "E-p:64:64:64-a0:0:8-f32:32:32-f64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:32:64-v64:64:64-v128:128:128"
 
 @x = external global <2 x i64>, align 16
 @xx = external global [13 x <2 x i64>], align 16
@@ -28,7 +29,7 @@ define <2 x i64> @foo() {
 
 define <2 x i64> @bar() {
 	%t = alloca <2 x i64>
-        call void @kip(<2 x i64>* %t);
+        call void @kip(<2 x i64>* %t)
 	%tmp1 = load <2 x i64>* %t, align 1
 	ret <2 x i64> %tmp1
 }
@@ -58,7 +59,7 @@ define void @foo_store(<2 x i64> %y) {
 
 define void @bar_store(<2 x i64> %y) {
 	%t = alloca <2 x i64>
-        call void @kip(<2 x i64>* %t);
+        call void @kip(<2 x i64>* %t)
 	store <2 x i64> %y, <2 x i64>* %t, align 1
         ret void
 }

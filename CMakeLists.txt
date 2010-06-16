@@ -4,7 +4,7 @@ project(LLVM)
 cmake_minimum_required(VERSION 2.6.1)
 
 set(PACKAGE_NAME llvm)
-set(PACKAGE_VERSION 2.6svn)
+set(PACKAGE_VERSION 2.7svn)
 set(PACKAGE_STRING "${PACKAGE_NAME} ${PACKAGE_VERSION}")
 set(PACKAGE_BUGREPORT "llvmbugs@cs.uiuc.edu")
 
@@ -52,6 +52,7 @@ set(LLVM_ALL_TARGETS
   CellSPU
   CppBackend
   Mips
+  MBlaze
   MSIL
   MSP430
   PIC16
@@ -69,6 +70,12 @@ else( MSVC )
   set(LLVM_TARGETS_TO_BUILD ${LLVM_ALL_TARGETS}
     CACHE STRING "Semicolon-separated list of targets to build, or \"all\".")
 endif( MSVC )
+
+set(C_INCLUDE_DIRS "" CACHE STRING
+  "Colon separated list of directories clang will search for headers.")
+
+set(LLVM_TARGET_ARCH "host"
+  CACHE STRING "Set target to use for LLVM JIT or use \"host\" for automatic detection.")
 
 option(LLVM_ENABLE_THREADS "Use threads if available." ON)
 
@@ -93,12 +100,6 @@ else()
     add_definitions( -DNDEBUG )
   endif()
 endif()
-
-if( uppercase_CMAKE_BUILD_TYPE STREQUAL "RELEASE" AND NOT LLVM_ENABLE_ASSERTIONS )
-  set( LLVM_COMPACT_SENTINELS 1 )
-else( uppercase_CMAKE_BUILD_TYPE STREQUAL "RELEASE" AND NOT LLVM_ENABLE_ASSERTIONS )
-  set( LLVM_COMPACT_SENTINELS 0 )
-endif( uppercase_CMAKE_BUILD_TYPE STREQUAL "RELEASE" AND NOT LLVM_ENABLE_ASSERTIONS )
 
 if( LLVM_TARGETS_TO_BUILD STREQUAL "all" )
   set( LLVM_TARGETS_TO_BUILD ${LLVM_ALL_TARGETS} )
@@ -148,7 +149,11 @@ else(WIN32)
   if(UNIX)
     set(LLVM_ON_WIN32 0)
     set(LLVM_ON_UNIX 1)
-    set(LTDL_SHLIB_EXT ".so")
+    if(APPLE)
+      set(LTDL_SHLIB_EXT ".dylib")
+    else(APPLE)
+      set(LTDL_SHLIB_EXT ".so")
+    endif(APPLE)
     set(EXEEXT "")
     # FIXME: Maximum path length is currently set to 'safe' fixed value
     set(MAXPATHLEN 2024)
@@ -163,13 +168,19 @@ option(LLVM_ENABLE_PIC "Build Position-Independent Code" ON)
 
 set(ENABLE_PIC 0)
 if( LLVM_ENABLE_PIC )
-  if( SUPPORTS_FPIC_FLAG )
-    message(STATUS "Building with -fPIC")
-    add_llvm_definitions(-fPIC)
-    set(ENABLE_PIC 1)
- else( SUPPORTS_FPIC_FLAG )
-    message(STATUS "Warning: -fPIC not supported.")
-  endif()
+ if( XCODE )
+   # Xcode has -mdynamic-no-pic on by default, which overrides -fPIC. I don't
+   # know how to disable this, so just force ENABLE_PIC off for now.
+   message(STATUS "Warning: -fPIC not supported with Xcode.")
+ else( XCODE )
+   if( SUPPORTS_FPIC_FLAG )
+      message(STATUS "Building with -fPIC")
+      add_llvm_definitions(-fPIC)
+      set(ENABLE_PIC 1)
+   else( SUPPORTS_FPIC_FLAG )
+      message(STATUS "Warning: -fPIC not supported.")
+   endif()
+ endif()
 endif()
 
 set( CMAKE_RUNTIME_OUTPUT_DIRECTORY ${LLVM_TOOLS_BINARY_DIR} )
@@ -180,6 +191,16 @@ set( CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${LLVM_BINARY_DIR}/lib )
 
 add_llvm_definitions( -D__STDC_LIMIT_MACROS )
 add_llvm_definitions( -D__STDC_CONSTANT_MACROS )
+
+# MSVC has a gazillion warnings with this.
+if( MSVC )
+  option(LLVM_ENABLE_WARNINGS "Enable compiler warnings." OFF)
+else( MSVC )
+  option(LLVM_ENABLE_WARNINGS "Enable compiler warnings." ON)
+endif()
+
+option(LLVM_ENABLE_PEDANTIC "Compile with pedantic enabled." ON)
+option(LLVM_ENABLE_WERROR "Fail and stop if a warning is triggered." OFF)
 
 if( CMAKE_SIZEOF_VOID_P EQUAL 8 AND NOT WIN32 )
   # TODO: support other platforms and toolchains.
@@ -216,9 +237,34 @@ if( MSVC )
     add_llvm_definitions("/${LLVM_USE_CRT}")
     message(STATUS "Using VC++ CRT: ${LLVM_USE_CRT}")
   endif (NOT ${LLVM_USE_CRT} STREQUAL "")
+
+  # Enable warnings
+  if (LLVM_ENABLE_WARNINGS)
+    add_llvm_definitions( /W4 /Wall )
+    if (LLVM_ENABLE_PEDANTIC)
+      # No MSVC equivalent available
+    endif (LLVM_ENABLE_PEDANTIC)
+  endif (LLVM_ENABLE_WARNINGS)
+  if (LLVM_ENABLE_WERROR)
+    add_llvm_definitions( /WX )
+  endif (LLVM_ENABLE_WERROR)
+elseif( CMAKE_COMPILER_IS_GNUCXX )
+  if (LLVM_ENABLE_WARNINGS)
+    add_llvm_definitions( -Wall -W -Wno-unused-parameter -Wwrite-strings )
+    if (LLVM_ENABLE_PEDANTIC)
+      add_llvm_definitions( -pedantic -Wno-long-long )
+    endif (LLVM_ENABLE_PEDANTIC)
+  endif (LLVM_ENABLE_WARNINGS)
+  if (LLVM_ENABLE_WERROR)
+    add_llvm_definitions( -Werror )
+  endif (LLVM_ENABLE_WERROR)
 endif( MSVC )
 
 include_directories( ${LLVM_BINARY_DIR}/include ${LLVM_MAIN_INCLUDE_DIR})
+
+if( ${CMAKE_SYSTEM_NAME} MATCHES SunOS )
+   SET(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-include llvm/System/Solaris.h")
+endif( ${CMAKE_SYSTEM_NAME} MATCHES SunOS )
 
 include(AddLLVM)
 include(TableGen)
@@ -251,6 +297,7 @@ add_subdirectory(lib/Bitcode/Reader)
 add_subdirectory(lib/Bitcode/Writer)
 add_subdirectory(lib/Transforms/Utils)
 add_subdirectory(lib/Transforms/Instrumentation)
+add_subdirectory(lib/Transforms/InstCombine)
 add_subdirectory(lib/Transforms/Scalar)
 add_subdirectory(lib/Transforms/IPO)
 add_subdirectory(lib/Transforms/Hello)
@@ -258,11 +305,16 @@ add_subdirectory(lib/Linker)
 add_subdirectory(lib/Analysis)
 add_subdirectory(lib/Analysis/IPA)
 add_subdirectory(lib/MC)
+add_subdirectory(lib/MC/MCParser)
+add_subdirectory(test)
 
 add_subdirectory(utils/FileCheck)
+add_subdirectory(utils/count)
+add_subdirectory(utils/not)
 
 set(LLVM_ENUM_ASM_PRINTERS "")
 set(LLVM_ENUM_ASM_PARSERS "")
+set(LLVM_ENUM_DISASSEMBLERS "")
 foreach(t ${LLVM_TARGETS_TO_BUILD})
   message(STATUS "Targeting ${t}")
   add_subdirectory(lib/Target/${t})
@@ -277,6 +329,11 @@ foreach(t ${LLVM_TARGETS_TO_BUILD})
     set(LLVM_ENUM_ASM_PARSERS 
       "${LLVM_ENUM_ASM_PARSERS}LLVM_ASM_PARSER(${t})\n")
   endif( EXISTS ${LLVM_MAIN_SRC_DIR}/lib/Target/${t}/AsmParser/CMakeLists.txt )
+  if( EXISTS ${LLVM_MAIN_SRC_DIR}/lib/Target/${t}/Disassembler/CMakeLists.txt )
+    add_subdirectory(lib/Target/${t}/Disassembler)
+    set(LLVM_ENUM_DISASSEMBLERS
+      "${LLVM_ENUM_DISASSEMBLERS}LLVM_DISASSEMBLER(${t})\n")
+  endif( EXISTS ${LLVM_MAIN_SRC_DIR}/lib/Target/${t}/Disassembler/CMakeLists.txt )
   set(CURRENT_LLVM_TARGET)
 endforeach(t)
 
@@ -292,36 +349,47 @@ configure_file(
   ${LLVM_BINARY_DIR}/include/llvm/Config/AsmParsers.def
   )
 
+# Produce llvm/Config/Disassemblers.def
+configure_file(
+  ${LLVM_MAIN_INCLUDE_DIR}/llvm/Config/Disassemblers.def.in
+  ${LLVM_BINARY_DIR}/include/llvm/Config/Disassemblers.def
+  )
+
 add_subdirectory(lib/ExecutionEngine)
 add_subdirectory(lib/ExecutionEngine/Interpreter)
 add_subdirectory(lib/ExecutionEngine/JIT)
 add_subdirectory(lib/Target)
 add_subdirectory(lib/AsmParser)
-add_subdirectory(lib/Debugger)
 add_subdirectory(lib/Archive)
 
 add_subdirectory(projects)
 
 option(LLVM_BUILD_TOOLS "Build LLVM tool programs." ON)
-if(LLVM_BUILD_TOOLS)
-  add_subdirectory(tools)
-endif()
+add_subdirectory(tools)
 
-option(LLVM_BUILD_EXAMPLES "Build LLVM example programs." ON)
-if(LLVM_BUILD_EXAMPLES)
-  add_subdirectory(examples)
-endif ()
+option(LLVM_BUILD_EXAMPLES "Build LLVM example programs." OFF)
+add_subdirectory(examples)
 
-install(DIRECTORY include
-  DESTINATION .
+install(DIRECTORY include/
+  DESTINATION include
+  FILES_MATCHING
+  PATTERN "*.def"
+  PATTERN "*.h"
+  PATTERN "*.td"
+  PATTERN "*.inc"
   PATTERN ".svn" EXCLUDE
-  PATTERN "*.cmake" EXCLUDE
-  PATTERN "*.in" EXCLUDE
-  PATTERN "*.tmp" EXCLUDE
   )
 
-install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/include
-  DESTINATION .
+install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/include/
+  DESTINATION include
+  FILES_MATCHING
+  PATTERN "*.def"
+  PATTERN "*.h"
+  PATTERN "*.gen"
+  PATTERN "*.inc"
+  # Exclude include/llvm/CMakeFiles/intrinsics_gen.dir, matched by "*.def"
+  PATTERN "CMakeFiles" EXCLUDE
+  PATTERN ".svn" EXCLUDE
   )
 
 # TODO: make and install documentation.

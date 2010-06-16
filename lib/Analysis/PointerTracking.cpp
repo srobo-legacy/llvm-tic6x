@@ -10,9 +10,11 @@
 // This file implements tracking of pointer bounds.
 //
 //===----------------------------------------------------------------------===//
+
 #include "llvm/Analysis/ConstantFolding.h"
 #include "llvm/Analysis/Dominators.h"
 #include "llvm/Analysis/LoopInfo.h"
+#include "llvm/Analysis/MemoryBuiltins.h"
 #include "llvm/Analysis/PointerTracking.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
@@ -23,9 +25,9 @@
 #include "llvm/Support/InstIterator.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetData.h"
+using namespace llvm;
 
-namespace llvm {
-char PointerTracking::ID=0;
+char PointerTracking::ID = 0;
 PointerTracking::PointerTracking() : FunctionPass(&ID) {}
 
 bool PointerTracking::runOnFunction(Function &F) {
@@ -47,7 +49,7 @@ void PointerTracking::getAnalysisUsage(AnalysisUsage &AU) const {
 }
 
 bool PointerTracking::doInitialization(Module &M) {
-  const Type *PTy = PointerType::getUnqual(Type::getInt8Ty(M.getContext()));
+  const Type *PTy = Type::getInt8PtrTy(M.getContext());
 
   // Find calloc(i64, i64) or calloc(i32, i32).
   callocFunc = M.getFunction("calloc");
@@ -92,9 +94,18 @@ bool PointerTracking::doInitialization(Module &M) {
 const SCEV *PointerTracking::computeAllocationCount(Value *P,
                                                     const Type *&Ty) const {
   Value *V = P->stripPointerCasts();
-  if (AllocationInst *AI = dyn_cast<AllocationInst>(V)) {
+  if (AllocaInst *AI = dyn_cast<AllocaInst>(V)) {
     Value *arraySize = AI->getArraySize();
     Ty = AI->getAllocatedType();
+    // arraySize elements of type Ty.
+    return SE->getSCEV(arraySize);
+  }
+
+  if (CallInst *CI = extractMallocCall(V)) {
+    Value *arraySize = getMallocArraySize(CI, TD);
+    const Type* AllocTy = getMallocAllocatedType(CI);
+    if (!AllocTy || !arraySize) return SE->getCouldNotCompute();
+    Ty = AllocTy;
     // arraySize elements of type Ty.
     return SE->getSCEV(arraySize);
   }
@@ -220,7 +231,7 @@ void PointerTracking::print(raw_ostream &OS, const Module* M) const {
   // this should be safe for the same reason its safe for SCEV.
   PointerTracking &PT = *const_cast<PointerTracking*>(this);
   for (inst_iterator I=inst_begin(*FF), E=inst_end(*FF); I != E; ++I) {
-    if (!isa<PointerType>(I->getType()))
+    if (!I->getType()->isPointerTy())
       continue;
     Value *Base;
     const SCEV *Limit, *Offset;
@@ -252,11 +263,5 @@ void PointerTracking::print(raw_ostream &OS, const Module* M) const {
   }
 }
 
-void PointerTracking::print(std::ostream &o, const Module* M) const {
-  raw_os_ostream OS(o);
-  print(OS, M);
-}
-
 static RegisterPass<PointerTracking> X("pointertracking",
                                        "Track pointer bounds", false, true);
-}

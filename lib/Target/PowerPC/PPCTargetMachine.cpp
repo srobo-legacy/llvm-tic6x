@@ -12,7 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "PPC.h"
-#include "PPCTargetAsmInfo.h"
+#include "PPCMCAsmInfo.h"
 #include "PPCTargetMachine.h"
 #include "llvm/PassManager.h"
 #include "llvm/Target/TargetOptions.h"
@@ -20,13 +20,12 @@
 #include "llvm/Support/FormattedStream.h"
 using namespace llvm;
 
-static const TargetAsmInfo *createTargetAsmInfo(const Target &T,
-                                                const StringRef &TT) {
+static const MCAsmInfo *createMCAsmInfo(const Target &T, StringRef TT) {
   Triple TheTriple(TT);
   bool isPPC64 = TheTriple.getArch() == Triple::ppc64;
   if (TheTriple.getOS() == Triple::Darwin)
-    return new PPCDarwinTargetAsmInfo(isPPC64);
-  return new PPCLinuxTargetAsmInfo(isPPC64);
+    return new PPCMCAsmInfoDarwin(isPPC64);
+  return new PPCLinuxMCAsmInfo(isPPC64);
   
 }
 
@@ -35,8 +34,8 @@ extern "C" void LLVMInitializePowerPCTarget() {
   RegisterTargetMachine<PPC32TargetMachine> A(ThePPC32Target);  
   RegisterTargetMachine<PPC64TargetMachine> B(ThePPC64Target);
   
-  RegisterAsmInfoFn C(ThePPC32Target, createTargetAsmInfo);
-  RegisterAsmInfoFn D(ThePPC64Target, createTargetAsmInfo);
+  RegisterAsmInfoFn C(ThePPC32Target, createMCAsmInfo);
+  RegisterAsmInfoFn D(ThePPC64Target, createMCAsmInfo);
 }
 
 
@@ -46,7 +45,7 @@ PPCTargetMachine::PPCTargetMachine(const Target &T, const std::string &TT,
     Subtarget(TT, FS, is64Bit),
     DataLayout(Subtarget.getTargetDataString()), InstrInfo(*this),
     FrameInfo(*this, is64Bit), JITInfo(*this, is64Bit), TLInfo(*this),
-    InstrItins(Subtarget.getInstrItineraryData()), MachOWriterInfo(*this) {
+    InstrItins(Subtarget.getInstrItineraryData()) {
 
   if (getRelocationModel() == Reloc::Default) {
     if (Subtarget.isDarwin())
@@ -92,33 +91,6 @@ bool PPCTargetMachine::addPreEmitPass(PassManagerBase &PM,
 
 bool PPCTargetMachine::addCodeEmitter(PassManagerBase &PM,
                                       CodeGenOpt::Level OptLevel,
-                                      MachineCodeEmitter &MCE) {
-  // The JIT should use the static relocation model in ppc32 mode, PIC in ppc64.
-  // FIXME: This should be moved to TargetJITInfo!!
-  if (Subtarget.isPPC64()) {
-    // We use PIC codegen in ppc64 mode, because otherwise we'd have to use many
-    // instructions to materialize arbitrary global variable + function +
-    // constant pool addresses.
-    setRelocationModel(Reloc::PIC_);
-    // Temporary workaround for the inability of PPC64 JIT to handle jump
-    // tables.
-    DisableJumpTables = true;      
-  } else {
-    setRelocationModel(Reloc::Static);
-  }
-  
-  // Inform the subtarget that we are in JIT mode.  FIXME: does this break macho
-  // writing?
-  Subtarget.SetJITMode();
-  
-  // Machine code emitter pass for PowerPC.
-  PM.add(createPPCCodeEmitterPass(*this, MCE));
-
-  return false;
-}
-
-bool PPCTargetMachine::addCodeEmitter(PassManagerBase &PM,
-                                      CodeGenOpt::Level OptLevel,
                                       JITCodeEmitter &JCE) {
   // The JIT should use the static relocation model in ppc32 mode, PIC in ppc64.
   // FIXME: This should be moved to TargetJITInfo!!
@@ -143,56 +115,3 @@ bool PPCTargetMachine::addCodeEmitter(PassManagerBase &PM,
 
   return false;
 }
-
-bool PPCTargetMachine::addCodeEmitter(PassManagerBase &PM,
-                                      CodeGenOpt::Level OptLevel,
-                                      ObjectCodeEmitter &OCE) {
-  // The JIT should use the static relocation model in ppc32 mode, PIC in ppc64.
-  // FIXME: This should be moved to TargetJITInfo!!
-  if (Subtarget.isPPC64()) {
-    // We use PIC codegen in ppc64 mode, because otherwise we'd have to use many
-    // instructions to materialize arbitrary global variable + function +
-    // constant pool addresses.
-    setRelocationModel(Reloc::PIC_);
-    // Temporary workaround for the inability of PPC64 JIT to handle jump
-    // tables.
-    DisableJumpTables = true;      
-  } else {
-    setRelocationModel(Reloc::Static);
-  }
-  
-  // Inform the subtarget that we are in JIT mode.  FIXME: does this break macho
-  // writing?
-  Subtarget.SetJITMode();
-  
-  // Machine code emitter pass for PowerPC.
-  PM.add(createPPCObjectCodeEmitterPass(*this, OCE));
-
-  return false;
-}
-
-bool PPCTargetMachine::addSimpleCodeEmitter(PassManagerBase &PM,
-                                            CodeGenOpt::Level OptLevel,
-                                            MachineCodeEmitter &MCE) {
-  // Machine code emitter pass for PowerPC.
-  PM.add(createPPCCodeEmitterPass(*this, MCE));
-  return false;
-}
-
-bool PPCTargetMachine::addSimpleCodeEmitter(PassManagerBase &PM,
-                                            CodeGenOpt::Level OptLevel,
-                                            JITCodeEmitter &JCE) {
-  // Machine code emitter pass for PowerPC.
-  PM.add(createPPCJITCodeEmitterPass(*this, JCE));
-  return false;
-}
-
-bool PPCTargetMachine::addSimpleCodeEmitter(PassManagerBase &PM,
-                                            CodeGenOpt::Level OptLevel,
-                                            ObjectCodeEmitter &OCE) {
-  // Machine code emitter pass for PowerPC.
-  PM.add(createPPCObjectCodeEmitterPass(*this, OCE));
-  return false;
-}
-
-

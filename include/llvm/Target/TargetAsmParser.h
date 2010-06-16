@@ -11,10 +11,13 @@
 #define LLVM_TARGET_TARGETPARSER_H
 
 namespace llvm {
-class MCAsmParser;
 class MCInst;
 class StringRef;
 class Target;
+class SMLoc;
+class AsmToken;
+class MCParsedAsmOperand;
+template <typename T> class SmallVectorImpl;
 
 /// TargetAsmParser - Generic interface to target specific assembly parsers.
 class TargetAsmParser {
@@ -39,11 +42,33 @@ public:
   /// line should be parsed up to and including the end-of-statement token. On
   /// failure, the parser is not required to read to the end of the line.
   //
-  /// \param AP - The current parser object.
   /// \param Name - The instruction name.
-  /// \param Inst [out] - On success, the parsed instruction.
+  /// \param NameLoc - The source location of the name.
+  /// \param Operands [out] - The list of parsed operands, this returns
+  ///        ownership of them to the caller.
   /// \return True on failure.
-  virtual bool ParseInstruction(const StringRef &Name, MCInst &Inst) = 0;
+  virtual bool ParseInstruction(const StringRef &Name, SMLoc NameLoc,
+                            SmallVectorImpl<MCParsedAsmOperand*> &Operands) = 0;
+
+  /// ParseDirective - Parse a target specific assembler directive
+  ///
+  /// The parser is positioned following the directive name.  The target
+  /// specific directive parser should parse the entire directive doing or
+  /// recording any target specific work, or return true and do nothing if the
+  /// directive is not target specific. If the directive is specific for
+  /// the target, the entire line is parsed up to and including the
+  /// end-of-statement token and false is returned.
+  ///
+  /// \param DirectiveID - the identifier token of the directive.
+  virtual bool ParseDirective(AsmToken DirectiveID) = 0;
+  
+  /// MatchInstruction - Recognize a series of operands of a parsed instruction
+  /// as an actual MCInst.  This returns false and fills in Inst on success and
+  /// returns true on failure to match.
+  virtual bool 
+  MatchInstruction(const SmallVectorImpl<MCParsedAsmOperand*> &Operands,
+                   MCInst &Inst) = 0;
+  
 };
 
 } // End llvm namespace

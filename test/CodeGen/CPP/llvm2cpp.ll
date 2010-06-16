@@ -1,5 +1,5 @@
 ; RUN: llvm-as < %s | llvm-dis > /dev/null
-; RUN: llvm-as < %s | llc -march=cpp -cppgen=program -o -
+; RUN: llc < %s -march=cpp -cppgen=program -o -
 
 @X = global i32 4, align 16		; <i32*> [#uses=0]
 
@@ -273,7 +273,7 @@ define i32 @foozball(i32) {
 @A = global i32* @B		; <i32**> [#uses=0]
 @B = global i32 7		; <i32*> [#uses=1]
 
-define void @X() {
+define void @test12312() {
 	ret void
 }
 ; ModuleID = 'global_section.ll'

@@ -18,6 +18,7 @@
 #define LLVM_SUPPORT_CONSTANTFOLDER_H
 
 #include "llvm/Constants.h"
+#include "llvm/InstrTypes.h"
 
 namespace llvm {
 
@@ -38,17 +39,32 @@ public:
   Constant *CreateNSWAdd(Constant *LHS, Constant *RHS) const {
     return ConstantExpr::getNSWAdd(LHS, RHS);
   }
+  Constant *CreateNUWAdd(Constant *LHS, Constant *RHS) const {
+    return ConstantExpr::getNUWAdd(LHS, RHS);
+  }
   Constant *CreateFAdd(Constant *LHS, Constant *RHS) const {
     return ConstantExpr::getFAdd(LHS, RHS);
   }
   Constant *CreateSub(Constant *LHS, Constant *RHS) const {
     return ConstantExpr::getSub(LHS, RHS);
   }
+  Constant *CreateNSWSub(Constant *LHS, Constant *RHS) const {
+    return ConstantExpr::getNSWSub(LHS, RHS);
+  }
+  Constant *CreateNUWSub(Constant *LHS, Constant *RHS) const {
+    return ConstantExpr::getNUWSub(LHS, RHS);
+  }
   Constant *CreateFSub(Constant *LHS, Constant *RHS) const {
     return ConstantExpr::getFSub(LHS, RHS);
   }
   Constant *CreateMul(Constant *LHS, Constant *RHS) const {
     return ConstantExpr::getMul(LHS, RHS);
+  }
+  Constant *CreateNSWMul(Constant *LHS, Constant *RHS) const {
+    return ConstantExpr::getNSWMul(LHS, RHS);
+  }
+  Constant *CreateNUWMul(Constant *LHS, Constant *RHS) const {
+    return ConstantExpr::getNUWMul(LHS, RHS);
   }
   Constant *CreateFMul(Constant *LHS, Constant *RHS) const {
     return ConstantExpr::getFMul(LHS, RHS);
@@ -104,6 +120,12 @@ public:
 
   Constant *CreateNeg(Constant *C) const {
     return ConstantExpr::getNeg(C);
+  }
+  Constant *CreateNSWNeg(Constant *C) const {
+    return ConstantExpr::getNSWNeg(C);
+  }
+  Constant *CreateNUWNeg(Constant *C) const {
+    return ConstantExpr::getNUWNeg(C);
   }
   Constant *CreateFNeg(Constant *C) const {
     return ConstantExpr::getFNeg(C);

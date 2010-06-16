@@ -12,7 +12,7 @@
 
 #include "BlackfinTargetMachine.h"
 #include "Blackfin.h"
-#include "BlackfinTargetAsmInfo.h"
+#include "BlackfinMCAsmInfo.h"
 #include "llvm/PassManager.h"
 #include "llvm/Target/TargetRegistry.h"
 
@@ -20,7 +20,7 @@ using namespace llvm;
 
 extern "C" void LLVMInitializeBlackfinTarget() {
   RegisterTargetMachine<BlackfinTargetMachine> X(TheBlackfinTarget);
-  RegisterAsmInfo<BlackfinTargetAsmInfo> Y(TheBlackfinTarget);
+  RegisterAsmInfo<BlackfinMCAsmInfo> Y(TheBlackfinTarget);
 
 }
 
@@ -28,7 +28,7 @@ BlackfinTargetMachine::BlackfinTargetMachine(const Target &T,
                                              const std::string &TT,
                                              const std::string &FS)
   : LLVMTargetMachine(T, TT),
-    DataLayout("e-p:32:32-i64:32-f64:32"),
+    DataLayout("e-p:32:32-i64:32-f64:32-n32"),
     Subtarget(TT, FS),
     TLInfo(*this),
     InstrInfo(Subtarget),

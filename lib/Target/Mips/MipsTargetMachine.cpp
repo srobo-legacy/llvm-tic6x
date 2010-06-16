@@ -12,7 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Mips.h"
-#include "MipsTargetAsmInfo.h"
+#include "MipsMCAsmInfo.h"
 #include "MipsTargetMachine.h"
 #include "llvm/PassManager.h"
 #include "llvm/Target/TargetRegistry.h"
@@ -22,8 +22,8 @@ extern "C" void LLVMInitializeMipsTarget() {
   // Register the target.
   RegisterTargetMachine<MipsTargetMachine> X(TheMipsTarget);
   RegisterTargetMachine<MipselTargetMachine> Y(TheMipselTarget);
-  RegisterAsmInfo<MipsTargetAsmInfo> A(TheMipsTarget);
-  RegisterAsmInfo<MipsTargetAsmInfo> B(TheMipselTarget);
+  RegisterAsmInfo<MipsMCAsmInfo> A(TheMipsTarget);
+  RegisterAsmInfo<MipsMCAsmInfo> B(TheMipselTarget);
 }
 
 // DataLayout --> Big-endian, 32-bit pointer/ABI/alignment
@@ -38,8 +38,8 @@ MipsTargetMachine(const Target &T, const std::string &TT, const std::string &FS,
                   bool isLittle=false):
   LLVMTargetMachine(T, TT),
   Subtarget(TT, FS, isLittle), 
-  DataLayout(isLittle ? std::string("e-p:32:32:32-i8:8:32-i16:16:32") :
-                        std::string("E-p:32:32:32-i8:8:32-i16:16:32")), 
+  DataLayout(isLittle ? std::string("e-p:32:32:32-i8:8:32-i16:16:32-n32") :
+                        std::string("E-p:32:32:32-i8:8:32-i16:16:32-n32")), 
   InstrInfo(*this), 
   FrameInfo(TargetFrameInfo::StackGrowsUp, 8, 0),
   TLInfo(*this) {
@@ -50,11 +50,6 @@ MipsTargetMachine(const Target &T, const std::string &TT, const std::string &FS,
     else
       setRelocationModel(Reloc::Static);
   }
-
-  // TODO: create an option to enable long calls, like -mlong-calls, 
-  // that would be our CodeModel::Large. It must not work with Abicall.
-  if (getCodeModel() == CodeModel::Default)
-    setCodeModel(CodeModel::Small);
 }
 
 MipselTargetMachine::

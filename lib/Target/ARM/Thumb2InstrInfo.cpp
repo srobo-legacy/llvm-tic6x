@@ -1,4 +1,4 @@
-//===- Thumb2InstrInfo.cpp - Thumb-2 Instruction Information --------*- C++ -*-===//
+//===- Thumb2InstrInfo.cpp - Thumb-2 Instruction Information ----*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -11,47 +11,28 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ARMInstrInfo.h"
+#include "Thumb2InstrInfo.h"
 #include "ARM.h"
+#include "ARMConstantPoolValue.h"
 #include "ARMAddressingModes.h"
 #include "ARMGenInstrInfo.inc"
 #include "ARMMachineFunctionInfo.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
+#include "llvm/CodeGen/MachineMemOperand.h"
+#include "llvm/CodeGen/PseudoSourceValue.h"
 #include "llvm/ADT/SmallVector.h"
 #include "Thumb2InstrInfo.h"
 
 using namespace llvm;
 
-Thumb2InstrInfo::Thumb2InstrInfo(const ARMSubtarget &STI) : RI(*this, STI) {
+Thumb2InstrInfo::Thumb2InstrInfo(const ARMSubtarget &STI)
+  : ARMBaseInstrInfo(STI), RI(*this, STI) {
 }
 
 unsigned Thumb2InstrInfo::getUnindexedOpcode(unsigned Opc) const {
   // FIXME
   return 0;
-}
-
-bool
-Thumb2InstrInfo::BlockHasNoFallThrough(const MachineBasicBlock &MBB) const {
-  if (MBB.empty()) return false;
-
-  switch (MBB.back().getOpcode()) {
-  case ARM::t2LDM_RET:
-  case ARM::t2B:        // Uncond branch.
-  case ARM::t2BR_JT:    // Jumptable branch.
-  case ARM::t2TBB:      // Table branch byte.
-  case ARM::t2TBH:      // Table branch halfword.
-  case ARM::tBR_JTr:    // Jumptable branch (16-bit version).
-  case ARM::tBX_RET:
-  case ARM::tBX_RET_vararg:
-  case ARM::tPOP_RET:
-  case ARM::tB:
-    return true;
-  default:
-    break;
-  }
-
-  return false;
 }
 
 bool
@@ -89,9 +70,16 @@ storeRegToStackSlot(MachineBasicBlock &MBB, MachineBasicBlock::iterator I,
   if (I != MBB.end()) DL = I->getDebugLoc();
 
   if (RC == ARM::GPRRegisterClass) {
+    MachineFunction &MF = *MBB.getParent();
+    MachineFrameInfo &MFI = *MF.getFrameInfo();
+    MachineMemOperand *MMO =
+      MF.getMachineMemOperand(PseudoSourceValue::getFixedStack(FI),
+                              MachineMemOperand::MOStore, 0,
+                              MFI.getObjectSize(FI),
+                              MFI.getObjectAlignment(FI));
     AddDefaultPred(BuildMI(MBB, I, DL, get(ARM::t2STRi12))
                    .addReg(SrcReg, getKillRegState(isKill))
-                   .addFrameIndex(FI).addImm(0));
+                   .addFrameIndex(FI).addImm(0).addMemOperand(MMO));
     return;
   }
 
@@ -106,14 +94,20 @@ loadRegFromStackSlot(MachineBasicBlock &MBB, MachineBasicBlock::iterator I,
   if (I != MBB.end()) DL = I->getDebugLoc();
 
   if (RC == ARM::GPRRegisterClass) {
+    MachineFunction &MF = *MBB.getParent();
+    MachineFrameInfo &MFI = *MF.getFrameInfo();
+    MachineMemOperand *MMO =
+      MF.getMachineMemOperand(PseudoSourceValue::getFixedStack(FI),
+                              MachineMemOperand::MOLoad, 0,
+                              MFI.getObjectSize(FI),
+                              MFI.getObjectAlignment(FI));
     AddDefaultPred(BuildMI(MBB, I, DL, get(ARM::t2LDRi12), DestReg)
-                   .addFrameIndex(FI).addImm(0));
+                   .addFrameIndex(FI).addImm(0).addMemOperand(MMO));
     return;
   }
 
   ARMBaseInstrInfo::loadRegFromStackSlot(MBB, I, DestReg, FI, RC);
 }
-
 
 void llvm::emitT2RegPlusImmediate(MachineBasicBlock &MBB,
                                MachineBasicBlock::iterator &MBBI, DebugLoc dl,
@@ -319,9 +313,9 @@ immediateOffsetOpcode(unsigned opcode)
   return 0;
 }
 
-int llvm::rewriteT2FrameIndex(MachineInstr &MI, unsigned FrameRegIdx,
-                              unsigned FrameReg, int Offset,
-                              const ARMBaseInstrInfo &TII) {
+bool llvm::rewriteT2FrameIndex(MachineInstr &MI, unsigned FrameRegIdx,
+                               unsigned FrameReg, int &Offset,
+                               const ARMBaseInstrInfo &TII) {
   unsigned Opcode = MI.getOpcode();
   const TargetInstrDesc &Desc = MI.getDesc();
   unsigned AddrMode = (Desc.TSFlags & ARMII::AddrModeMask);
@@ -335,12 +329,17 @@ int llvm::rewriteT2FrameIndex(MachineInstr &MI, unsigned FrameRegIdx,
     Offset += MI.getOperand(FrameRegIdx+1).getImm();
 
     bool isSP = FrameReg == ARM::SP;
-    if (Offset == 0) {
+    unsigned PredReg;
+    if (Offset == 0 && getInstrPredicate(&MI, PredReg) == ARMCC::AL) {
       // Turn it into a move.
       MI.setDesc(TII.get(ARM::tMOVgpr2gpr));
       MI.getOperand(FrameRegIdx).ChangeToRegister(FrameReg, false);
-      MI.RemoveOperand(FrameRegIdx+1);
-      return 0;
+      // Remove offset and remaining explicit predicate operands.
+      do MI.RemoveOperand(FrameRegIdx+1);
+      while (MI.getNumOperands() > FrameRegIdx+1 &&
+             (!MI.getOperand(FrameRegIdx+1).isReg() ||
+              !MI.getOperand(FrameRegIdx+1).isImm()));
+      return true;
     }
 
     if (Offset < 0) {
@@ -355,7 +354,8 @@ int llvm::rewriteT2FrameIndex(MachineInstr &MI, unsigned FrameRegIdx,
     if (ARM_AM::getT2SOImmVal(Offset) != -1) {
       MI.getOperand(FrameRegIdx).ChangeToRegister(FrameReg, false);
       MI.getOperand(FrameRegIdx+1).ChangeToImmediate(Offset);
-      return 0;
+      Offset = 0;
+      return true;
     }
     // Another common case: imm12.
     if (Offset < 4096) {
@@ -365,7 +365,8 @@ int llvm::rewriteT2FrameIndex(MachineInstr &MI, unsigned FrameRegIdx,
       MI.setDesc(TII.get(NewOpc));
       MI.getOperand(FrameRegIdx).ChangeToRegister(FrameReg, false);
       MI.getOperand(FrameRegIdx+1).ChangeToImmediate(Offset);
-      return 0;
+      Offset = 0;
+      return true;
     }
 
     // Otherwise, extract 8 adjacent bits from the immediate into this
@@ -380,6 +381,11 @@ int llvm::rewriteT2FrameIndex(MachineInstr &MI, unsigned FrameRegIdx,
            "Bit extraction didn't work?");
     MI.getOperand(FrameRegIdx+1).ChangeToImmediate(ThisImmVal);
   } else {
+
+    // AddrMode4 and AddrMode6 cannot handle any offset.
+    if (AddrMode == ARMII::AddrMode4 || AddrMode == ARMII::AddrMode6)
+      return false;
+
     // AddrModeT2_so cannot handle any offset. If there is no offset
     // register then we change to an immediate version.
     unsigned NewOpc = Opcode;
@@ -387,7 +393,7 @@ int llvm::rewriteT2FrameIndex(MachineInstr &MI, unsigned FrameRegIdx,
       unsigned OffsetReg = MI.getOperand(FrameRegIdx+1).getReg();
       if (OffsetReg != 0) {
         MI.getOperand(FrameRegIdx).ChangeToRegister(FrameReg, false);
-        return Offset;
+        return Offset == 0;
       }
 
       MI.RemoveOperand(FrameRegIdx+1);
@@ -412,11 +418,11 @@ int llvm::rewriteT2FrameIndex(MachineInstr &MI, unsigned FrameRegIdx,
         NewOpc = positiveOffsetOpcode(Opcode);
         NumBits = 12;
       }
-    } else {
-      // VFP address modes.
-      assert(AddrMode == ARMII::AddrMode5);
-      int InstrOffs=ARM_AM::getAM5Offset(MI.getOperand(FrameRegIdx+1).getImm());
-      if (ARM_AM::getAM5Op(MI.getOperand(FrameRegIdx+1).getImm()) ==ARM_AM::sub)
+    } else if (AddrMode == ARMII::AddrMode5) {
+      // VFP address mode.
+      const MachineOperand &OffOp = MI.getOperand(FrameRegIdx+1);
+      int InstrOffs = ARM_AM::getAM5Offset(OffOp.getImm());
+      if (ARM_AM::getAM5Op(OffOp.getImm()) == ARM_AM::sub)
         InstrOffs *= -1;
       NumBits = 8;
       Scale = 4;
@@ -426,6 +432,8 @@ int llvm::rewriteT2FrameIndex(MachineInstr &MI, unsigned FrameRegIdx,
         Offset = -Offset;
         isSub = true;
       }
+    } else {
+      llvm_unreachable("Unsupported addressing mode!");
     }
 
     if (NewOpc != Opcode)
@@ -448,7 +456,8 @@ int llvm::rewriteT2FrameIndex(MachineInstr &MI, unsigned FrameRegIdx,
           ImmedOffset = -ImmedOffset;
       }
       ImmOp.ChangeToImmediate(ImmedOffset);
-      return 0;
+      Offset = 0;
+      return true;
     }
 
     // Otherwise, offset doesn't fit. Pull in what we can to simplify
@@ -468,5 +477,6 @@ int llvm::rewriteT2FrameIndex(MachineInstr &MI, unsigned FrameRegIdx,
     Offset &= ~(Mask*Scale);
   }
 
-  return (isSub) ? -Offset : Offset;
+  Offset = (isSub) ? -Offset : Offset;
+  return Offset == 0;
 }

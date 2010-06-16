@@ -8,11 +8,9 @@ Reimplement 'select' in terms of 'SEL'.
   add doesn't need to overflow between the two 16-bit chunks.
 
 * Implement pre/post increment support.  (e.g. PR935)
-* Coalesce stack slots!
 * Implement smarter constant generation for binops with large immediates.
 
-* Consider materializing FP constants like 0.0f and 1.0f using integer 
-  immediate instructions then copy to FPU.  Slower than load into FPU?
+A few ARMv6T2 ops should be pattern matched: BFI, SBFX, and UBFX
 
 //===---------------------------------------------------------------------===//
 
@@ -72,26 +70,6 @@ __Z6slow4bii:
 
 Implement long long "X-3" with instructions that fold the immediate in.  These
 were disabled due to badness with the ARM carry flag on subtracts.
-
-//===---------------------------------------------------------------------===//
-
-We currently compile abs:
-int foo(int p) { return p < 0 ? -p : p; }
-
-into:
-
-_foo:
-        rsb r1, r0, #0
-        cmn r0, #1
-        movgt r1, r0
-        mov r0, r1
-        bx lr
-
-This is very, uh, literal.  This could be a 3 operation sequence:
-  t = (p sra 31); 
-  res = (p xor t)-t
-
-Which would be better.  This occurs in png decode.
 
 //===---------------------------------------------------------------------===//
 
@@ -325,7 +303,7 @@ time.
 4) Once we added support for multiple result patterns, write indexed loads
    patterns instead of C++ instruction selection code.
 
-5) Use FLDM / FSTM to emulate indexed FP load / store.
+5) Use VLDM / VSTM to emulate indexed FP load / store.
 
 //===---------------------------------------------------------------------===//
 
@@ -419,14 +397,6 @@ branches instead of 3.
 More seriously, there is a byte->word extend before
 each comparison, where there should be only one, and the condition codes
 are not remembered when the same two values are compared twice.
-
-//===---------------------------------------------------------------------===//
-
-More register scavenging work:
-
-1. Use the register scavenger to track frame index materialized into registers
-   (those that do not fit in addressing modes) to allow reuse in the same BB.
-2. Finish scavenging for Thumb.
 
 //===---------------------------------------------------------------------===//
 
@@ -540,10 +510,6 @@ while ARMConstantIslandPass only need to worry about LDR (literal).
 
 //===---------------------------------------------------------------------===//
 
-We need to fix constant isel for ARMv6t2 to use MOVT.
-
-//===---------------------------------------------------------------------===//
-
 Constant island pass should make use of full range SoImm values for LEApcrel.
 Be careful though as the last attempt caused infinite looping on lencod.
 
@@ -592,3 +558,32 @@ conditional move:
 it saves an instruction and a register.
 
 //===---------------------------------------------------------------------===//
+
+It might be profitable to cse MOVi16 if there are lots of 32-bit immediates
+with the same bottom half.
+
+//===---------------------------------------------------------------------===//
+
+Robert Muth started working on an alternate jump table implementation that
+does not put the tables in-line in the text.  This is more like the llvm
+default jump table implementation.  This might be useful sometime.  Several
+revisions of patches are on the mailing list, beginning at:
+http://lists.cs.uiuc.edu/pipermail/llvmdev/2009-June/022763.html
+
+//===---------------------------------------------------------------------===//
+
+Make use of the "rbit" instruction.
+
+//===---------------------------------------------------------------------===//
+
+Take a look at test/CodeGen/Thumb2/machine-licm.ll. ARM should be taught how
+to licm and cse the unnecessary load from cp#1.
+
+//===---------------------------------------------------------------------===//
+
+The CMN instruction sets the flags like an ADD instruction, while CMP sets
+them like a subtract. Therefore to be able to use CMN for comparisons other
+than the Z bit, we'll need additional logic to reverse the conditionals
+associated with the comparison. Perhaps a pseudo-instruction for the comparison,
+with a post-codegen pass to clean up and handle the condition codes?
+See PR5694 for testcase.

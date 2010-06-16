@@ -32,12 +32,12 @@ def SDT_SystemZCall         : SDTypeProfile<0, -1, [SDTCisPtrTy<0>]>;
 def SDT_SystemZCallSeqStart : SDCallSeqStart<[SDTCisI64<0>]>;
 def SDT_SystemZCallSeqEnd   : SDCallSeqEnd<[SDTCisI64<0>, SDTCisI64<1>]>;
 def SDT_CmpTest             : SDTypeProfile<0, 2, [SDTCisSameAs<0, 1>]>;
-def SDT_BrCond              : SDTypeProfile<0, 2,
+def SDT_BrCond              : SDTypeProfile<0, 3,
                                            [SDTCisVT<0, OtherVT>,
-                                            SDTCisI8<1>]>;
-def SDT_SelectCC            : SDTypeProfile<1, 3,
+                                            SDTCisI8<1>, SDTCisVT<2, i64>]>;
+def SDT_SelectCC            : SDTypeProfile<1, 4,
                                            [SDTCisSameAs<0, 1>, SDTCisSameAs<1, 2>,
-                                            SDTCisI8<3>]>;
+                                            SDTCisI8<3>, SDTCisVT<4, i64>]>;
 def SDT_Address             : SDTypeProfile<1, 1,
                                             [SDTCisSameAs<0, 1>, SDTCisPtrTy<0>]>;
 
@@ -54,11 +54,11 @@ def SystemZcallseq_start :
 def SystemZcallseq_end :
                  SDNode<"ISD::CALLSEQ_END",   SDT_SystemZCallSeqEnd,
                         [SDNPHasChain, SDNPOptInFlag, SDNPOutFlag]>;
-def SystemZcmp     : SDNode<"SystemZISD::CMP", SDT_CmpTest, [SDNPOutFlag]>;
-def SystemZucmp    : SDNode<"SystemZISD::UCMP", SDT_CmpTest, [SDNPOutFlag]>;
+def SystemZcmp     : SDNode<"SystemZISD::CMP", SDT_CmpTest>;
+def SystemZucmp    : SDNode<"SystemZISD::UCMP", SDT_CmpTest>;
 def SystemZbrcond  : SDNode<"SystemZISD::BRCOND", SDT_BrCond,
-                            [SDNPHasChain, SDNPInFlag]>;
-def SystemZselect  : SDNode<"SystemZISD::SELECT", SDT_SelectCC, [SDNPInFlag]>;
+                            [SDNPHasChain]>;
+def SystemZselect  : SDNode<"SystemZISD::SELECT", SDT_SelectCC>;
 def SystemZpcrelwrapper : SDNode<"SystemZISD::PCRelativeWrapper", SDT_Address, []>;
 
 
@@ -74,15 +74,15 @@ def ADJCALLSTACKUP   : Pseudo<(outs), (ins i64imm:$amt1, i64imm:$amt2),
                               "#ADJCALLSTACKUP",
                               [(SystemZcallseq_end timm:$amt1, timm:$amt2)]>;
 
-let usesCustomDAGSchedInserter = 1 in {
+let Uses = [PSW], usesCustomInserter = 1 in {
   def Select32 : Pseudo<(outs GR32:$dst), (ins GR32:$src1, GR32:$src2, i8imm:$cc),
                         "# Select32 PSEUDO",
                         [(set GR32:$dst,
-                              (SystemZselect GR32:$src1, GR32:$src2, imm:$cc))]>;
+                              (SystemZselect GR32:$src1, GR32:$src2, imm:$cc, PSW))]>;
   def Select64 : Pseudo<(outs GR64:$dst), (ins GR64:$src1, GR64:$src2, i8imm:$cc),
                         "# Select64 PSEUDO",
                         [(set GR64:$dst,
-                              (SystemZselect GR64:$src1, GR64:$src2, imm:$cc))]>;
+                              (SystemZselect GR64:$src1, GR64:$src2, imm:$cc, PSW))]>;
 }
 
 
@@ -106,46 +106,46 @@ let isBranch = 1, isTerminator = 1 in {
   let Uses = [PSW] in {
     def JO  : Pseudo<(outs), (ins brtarget:$dst),
                      "jo\t$dst",
-                     [(SystemZbrcond bb:$dst, SYSTEMZ_COND_O)]>;
+                     [(SystemZbrcond bb:$dst, SYSTEMZ_COND_O, PSW)]>;
     def JH  : Pseudo<(outs), (ins brtarget:$dst),
                      "jh\t$dst",
-                     [(SystemZbrcond bb:$dst, SYSTEMZ_COND_H)]>;
+                     [(SystemZbrcond bb:$dst, SYSTEMZ_COND_H, PSW)]>;
     def JNLE: Pseudo<(outs), (ins brtarget:$dst),
                      "jnle\t$dst",
-                     [(SystemZbrcond bb:$dst, SYSTEMZ_COND_NLE)]>;
+                     [(SystemZbrcond bb:$dst, SYSTEMZ_COND_NLE, PSW)]>;
     def JL  : Pseudo<(outs), (ins brtarget:$dst),
                      "jl\t$dst",
-                     [(SystemZbrcond bb:$dst, SYSTEMZ_COND_L)]>;
+                     [(SystemZbrcond bb:$dst, SYSTEMZ_COND_L, PSW)]>;
     def JNHE: Pseudo<(outs), (ins brtarget:$dst),
                      "jnhe\t$dst",
-                     [(SystemZbrcond bb:$dst, SYSTEMZ_COND_NHE)]>;
+                     [(SystemZbrcond bb:$dst, SYSTEMZ_COND_NHE, PSW)]>;
     def JLH : Pseudo<(outs), (ins brtarget:$dst),
                      "jlh\t$dst",
-                     [(SystemZbrcond bb:$dst, SYSTEMZ_COND_LH)]>;
+                     [(SystemZbrcond bb:$dst, SYSTEMZ_COND_LH, PSW)]>;
     def JNE : Pseudo<(outs), (ins brtarget:$dst),
                      "jne\t$dst",
-                     [(SystemZbrcond bb:$dst, SYSTEMZ_COND_NE)]>;
+                     [(SystemZbrcond bb:$dst, SYSTEMZ_COND_NE, PSW)]>;
     def JE  : Pseudo<(outs), (ins brtarget:$dst),
                      "je\t$dst",
-                     [(SystemZbrcond bb:$dst, SYSTEMZ_COND_E)]>;
+                     [(SystemZbrcond bb:$dst, SYSTEMZ_COND_E, PSW)]>;
     def JNLH: Pseudo<(outs), (ins brtarget:$dst),
                      "jnlh\t$dst",
-                     [(SystemZbrcond bb:$dst, SYSTEMZ_COND_NLH)]>;
+                     [(SystemZbrcond bb:$dst, SYSTEMZ_COND_NLH, PSW)]>;
     def JHE : Pseudo<(outs), (ins brtarget:$dst),
                      "jhe\t$dst",
-                     [(SystemZbrcond bb:$dst, SYSTEMZ_COND_HE)]>;
+                     [(SystemZbrcond bb:$dst, SYSTEMZ_COND_HE, PSW)]>;
     def JNL : Pseudo<(outs), (ins brtarget:$dst),
                      "jnl\t$dst",
-                     [(SystemZbrcond bb:$dst, SYSTEMZ_COND_NL)]>;
+                     [(SystemZbrcond bb:$dst, SYSTEMZ_COND_NL, PSW)]>;
     def JLE : Pseudo<(outs), (ins brtarget:$dst),
                      "jle\t$dst",
-                     [(SystemZbrcond bb:$dst, SYSTEMZ_COND_LE)]>;
+                     [(SystemZbrcond bb:$dst, SYSTEMZ_COND_LE, PSW)]>;
     def JNH : Pseudo<(outs), (ins brtarget:$dst),
                      "jnh\t$dst",
-                     [(SystemZbrcond bb:$dst, SYSTEMZ_COND_NH)]>;
+                     [(SystemZbrcond bb:$dst, SYSTEMZ_COND_NH, PSW)]>;
     def JNO : Pseudo<(outs), (ins brtarget:$dst),
                      "jno\t$dst",
-                     [(SystemZbrcond bb:$dst, SYSTEMZ_COND_NO)]>;
+                     [(SystemZbrcond bb:$dst, SYSTEMZ_COND_NO, PSW)]>;
   } // Uses = [PSW]
 } // isBranch = 1
 
@@ -257,7 +257,7 @@ def MOV64rihi32 : RILI<0xEC0, (outs GR64:$dst), (ins i64imm:$src),
                        [(set GR64:$dst, i64hi32:$src)]>;
 }
 
-let canFoldAsLoad = 1, isReMaterializable = 1, mayHaveSideEffects = 1 in {
+let canFoldAsLoad = 1, isReMaterializable = 1 in {
 def MOV32rm  : RXI<0x58,
                    (outs GR32:$dst), (ins rriaddr12:$src),
                    "l\t{$dst, $src}",
@@ -324,6 +324,7 @@ def MOV8miy   : SIYI<0x52EB,
                      "mviy\t{$dst, $src}",
                      [(truncstorei8 (i32 i32immSExt8:$src), riaddr:$dst)]>;
 
+let AddedComplexity = 2 in {
 def MOV16mi   : SILI<0xE544,
                      (outs), (ins riaddr12:$dst, s16imm:$src),
                      "mvhhi\t{$dst, $src}",
@@ -339,6 +340,7 @@ def MOV64mi16 : SILI<0xE548,
                      "mvghi\t{$dst, $src}",
                      [(store (i64 immSExt16:$src), riaddr12:$dst)]>,
                      Requires<[IsZ10]>;
+}
 
 // sexts
 def MOVSX32rr8  : RREI<0xB926,
@@ -856,6 +858,7 @@ def MUL64ri16   : RII<0xA7D,
                       "mghi\t{$dst, $src2}",
                       [(set GR64:$dst, (mul GR64:$src1, immSExt16:$src2))]>;
 
+let AddedComplexity = 2 in {
 def MUL32ri     : RILI<0xC21,
                        (outs GR32:$dst), (ins GR32:$src1, s32imm:$src2),
                        "msfi\t{$dst, $src2}",
@@ -866,6 +869,7 @@ def MUL64ri32   : RILI<0xC20,
                        "msgfi\t{$dst, $src2}",
                        [(set GR64:$dst, (mul GR64:$src1, i64immSExt32:$src2))]>,
                        Requires<[IsZ10]>;
+}
 
 def MUL32rm : RXI<0x71,
                   (outs GR32:$dst), (ins GR32:$src1, rriaddr12:$src2),
