@@ -462,10 +462,6 @@ struct PatternToMatch {
   std::string getPredicateCheck() const;
 };
 
-// Deterministic comparison of Record*.
-struct RecordPtrCmp {
-  bool operator()(const Record *LHS, const Record *RHS) const;
-};
   
 class CodeGenDAGPatterns {
   RecordKeeper &Records;
@@ -473,12 +469,12 @@ class CodeGenDAGPatterns {
   std::vector<CodeGenIntrinsic> Intrinsics;
   std::vector<CodeGenIntrinsic> TgtIntrinsics;
   
-  std::map<Record*, SDNodeInfo, RecordPtrCmp> SDNodes;
-  std::map<Record*, std::pair<Record*, std::string>, RecordPtrCmp> SDNodeXForms;
-  std::map<Record*, ComplexPattern, RecordPtrCmp> ComplexPatterns;
-  std::map<Record*, TreePattern*, RecordPtrCmp> PatternFragments;
-  std::map<Record*, DAGDefaultOperand, RecordPtrCmp> DefaultOperands;
-  std::map<Record*, DAGInstruction, RecordPtrCmp> Instructions;
+  std::map<Record*, SDNodeInfo> SDNodes;
+  std::map<Record*, std::pair<Record*, std::string> > SDNodeXForms;
+  std::map<Record*, ComplexPattern> ComplexPatterns;
+  std::map<Record*, TreePattern*> PatternFragments;
+  std::map<Record*, DAGDefaultOperand> DefaultOperands;
+  std::map<Record*, DAGInstruction> Instructions;
   
   // Specific SDNode definitions:
   Record *intrinsic_void_sdnode;
@@ -509,8 +505,7 @@ public:
     return SDNodeXForms.find(R)->second;
   }
   
-  typedef std::map<Record*, NodeXForm, RecordPtrCmp>::const_iterator
-          nx_iterator;
+  typedef std::map<Record*, NodeXForm>::const_iterator nx_iterator;
   nx_iterator nx_begin() const { return SDNodeXForms.begin(); }
   nx_iterator nx_end() const { return SDNodeXForms.end(); }
 
@@ -557,8 +552,7 @@ public:
     assert(PatternFragments.count(R) && "Invalid pattern fragment request!");
     return PatternFragments.find(R)->second;
   }
-  typedef std::map<Record*, TreePattern*, RecordPtrCmp>::const_iterator
-          pf_iterator;
+  typedef std::map<Record*, TreePattern*>::const_iterator pf_iterator;
   pf_iterator pf_begin() const { return PatternFragments.begin(); }
   pf_iterator pf_end() const { return PatternFragments.end(); }
 

@@ -100,9 +100,6 @@ bool isExtVectorInVTs(const std::vector<unsigned char> &EVTs) {
 } // end namespace EEVT.
 } // end namespace llvm.
 
-bool RecordPtrCmp::operator()(const Record *LHS, const Record *RHS) const {
-  return LHS->getID() < RHS->getID();
-}
 
 /// Dependent variable map for CodeGenDAGPattern variant generation
 typedef std::map<std::string, int> DepVarMap;
@@ -1331,7 +1328,7 @@ CodeGenDAGPatterns::CodeGenDAGPatterns(RecordKeeper &R) : Records(R) {
 }
 
 CodeGenDAGPatterns::~CodeGenDAGPatterns() {
-  for (pf_iterator I = PatternFragments.begin(),
+  for (std::map<Record*, TreePattern*>::iterator I = PatternFragments.begin(),
        E = PatternFragments.end(); I != E; ++I)
     delete I->second;
 }
@@ -1983,8 +1980,7 @@ void CodeGenDAGPatterns::ParseInstructions() {
   }
    
   // If we can, convert the instructions to be patterns that are matched!
-  for (std::map<Record*, DAGInstruction, RecordPtrCmp>::iterator II =
-        Instructions.begin(),
+  for (std::map<Record*, DAGInstruction>::iterator II = Instructions.begin(),
        E = Instructions.end(); II != E; ++II) {
     DAGInstruction &TheInst = II->second;
     const TreePattern *I = TheInst.getPattern();

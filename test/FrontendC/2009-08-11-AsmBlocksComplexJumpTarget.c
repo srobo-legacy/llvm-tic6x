@@ -1,7 +1,7 @@
 // RUN: %llvmgcc %s -fasm-blocks -S -o - | grep {\\\*1192}
 // Complicated expression as jump target
 // XFAIL: *
-// XTARGET: x86,i386,i686
+// XTARGET: darwin
 
 asm void Method3()
 {

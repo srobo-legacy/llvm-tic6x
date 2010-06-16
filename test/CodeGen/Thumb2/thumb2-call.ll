@@ -7,7 +7,7 @@ declare void @g(i32, i32, i32, i32)
 
 define void @f() {
 ; DARWIN: f:
-; DARWIN: blx _g
+; DARWIN: blx L_g$stub
 
 ; LINUX: f:
 ; LINUX: bl g

@@ -324,7 +324,6 @@ def MOV8miy   : SIYI<0x52EB,
                      "mviy\t{$dst, $src}",
                      [(truncstorei8 (i32 i32immSExt8:$src), riaddr:$dst)]>;
 
-let AddedComplexity = 2 in {
 def MOV16mi   : SILI<0xE544,
                      (outs), (ins riaddr12:$dst, s16imm:$src),
                      "mvhhi\t{$dst, $src}",
@@ -340,7 +339,6 @@ def MOV64mi16 : SILI<0xE548,
                      "mvghi\t{$dst, $src}",
                      [(store (i64 immSExt16:$src), riaddr12:$dst)]>,
                      Requires<[IsZ10]>;
-}
 
 // sexts
 def MOVSX32rr8  : RREI<0xB926,
@@ -858,7 +856,6 @@ def MUL64ri16   : RII<0xA7D,
                       "mghi\t{$dst, $src2}",
                       [(set GR64:$dst, (mul GR64:$src1, immSExt16:$src2))]>;
 
-let AddedComplexity = 2 in {
 def MUL32ri     : RILI<0xC21,
                        (outs GR32:$dst), (ins GR32:$src1, s32imm:$src2),
                        "msfi\t{$dst, $src2}",
@@ -869,7 +866,6 @@ def MUL64ri32   : RILI<0xC20,
                        "msgfi\t{$dst, $src2}",
                        [(set GR64:$dst, (mul GR64:$src1, i64immSExt32:$src2))]>,
                        Requires<[IsZ10]>;
-}
 
 def MUL32rm : RXI<0x71,
                   (outs GR32:$dst), (ins GR32:$src1, rriaddr12:$src2),

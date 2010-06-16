@@ -1319,8 +1319,6 @@ void RecordVal::print(raw_ostream &OS, bool PrintSem) const {
   if (PrintSem) OS << ";\n";
 }
 
-unsigned Record::LastID = 0;
-
 void Record::setName(const std::string &Name) {
   if (Records.getDef(getName()) == this) {
     Records.removeDef(getName());

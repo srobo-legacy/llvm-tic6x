@@ -109,6 +109,3 @@ module ExecutionEngine = struct
   
    *)
 end
-
-external initialize_native_target : unit -> bool
-                                  = "llvm_initialize_native_target"

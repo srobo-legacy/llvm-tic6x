@@ -5888,9 +5888,9 @@ Instruction *InstCombiner::visitFCmpInst(FCmpInst &I) {
 
   // Fold trivial predicates.
   if (I.getPredicate() == FCmpInst::FCMP_FALSE)
-    return ReplaceInstUsesWith(I, ConstantInt::get(I.getType(), 0));
+    return ReplaceInstUsesWith(I, ConstantInt::getFalse(*Context));
   if (I.getPredicate() == FCmpInst::FCMP_TRUE)
-    return ReplaceInstUsesWith(I, ConstantInt::get(I.getType(), 1));
+    return ReplaceInstUsesWith(I, ConstantInt::getTrue(*Context));
   
   // Simplify 'fcmp pred X, X'
   if (Op0 == Op1) {
@@ -5899,11 +5899,11 @@ Instruction *InstCombiner::visitFCmpInst(FCmpInst &I) {
     case FCmpInst::FCMP_UEQ:    // True if unordered or equal
     case FCmpInst::FCMP_UGE:    // True if unordered, greater than, or equal
     case FCmpInst::FCMP_ULE:    // True if unordered, less than, or equal
-      return ReplaceInstUsesWith(I, ConstantInt::get(I.getType(), 1));
+      return ReplaceInstUsesWith(I, ConstantInt::getTrue(*Context));
     case FCmpInst::FCMP_OGT:    // True if ordered and greater than
     case FCmpInst::FCMP_OLT:    // True if ordered and less than
     case FCmpInst::FCMP_ONE:    // True if ordered and operands are unequal
-      return ReplaceInstUsesWith(I, ConstantInt::get(I.getType(), 0));
+      return ReplaceInstUsesWith(I, ConstantInt::getFalse(*Context));
       
     case FCmpInst::FCMP_UNO:    // True if unordered: isnan(X) | isnan(Y)
     case FCmpInst::FCMP_ULT:    // True if unordered or less than
@@ -5926,7 +5926,7 @@ Instruction *InstCombiner::visitFCmpInst(FCmpInst &I) {
   }
     
   if (isa<UndefValue>(Op1))                  // fcmp pred X, undef -> undef
-    return ReplaceInstUsesWith(I, UndefValue::get(I.getType()));
+    return ReplaceInstUsesWith(I, UndefValue::get(Type::getInt1Ty(*Context)));
 
   // Handle fcmp with constant RHS
   if (Constant *RHSC = dyn_cast<Constant>(Op1)) {
@@ -5996,11 +5996,11 @@ Instruction *InstCombiner::visitICmpInst(ICmpInst &I) {
 
   // icmp X, X
   if (Op0 == Op1)
-    return ReplaceInstUsesWith(I, ConstantInt::get(I.getType(),
+    return ReplaceInstUsesWith(I, ConstantInt::get(Type::getInt1Ty(*Context), 
                                                    I.isTrueWhenEqual()));
 
   if (isa<UndefValue>(Op1))                  // X icmp undef -> undef
-    return ReplaceInstUsesWith(I, UndefValue::get(I.getType()));
+    return ReplaceInstUsesWith(I, UndefValue::get(Type::getInt1Ty(*Context)));
   
   // icmp <global/alloca*/null>, <global/alloca*/null> - Global/Stack value
   // addresses never equal each other!  We already know that Op0 != Op1.
@@ -11815,16 +11815,12 @@ static bool equivalentAddressValues(Value *A, Value *B) {
   if (A == B) return true;
   
   // Test if the values come form identical arithmetic instructions.
-  // This uses isIdenticalToWhenDefined instead of isIdenticalTo because
-  // its only used to compare two uses within the same basic block, which
-  // means that they'll always either have the same value or one of them
-  // will have an undefined value.
   if (isa<BinaryOperator>(A) ||
       isa<CastInst>(A) ||
       isa<PHINode>(A) ||
       isa<GetElementPtrInst>(A))
     if (Instruction *BI = dyn_cast<Instruction>(B))
-      if (cast<Instruction>(A)->isIdenticalToWhenDefined(BI))
+      if (cast<Instruction>(A)->isIdenticalTo(BI))
         return true;
   
   // Otherwise they may not be equivalent.

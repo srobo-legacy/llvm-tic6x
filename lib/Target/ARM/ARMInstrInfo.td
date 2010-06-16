@@ -904,9 +904,7 @@ def MOVs : AsI1<0b1101, (outs GPR:$dst), (ins so_reg:$src),
 
 let isReMaterializable = 1, isAsCheapAsAMove = 1 in
 def MOVi : AsI1<0b1101, (outs GPR:$dst), (ins so_imm:$src), DPFrm, IIC_iMOVi,
-                 "mov", " $dst, $src", [(set GPR:$dst, so_imm:$src)]>, UnaryDP {
-    let Inst{25} = 1;
-}
+                 "mov", " $dst, $src", [(set GPR:$dst, so_imm:$src)]>, UnaryDP;
 
 def MOVrx : AsI1<0b1101, (outs GPR:$dst), (ins GPR:$src), Pseudo, IIC_iMOVsi,
                  "mov", " $dst, $src, rrx",
@@ -991,9 +989,7 @@ defm SBC : AI1_adde_sube_irs<0b0110, "sbc",
 // These don't define reg/reg forms, because they are handled above.
 def RSBri : AsI1<0b0011, (outs GPR:$dst), (ins GPR:$a, so_imm:$b), DPFrm,
                   IIC_iALUi, "rsb", " $dst, $a, $b",
-                  [(set GPR:$dst, (sub so_imm:$b, GPR:$a))]> {
-    let Inst{25} = 1;
-}
+                  [(set GPR:$dst, (sub so_imm:$b, GPR:$a))]>;
 
 def RSBrs : AsI1<0b0011, (outs GPR:$dst), (ins GPR:$a, so_reg:$b), DPSoRegFrm,
                   IIC_iALUsr, "rsb", " $dst, $a, $b",
@@ -1003,9 +999,7 @@ def RSBrs : AsI1<0b0011, (outs GPR:$dst), (ins GPR:$a, so_reg:$b), DPSoRegFrm,
 let Defs = [CPSR] in {
 def RSBSri : AI1<0b0011, (outs GPR:$dst), (ins GPR:$a, so_imm:$b), DPFrm,
                  IIC_iALUi, "rsb", "s $dst, $a, $b",
-                 [(set GPR:$dst, (subc so_imm:$b, GPR:$a))]> {
-    let Inst{25} = 1;
-}
+                 [(set GPR:$dst, (subc so_imm:$b, GPR:$a))]>;
 def RSBSrs : AI1<0b0011, (outs GPR:$dst), (ins GPR:$a, so_reg:$b), DPSoRegFrm,
                  IIC_iALUsr, "rsb", "s $dst, $a, $b",
                  [(set GPR:$dst, (subc so_reg:$b, GPR:$a))]>;
@@ -1015,9 +1009,7 @@ let Uses = [CPSR] in {
 def RSCri : AsI1<0b0111, (outs GPR:$dst), (ins GPR:$a, so_imm:$b),
                  DPFrm, IIC_iALUi, "rsc", " $dst, $a, $b",
                  [(set GPR:$dst, (sube so_imm:$b, GPR:$a))]>,
-                 Requires<[IsARM, CarryDefIsUnused]> {
-    let Inst{25} = 1;
-}
+                 Requires<[IsARM, CarryDefIsUnused]>;
 def RSCrs : AsI1<0b0111, (outs GPR:$dst), (ins GPR:$a, so_reg:$b),
                  DPSoRegFrm, IIC_iALUsr, "rsc", " $dst, $a, $b",
                  [(set GPR:$dst, (sube so_reg:$b, GPR:$a))]>,
@@ -1029,9 +1021,7 @@ let Defs = [CPSR], Uses = [CPSR] in {
 def RSCSri : AXI1<0b0111, (outs GPR:$dst), (ins GPR:$a, so_imm:$b),
                   DPFrm, IIC_iALUi, "rscs $dst, $a, $b",
                   [(set GPR:$dst, (sube so_imm:$b, GPR:$a))]>,
-                  Requires<[IsARM, CarryDefIsUnused]> {
-    let Inst{25} = 1;
-}
+                  Requires<[IsARM, CarryDefIsUnused]>;
 def RSCSrs : AXI1<0b0111, (outs GPR:$dst), (ins GPR:$a, so_reg:$b),
                   DPSoRegFrm, IIC_iALUsr, "rscs $dst, $a, $b",
                   [(set GPR:$dst, (sube so_reg:$b, GPR:$a))]>,
@@ -1085,9 +1075,7 @@ def  MVNs  : AsI1<0b1111, (outs GPR:$dst), (ins so_reg:$src), DPSoRegFrm,
 let isReMaterializable = 1, isAsCheapAsAMove = 1 in
 def  MVNi  : AsI1<0b1111, (outs GPR:$dst), (ins so_imm:$imm), DPFrm, 
                   IIC_iMOVi, "mvn", " $dst, $imm",
-                  [(set GPR:$dst, so_imm_not:$imm)]>,UnaryDP {
-    let Inst{25} = 1;
-}
+                  [(set GPR:$dst, so_imm_not:$imm)]>,UnaryDP;
 
 def : ARMPat<(and   GPR:$src, so_imm_not:$imm),
              (BICri GPR:$src, so_imm_not:$imm)>;
@@ -1405,9 +1393,7 @@ def MOVCCi : AI1<0b1101, (outs GPR:$dst),
                         (ins GPR:$false, so_imm:$true), DPFrm, IIC_iCMOVi,
                 "mov", " $dst, $true",
    [/*(set GPR:$dst, (ARMcmov GPR:$false, so_imm:$true, imm:$cc, CCR:$ccr))*/]>,
-                RegConstraint<"$false = $dst">, UnaryDP {
-    let Inst{25} = 1;
-}
+                RegConstraint<"$false = $dst">, UnaryDP;
 
 
 //===----------------------------------------------------------------------===//

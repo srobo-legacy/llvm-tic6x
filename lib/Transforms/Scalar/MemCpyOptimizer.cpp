@@ -271,7 +271,6 @@ void MemsetRanges::addStore(int64_t Start, StoreInst *SI) {
   if (Start < I->Start) {
     I->Start = Start;
     I->StartPtr = SI->getPointerOperand();
-    I->Alignment = SI->getAlignment();
   }
     
   // Now we know that Start <= I->End and Start >= I->Start (so the startpoint
@@ -339,15 +338,13 @@ static RegisterPass<MemCpyOpt> X("memcpyopt",
 bool MemCpyOpt::processStore(StoreInst *SI, BasicBlock::iterator& BBI) {
   if (SI->isVolatile()) return false;
   
-  LLVMContext &Context = SI->getContext();
-
   // There are two cases that are interesting for this code to handle: memcpy
   // and memset.  Right now we only handle memset.
   
   // Ensure that the value being stored is something that can be memset'able a
   // byte at a time like "0" or "-1" or any width, as well as things like
   // 0xA0A0A0A0 and 0.0.
-  Value *ByteVal = isBytewiseValue(SI->getOperand(0), Context);
+  Value *ByteVal = isBytewiseValue(SI->getOperand(0), SI->getContext());
   if (!ByteVal)
     return false;
 
@@ -388,7 +385,8 @@ bool MemCpyOpt::processStore(StoreInst *SI, BasicBlock::iterator& BBI) {
     if (NextStore->isVolatile()) break;
     
     // Check to see if this stored value is of the same byte-splattable value.
-    if (ByteVal != isBytewiseValue(NextStore->getOperand(0), Context))
+    if (ByteVal != isBytewiseValue(NextStore->getOperand(0), 
+                                   NextStore->getContext()))
       break;
 
     // Check to see if this store is to a constant offset from the start ptr.
@@ -408,6 +406,7 @@ bool MemCpyOpt::processStore(StoreInst *SI, BasicBlock::iterator& BBI) {
   // store as well.  We try to avoid this unless there is at least something
   // interesting as a small compile-time optimization.
   Ranges.addStore(0, SI);
+
   
   Function *MemSetF = 0;
   
@@ -431,15 +430,17 @@ bool MemCpyOpt::processStore(StoreInst *SI, BasicBlock::iterator& BBI) {
     BasicBlock::iterator InsertPt = BI;
   
     if (MemSetF == 0) {
-      const Type *Ty = Type::getInt64Ty(Context);
-      MemSetF = Intrinsic::getDeclaration(M, Intrinsic::memset, &Ty, 1);
-    }
+      const Type *Tys[] = {Type::getInt64Ty(SI->getContext())};
+      MemSetF = Intrinsic::getDeclaration(M, Intrinsic::memset,
+                                          Tys, 1);
+   }
     
     // Get the starting pointer of the block.
     StartPtr = Range.StartPtr;
   
     // Cast the start ptr to be i8* as memset requires.
-    const Type *i8Ptr = PointerType::getUnqual(Type::getInt8Ty(Context));
+    const Type *i8Ptr =
+          PointerType::getUnqual(Type::getInt8Ty(SI->getContext()));
     if (StartPtr->getType() != i8Ptr)
       StartPtr = new BitCastInst(StartPtr, i8Ptr, StartPtr->getName(),
                                  InsertPt);
@@ -447,9 +448,10 @@ bool MemCpyOpt::processStore(StoreInst *SI, BasicBlock::iterator& BBI) {
     Value *Ops[] = {
       StartPtr, ByteVal,   // Start, value
       // size
-      ConstantInt::get(Type::getInt64Ty(Context), Range.End-Range.Start),
+      ConstantInt::get(Type::getInt64Ty(SI->getContext()),
+                       Range.End-Range.Start),
       // align
-      ConstantInt::get(Type::getInt32Ty(Context), Range.Alignment)
+      ConstantInt::get(Type::getInt32Ty(SI->getContext()), Range.Alignment)
     };
     Value *C = CallInst::Create(MemSetF, Ops, Ops+4, "", InsertPt);
     DEBUG(cerr << "Replace stores:\n";
@@ -461,8 +463,7 @@ bool MemCpyOpt::processStore(StoreInst *SI, BasicBlock::iterator& BBI) {
     BBI = BI;
   
     // Zap all the stores.
-    for (SmallVector<StoreInst*, 16>::const_iterator
-         SI = Range.TheStores.begin(),
+    for (SmallVector<StoreInst*, 16>::const_iterator SI = Range.TheStores.begin(),
          SE = Range.TheStores.end(); SI != SE; ++SI)
       (*SI)->eraseFromParent();
     ++NumMemSetInfer;

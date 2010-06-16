@@ -1086,12 +1086,12 @@ void X86RegisterInfo::emitPrologue(MachineFunction &MF) const {
       emitSPUpdate(MBB, MBBI, StackPtr, -(int64_t)NumBytes, Is64Bit, TII);
   }
 
-  if ((NumBytes || PushedRegs) && needsFrameMoves) {
+  if (NumBytes && needsFrameMoves) {
     // Mark end of stack pointer adjustment.
     unsigned LabelId = MMI->NextLabelID();
     BuildMI(MBB, MBBI, DL, TII.get(X86::DBG_LABEL)).addImm(LabelId);
 
-    if (!HasFP && NumBytes) {
+    if (!HasFP) {
       // Define the current CFA rule to use the provided offset.
       if (StackSize) {
         MachineLocation SPDst(MachineLocation::VirtualFP);

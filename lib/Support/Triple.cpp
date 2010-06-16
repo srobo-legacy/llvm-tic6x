@@ -9,7 +9,6 @@
 
 #include "llvm/ADT/Triple.h"
 
-#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
 #include <cassert>
 #include <cstring>
@@ -328,14 +327,7 @@ void Triple::setOS(OSType Kind) {
 }
 
 void Triple::setArchName(const StringRef &Str) {
-  // Work around a miscompilation bug for Twines in gcc 4.0.3.
-  SmallString<64> Triple;
-  Triple += Str;
-  Triple += "-";
-  Triple += getVendorName();
-  Triple += "-";
-  Triple += getOSAndEnvironmentName();
-  setTriple(Triple.str());
+  setTriple(Str + "-" + getVendorName() + "-" + getOSAndEnvironmentName());
 }
 
 void Triple::setVendorName(const StringRef &Str) {

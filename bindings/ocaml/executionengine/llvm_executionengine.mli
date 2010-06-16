@@ -161,6 +161,3 @@ module ExecutionEngine: sig
       [ee]. *)
   val target_data: t -> Llvm_target.TargetData.t
 end
-
-external initialize_native_target : unit -> bool
-                                  = "llvm_initialize_native_target"

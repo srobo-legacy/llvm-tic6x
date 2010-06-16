@@ -790,7 +790,7 @@ unsigned ReuseInfo::GetRegForReload(const TargetRegisterClass *RC,
       // value aliases the new register. If so, codegen the previous reload
       // and use this one.          
       unsigned PRRU = Op.PhysRegReused;
-      if (TRI->regsOverlap(PRRU, PhysReg)) {
+      if (TRI->areAliases(PRRU, PhysReg)) {
         // Okay, we found out that an alias of a reused register
         // was used.  This isn't good because it means we have
         // to undo a previous reuse.
@@ -802,21 +802,6 @@ unsigned ReuseInfo::GetRegForReload(const TargetRegisterClass *RC,
         // explicit load for it.
         ReusedOp NewOp = Op;
         Reuses.erase(Reuses.begin()+ro);
-
-        // MI may be using only a sub-register of PhysRegUsed.
-        unsigned RealPhysRegUsed = MI->getOperand(NewOp.Operand).getReg();
-        unsigned SubIdx = 0;
-        assert(TargetRegisterInfo::isPhysicalRegister(RealPhysRegUsed) &&
-               "A reuse cannot be a virtual register");
-        if (PRRU != RealPhysRegUsed) {
-          // What was the sub-register index?
-          unsigned SubReg;
-          for (SubIdx = 1; (SubReg = TRI->getSubReg(PRRU, SubIdx)); SubIdx++)
-            if (SubReg == RealPhysRegUsed)
-              break;
-          assert(SubReg == RealPhysRegUsed &&
-                 "Operand physreg is not a sub-register of PhysRegUsed");
-        }
 
         // Ok, we're going to try to reload the assigned physreg into the
         // slot that we were supposed to in the first place.  However, that
@@ -850,6 +835,7 @@ unsigned ReuseInfo::GetRegForReload(const TargetRegisterClass *RC,
         Spills.ClobberPhysReg(NewPhysReg);
         Spills.ClobberPhysReg(NewOp.PhysRegReused);
 
+        unsigned SubIdx = MI->getOperand(NewOp.Operand).getSubReg();
         unsigned RReg = SubIdx ? TRI->getSubReg(NewPhysReg, SubIdx) : NewPhysReg;
         MI->getOperand(NewOp.Operand).setReg(RReg);
         MI->getOperand(NewOp.Operand).setSubReg(0);

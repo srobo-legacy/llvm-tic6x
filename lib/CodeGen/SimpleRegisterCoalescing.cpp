@@ -527,15 +527,14 @@ static void removeRange(LiveInterval &li, unsigned Start, unsigned End,
       if (!li_->hasInterval(*SR))
         continue;
       LiveInterval &sli = li_->getInterval(*SR);
-      unsigned RemoveStart = Start;
       unsigned RemoveEnd = Start;
       while (RemoveEnd != End) {
-        LiveInterval::iterator LR = sli.FindLiveRangeContaining(RemoveStart);
+        LiveInterval::iterator LR = sli.FindLiveRangeContaining(Start);
         if (LR == sli.end())
           break;
         RemoveEnd = (LR->end < End) ? LR->end : End;
-        sli.removeRange(RemoveStart, RemoveEnd, true);
-        RemoveStart = RemoveEnd;
+        sli.removeRange(Start, RemoveEnd, true);
+        Start = RemoveEnd;
       }
     }
   }
@@ -633,22 +632,6 @@ bool SimpleRegisterCoalescing::ReMaterializeTrivialDef(LiveInterval &SrcInt,
       if (mri_->getRegClass(DstReg) != RC)
         return false;
     } else if (!RC->contains(DstReg))
-      return false;
-  }
-
-  // If destination register has a sub-register index on it, make sure it mtches
-  // the instruction register class.
-  if (DstSubIdx) {
-    const TargetInstrDesc &TID = DefMI->getDesc();
-    if (TID.getNumDefs() != 1)
-      return false;
-    const TargetRegisterClass *DstRC = mri_->getRegClass(DstReg);
-    const TargetRegisterClass *DstSubRC =
-      DstRC->getSubRegisterRegClass(DstSubIdx);
-    const TargetRegisterClass *DefRC = TID.OpInfo[0].getRegClass(tri_);
-    if (DefRC == DstRC)
-      DstSubIdx = 0;
-    else if (DefRC != DstSubRC)
       return false;
   }
 

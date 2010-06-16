@@ -60,7 +60,6 @@ namespace {
     ARMJITInfo                *JTI;
     const ARMInstrInfo        *II;
     const TargetData          *TD;
-    const ARMSubtarget        *Subtarget;
     TargetMachine             &TM;
     CodeEmitter               &MCE;
     const std::vector<MachineConstantPoolEntry> *MCPEs;
@@ -164,7 +163,7 @@ namespace {
     /// Routines that handle operands which add machine relocations which are
     /// fixed up by the relocation stage.
     void emitGlobalAddress(GlobalValue *GV, unsigned Reloc,
-                           bool NeedStub,  bool Indirect, intptr_t ACPV = 0);
+                           bool NeedStub, intptr_t ACPV = 0);
     void emitExternalSymbolAddress(const char *ES, unsigned Reloc);
     void emitConstPoolAddress(unsigned CPI, unsigned Reloc);
     void emitJumpTableAddress(unsigned JTIndex, unsigned Reloc);
@@ -196,10 +195,9 @@ bool Emitter<CodeEmitter>::runOnMachineFunction(MachineFunction &MF) {
   assert((MF.getTarget().getRelocationModel() != Reloc::Default ||
           MF.getTarget().getRelocationModel() != Reloc::Static) &&
          "JIT relocation model must be set to static or default!");
-  JTI = ((ARMTargetMachine&)MF.getTarget()).getJITInfo();
   II = ((ARMTargetMachine&)MF.getTarget()).getInstrInfo();
   TD = ((ARMTargetMachine&)MF.getTarget()).getTargetData();
-  Subtarget = &TM.getSubtarget<ARMSubtarget>();
+  JTI = ((ARMTargetMachine&)MF.getTarget()).getJITInfo();
   MCPEs = &MF.getConstantPool()->getConstants();
   MJTEs = &MF.getJumpTableInfo()->getJumpTables();
   IsPIC = TM.getRelocationModel() == Reloc::PIC_;
@@ -246,7 +244,7 @@ unsigned Emitter<CodeEmitter>::getMachineOpValue(const MachineInstr &MI,
   else if (MO.isImm())
     return static_cast<unsigned>(MO.getImm());
   else if (MO.isGlobal())
-    emitGlobalAddress(MO.getGlobal(), ARM::reloc_arm_branch, true, false);
+    emitGlobalAddress(MO.getGlobal(), ARM::reloc_arm_branch, true);
   else if (MO.isSymbol())
     emitExternalSymbolAddress(MO.getSymbolName(), ARM::reloc_arm_branch);
   else if (MO.isCPI()) {
@@ -272,14 +270,9 @@ unsigned Emitter<CodeEmitter>::getMachineOpValue(const MachineInstr &MI,
 ///
 template<class CodeEmitter>
 void Emitter<CodeEmitter>::emitGlobalAddress(GlobalValue *GV, unsigned Reloc,
-                                             bool NeedStub, bool Indirect,
-                                             intptr_t ACPV) {
-  MachineRelocation MR = Indirect
-    ? MachineRelocation::getIndirectSymbol(MCE.getCurrentPCOffset(), Reloc,
-                                           GV, ACPV, NeedStub)
-    : MachineRelocation::getGV(MCE.getCurrentPCOffset(), Reloc,
-                               GV, ACPV, NeedStub);
-  MCE.addRelocation(MR);
+                                             bool NeedStub, intptr_t ACPV) {
+  MCE.addRelocation(MachineRelocation::getGV(MCE.getCurrentPCOffset(), Reloc,
+                                             GV, ACPV, NeedStub));
 }
 
 /// emitExternalSymbolAddress - Arrange for the address of an external symbol to
@@ -430,12 +423,16 @@ void Emitter<CodeEmitter>::emitConstPoolInstruction(const MachineInstr &MI) {
 
     GlobalValue *GV = ACPV->getGV();
     if (GV) {
-      Reloc::Model RelocM = TM.getRelocationModel();
-      emitGlobalAddress(GV, ARM::reloc_arm_machine_cp_entry,
-                        isa<Function>(GV),
-                        Subtarget->GVIsIndirectSymbol(GV, RelocM),
-                        (intptr_t)ACPV);
+      assert(!ACPV->isStub() && "Don't know how to deal this yet!");
+      if (ACPV->isNonLazyPointer())
+        MCE.addRelocation(MachineRelocation::getIndirectSymbol(
+                  MCE.getCurrentPCOffset(), ARM::reloc_arm_machine_cp_entry, GV,
+                  (intptr_t)ACPV, false));
+      else
+        emitGlobalAddress(GV, ARM::reloc_arm_machine_cp_entry,
+                          ACPV->isStub() || isa<Function>(GV), (intptr_t)ACPV);
      } else  {
+      assert(!ACPV->isNonLazyPointer() && "Don't know how to deal this yet!");
       emitExternalSymbolAddress(ACPV->getSymbol(), ARM::reloc_arm_absolute);
     }
     emitWordLE(0);
@@ -453,7 +450,7 @@ void Emitter<CodeEmitter>::emitConstPoolInstruction(const MachineInstr &MI) {
       });
 
     if (GlobalValue *GV = dyn_cast<GlobalValue>(CV)) {
-      emitGlobalAddress(GV, ARM::reloc_arm_absolute, isa<Function>(GV), false);
+      emitGlobalAddress(GV, ARM::reloc_arm_absolute, isa<Function>(GV));
       emitWordLE(0);
     } else if (const ConstantInt *CI = dyn_cast<ConstantInt>(CV)) {
       uint32_t Val = *(uint32_t*)CI->getValue().getRawData();
@@ -966,7 +963,7 @@ static unsigned getAddrModeUPBits(unsigned Mode) {
   // DB - Decrement before - bit U = 0 and bit P = 1
   switch (Mode) {
   default: llvm_unreachable("Unknown addressing sub-mode!");
-  case ARM_AM::da:                                     break;
+  case ARM_AM::da:                      break;
   case ARM_AM::db: Binary |= 0x1 << ARMII::P_BitShift; break;
   case ARM_AM::ia: Binary |= 0x1 << ARMII::U_BitShift; break;
   case ARM_AM::ib: Binary |= 0x3 << ARMII::U_BitShift; break;

@@ -94,25 +94,19 @@ class RREI<bits<16> op, dag outs, dag ins, string asmstr, list<dag> pattern>
   : I16<op, RREForm, outs, ins, asmstr, pattern>;
 
 class RXI<bits<8> op, dag outs, dag ins, string asmstr, list<dag> pattern>
-  : I8<op, RXForm, outs, ins, asmstr, pattern> {
-  let AddedComplexity = 1;
-}
+  : I8<op, RXForm, outs, ins, asmstr, pattern>;
 
 class RXYI<bits<16> op, dag outs, dag ins, string asmstr, list<dag> pattern>
   : I16<op, RXYForm, outs, ins, asmstr, pattern>;
 
 class RSI<bits<8> op, dag outs, dag ins, string asmstr, list<dag> pattern>
-  : I8<op, RSForm, outs, ins, asmstr, pattern> {
-  let AddedComplexity = 1;
-}
+  : I8<op, RSForm, outs, ins, asmstr, pattern>;
 
 class RSYI<bits<16> op, dag outs, dag ins, string asmstr, list<dag> pattern>
   : I16<op, RSYForm, outs, ins, asmstr, pattern>;
 
 class SII<bits<8> op, dag outs, dag ins, string asmstr, list<dag> pattern>
-  : I8<op, SIForm, outs, ins, asmstr, pattern> {
-  let AddedComplexity = 1;
-}
+  : I8<op, SIForm, outs, ins, asmstr, pattern>;
 
 class SIYI<bits<16> op, dag outs, dag ins, string asmstr, list<dag> pattern>
   : I16<op, SIYForm, outs, ins, asmstr, pattern>;
