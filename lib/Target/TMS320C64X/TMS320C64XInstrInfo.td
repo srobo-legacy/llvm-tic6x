@@ -103,15 +103,15 @@ def TMS320C64Xcall : SDNode<"TMSISD::CALL", SDT_call,
 def retflag : SDNode<"TMSISD::RET_FLAG", SDTNone, [SDNPHasChain, SDNPOptInFlag]>;
 
 // FIXME: mv can be in any s/d/l slot
-def mv : inst<(outs GPRegs:$out), (ins GPRegs:$in), "mv\t$s\t$in,\t$out", [],
+def mv : inst<(outs GPRegs:$out), (ins GPRegs:$in), "mv\t.S1\t$in,\t$out", [],
 							0, unit_s>;
 
-def mv1 : inst<(outs GPRegs:$out), (ins GPRegs:$in), "mv\t$s\t$in,\t$out", [],
+def mv1 : inst<(outs GPRegs:$out), (ins GPRegs:$in), "mv\t.S1\t$in,\t$out", [],
 							0, unit_s>;
-def mv2 : inst<(outs GPRegs:$out), (ins GPRegs:$in), "mv\t$s\t$in,\t$out", [],
+def mv2 : inst<(outs GPRegs:$out), (ins GPRegs:$in), "mv\t.S2\t$in,\t$out", [],
 							1, unit_s>;
 
-def noop : inst<(outs), (ins i32imm:$cycles), "nop\t$s\t$cycles", [], 0,unit_s>;
+def noop : inst<(outs), (ins i32imm:$cycles), "nop\t.S1\t$cycles", [],0,unit_s>;
 
 
 // Shifts and rotates
@@ -153,7 +153,7 @@ defm add_d : inst_rx<"add", unit_d, add, 0>;
 defm add_d : inst_xr<"add", unit_d, add, 1>;
 defm add_d : inst_xi<"add", (i32 sconst5:$imm), unit_d, add, 0>;
 
-let Constraints = "$src1 = $dst", AsmString = "addk\t$s\t$imm,\t$dst" in {
+let Constraints = "$src1 = $dst", AsmString = "addk\t.S1\t$imm,\t$dst" in {
 def addk_p : pseudo_ri<"addk", (i32 sconst16:$imm), unit_s, add, 0>;
 defm addk : inst_ri<"addk", (i32 sconst16:$imm), unit_s, add, 0>;
 }
@@ -227,7 +227,7 @@ defm mpy32 : inst_xr<"mpy32", unit_m, mul, 0>;
 // We also don't want to pattern match anything, use explicit patterns for that
 
 let InOperandList = (ins i32imm:$imm, pred:$s),
-			AsmString = "mvk\t$s\t$imm,\t$dst" in {
+			AsmString = "mvk\t.S1\t$imm,\t$dst" in {
 def mvk_p : pseudo_rr<"mvk", unit_s, add, 0> {
 	let Pattern = [];
 }
@@ -247,7 +247,7 @@ def : Pat<(i32 mvk_pred:$val), (mvk_p imm:$val)>;
 // and set 32 bit constants
 
 let InOperandList = (ins i32imm:$imm, pred:$s),
-		AsmString = "mvkl\t$s\t$imm,\t$dst" in {
+		AsmString = "mvkl\t.S1\t$imm,\t$dst" in {
 def mvkl_p : pseudo_rr<"mvkl", unit_s, add, 0> {
 	let Pattern = [];
 }
@@ -255,15 +255,15 @@ defm mvkl_s : inst_rr<"mvkl", unit_s, add, 0>;
 }
 
 def mvkh_p : inst<(outs GPRegs:$dst), (ins i32imm:$imm, GPRegs:$src1),
-		"mvkh\t$s\t$imm,\t$dst", [], 0, unit_s> {
+		"mvkh\t.S1\t$imm,\t$dst", [], 0, unit_s> {
 	let Constraints = "$src1 = $dst";
 }
 
 let Constraints = "$src1 = $dst" in {
 def mvkh_1 : inst<(outs ARegs:$dst), (ins i32imm:$imm, ARegs:$src1),
-		"mvkh\t$s\t$imm,\t$dst", [], 0, unit_s>;
+		"mvkh\t.S1\t$imm,\t$dst", [], 0, unit_s>;
 def mvkh_2 : inst<(outs BRegs:$dst), (ins i32imm:$imm, BRegs:$src1),
-		"mvkh\t$s\t$imm,\t$dst", [], 1, unit_s>;
+		"mvkh\t.S2\t$imm,\t$dst", [], 1, unit_s>;
 }
 
 def : Pat<(i32 mvk_all_pred:$val),
@@ -276,14 +276,14 @@ def : Pat<(i32 (Wrapper tjumptable:$dst)),
 
 
 let InOperandList = (ins call_ret_label_operand_operand:$imm, pred:$s),
-		AsmString = "mvkl\t$s\t$imm,\t$dst" in {
+		AsmString = "mvkl\t.S1\t$imm,\t$dst" in {
 def mvkl_label : pseudo_rr<"mvkl", unit_s, add, 0> {
 	let Pattern = [];
 }
 }
 
 def mvkh_label : inst<(outs GPRegs:$dst), (ins call_ret_label_operand_operand:$imm, GPRegs:$src1),
-		"mvkh\t$s\t$imm,\t$dst", [], 0, unit_s> {
+		"mvkh\t.S1\t$imm,\t$dst", [], 0, unit_s> {
 	let Constraints = "$src1 = $dst";
 }
 
@@ -292,7 +292,7 @@ def : Pat<(call_ret_label_operand mvk_all_pred:$label),
 
 // FIXME: Work out what on earth to do with lea
 def lea_fail : inst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
-		"add\t$s\t${ptr:facebees},\t$dst",
+		"add\t.L1\t${ptr:facebees},\t$dst",
 		[(set GPRegs:$dst, idxaddr:$ptr)],
 		0, unit_l> {
 	let Pattern = sched_pattern;
@@ -369,14 +369,14 @@ defm cmpltu : inst_rx<"cmpltu", unit_l, cmpltu_node, 0>;
 // To support select, we need two conditional instructions with the same
 // destination - copy what i32 loading does.
 
-
 def mvselect_a : inst<(outs GPRegs:$dst), (ins GPRegs:$reg, nodefault_pred:$s),
-			"mv\t$s\t$reg,\t$dst", [], 0, unit_s> {
+			"mv\t.S1\t$reg,\t$dst", [], 0, unit_s> {
 	let InOperandList = (ins GPRegs:$reg, nodefault_pred:$s);
 }
 
+
 def mvselect_b : inst<(outs GPRegs:$dst), (ins GPRegs:$reg, GPRegs:$src1, nodefault_pred:$s),
-		"mv\t$s\t$reg,\t$dst", [], 0, unit_s> {
+		"mv\t.S1\t$reg,\t$dst", [], 0, unit_s> {
 	let Constraints = "$src1 = $dst";
 	let InOperandList = (ins GPRegs:$reg, GPRegs:$src1, nodefault_pred:$s);
 }
@@ -391,28 +391,27 @@ def : Pat<(i32 mvk_all_pred:$val),
 // Branch / call instructions
 
 let isTerminator = 1, isBranch = 1, delay_slots = 4, hasDelaySlot = 1 in {
-def branch_p : inst<(outs), (ins brtarget:$block), "b\t$s\t$block",
+def branch_p : inst<(outs), (ins brtarget:$block), "b\t.S1\t$block",
 				[(br bb:$block)], 0, unit_s> {
 	let Pattern = sched_pattern;
 }
-def branch_1 : inst<(outs), (ins brtarget:$block), "b\t$s\t$block",
+def branch_1 : inst<(outs), (ins brtarget:$block), "b\t.S1\t$block",
 				[(br bb:$block)], 0, unit_s>;
-def branch_2 : inst<(outs), (ins brtarget:$block), "b\t$s\t$block",
+def branch_2 : inst<(outs), (ins brtarget:$block), "b\t.S2\t$block",
 				[(br bb:$block)], 1, unit_s>;
 
-
 let InOperandList = (ins brtarget:$block, nodefault_pred:$s) in {
-def brcond_p : inst<(outs), (ins), "b\t$s\t$block",
+def brcond_p : inst<(outs), (ins), "b\t.S1\t$block",
 		[(brcond_node bb:$block, predwrapper:$s)], 0, unit_s> {
 	let Pattern = sched_pattern;
 }
-def brcond_1 : inst<(outs), (ins), "b\t$s\t$block",
+def brcond_1 : inst<(outs), (ins), "b\t.S1\t$block",
 		[(brcond_node bb:$block, predwrapper:$bees)], 0, unit_s>;
-def brcond_2 : inst<(outs), (ins), "b\t$s\t$block",
+def brcond_2 : inst<(outs), (ins), "b\t.S2\t$block",
 		[(brcond_node bb:$block, predwrapper:$bees)], 1, unit_s>;
 }
 
-def bindirect_2 : inst<(outs), (ins BRegs:$reg), "b\t$s\t$reg",
+def bindirect_2 : inst<(outs), (ins BRegs:$reg), "b\t.S2\t$reg",
 				[(brind BRegs:$reg)], 1, unit_s> {
 	let Pattern = sched_pattern;
 }
@@ -431,17 +430,17 @@ let isCall = 1, isPredicable = 0,
 // upon. So callp .S1 puts ret in A3, which isn't consistent with the TI
 // calling convention.
 
-def callp_p : inst<(outs), (ins calltarget:$dst), "callp\t$s\t$dst",
+def callp_p : inst<(outs), (ins calltarget:$dst), "callp\t.S2\t$dst",
 			[(TMS320C64Xcall tglobaladdr:$dst)], 1, unit_s> {
 	let Pattern = sched_pattern;
 }
 
-def callp_e_p : inst<(outs), (ins calltarget:$dst), "callp\t$s\t$dst",
+def callp_e_p : inst<(outs), (ins calltarget:$dst), "callp\t.S2\t$dst",
 			[(TMS320C64Xcall texternalsym:$dst)], 1, unit_s> {
 	let Pattern = sched_pattern;
 }
 
-def call_indirect_2 : inst<(outs), (ins BRegs:$reg), "b\t$s\t$reg",
+def call_indirect_2 : inst<(outs), (ins BRegs:$reg), "b\t.S2\t$reg",
 				[(TMS320C64Xcall BRegs:$reg)], 1, unit_s> {
 	let Pattern = sched_pattern;
 	let Uses = [B3];
@@ -462,7 +461,7 @@ def return_label : inst<(outs), (ins i32imm:$imm), ".ponylabel_$imm:",
 // Epilogue code should juggle the return addr into B3.
 // We only define one instruction in this form, scheduling shouldn't
 // have any reason touching this anyway.
-def ret : inst<(outs), (ins), "bnop\t$s\tB3,\t5", [(retflag)], 1, unit_s> {
+def ret : inst<(outs), (ins), "bnop\t.S2\tB3,\t5", [(retflag)], 1, unit_s> {
 	let isReturn = 1;
 	let isTerminator = 1;
 	let isPredicable = 0;
