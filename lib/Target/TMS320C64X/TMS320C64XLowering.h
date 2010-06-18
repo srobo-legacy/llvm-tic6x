@@ -71,8 +71,8 @@ public:
 	SDValue LowerReturn(SDValue Chain, unsigned CallConv, bool isVarArg,
 				const SmallVectorImpl<ISD::OutputArg> &Outs,
 				DebugLoc dl, SelectionDAG &DAG);
-	SDValue LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
-				bool isVarArg, bool isTailCall,
+	SDValue LowerCall(SDValue Chain, SDValue Callee, CallingConv::ID
+				CallConv, bool isVarArg, bool &isTailCall,
 				const SmallVectorImpl<ISD::OutputArg> &Outs,
 				const SmallVectorImpl<ISD::InputArg> &Ins,
 				DebugLoc dl, SelectionDAG &DAG,

@@ -296,8 +296,8 @@ TMS320C64XLowering::LowerReturn(SDValue Chain, unsigned CallConv, bool isVarArg,
 }
 
 SDValue
-TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
-			bool isVarArg, bool isTailCall,
+TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, CallingConv::ID
+			CallConv, bool isVarArg, bool &isTailCall,
 			const SmallVectorImpl<ISD::OutputArg> &Outs,
 			const SmallVectorImpl<ISD::InputArg> &Ins,
 			DebugLoc dl, SelectionDAG &DAG,
@@ -314,6 +314,8 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 	arg_idx = 0;
 	bytes = 0;
 	fixed_args = 0;
+
+	isTailCall = false;
 
 	CCState CCInfo(CallConv, isVarArg, getTargetMachine(), ArgLocs,
 							*DAG.getContext());
