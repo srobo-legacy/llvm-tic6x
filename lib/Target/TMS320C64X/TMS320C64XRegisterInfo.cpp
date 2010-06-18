@@ -316,7 +316,7 @@ TMS320C64XRegisterInfo::getRARegister() const
 }
 
 unsigned int
-TMS320C64XRegisterInfo::getFrameRegister(MachineFunction &MF) const
+TMS320C64XRegisterInfo::getFrameRegister(const MachineFunction &MF) const
 {
 
 	llvm_unreachable_internal("Unimplemented function getFrameRegister\n");

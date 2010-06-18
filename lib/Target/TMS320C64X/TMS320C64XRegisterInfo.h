@@ -61,7 +61,7 @@ public:
 
 	/* Debug stuff, apparently */
 	unsigned int getRARegister() const;
-	unsigned int getFrameRegister(MachineFunction &MF) const;
+	unsigned int getFrameRegister(const MachineFunction &MF) const;
 	int getDwarfRegNum(unsigned RegNum, bool isEH) const;
 };
 
