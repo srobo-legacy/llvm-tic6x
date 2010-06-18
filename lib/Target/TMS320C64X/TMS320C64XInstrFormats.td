@@ -234,6 +234,7 @@ class inst<dag outs, dag ins, string mnemonic, list<dag> pattern, bit side,
 			InstUnit u> : Instruction {
 	// All insns are conditional unless stated otherwise
 	let isPredicable = 1;
+	let CodeSize = 4;
 
 	let Namespace = "TMS320C64X";
 	let OutOperandList = outs;
