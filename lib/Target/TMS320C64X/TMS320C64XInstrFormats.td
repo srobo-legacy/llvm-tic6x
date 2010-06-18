@@ -172,6 +172,11 @@ def nodefault_pred : PredicateOperand<OtherVT, (ops timm, PredRegs),
 	let PrintMethod = "printUnitOperand";
 }
 
+def nodefault_zflag : PredicateOperand<i32, (ops timm), (ops)>;
+def nodefault_reg : PredicateOperand<i32, (ops PredRegs), (ops)>;
+
+def predwrapper1 : ComplexPattern<i32, 1, "bounce_predicate", [], []>;
+
 // A note on how we're formatting instruction representation.
 //
 // All instructions we care about right now have at _least_ a destination
@@ -255,6 +260,12 @@ class inst<dag outs, dag ins, string mnemonic, list<dag> pattern, bit side,
 	bit mem_access = 0;
 	bits<2> mem_shift_amt = 0;
 	bit mem_load_store = 0; // 0 for load, 1 for store
+}
+
+class nopred_inst<dag outs, dag ins, string mnemonic, list<dag> pattern,
+				bit side, InstUnit u> :
+		inst<outs, ins, mnemonic, pattern, side, u> {
+	let InOperandList = !con(ins, (ops nodefault_zflag:$a, nodefault_reg:$b));
 }
 
 class pseudo_rr<string mnemonic, InstUnit u, SDNode op, int swap> :

@@ -27,22 +27,17 @@
 // misc, to begin with
 
 def SDT_Wrapper : SDTypeProfile<1, 1, [SDTCisSameAs<0, 1>, SDTCisPtrTy<0>]>;
-def SDT_brcond : SDTypeProfile<0, 2, [SDTCisVT<0, OtherVT>]>;
+def SDT_brcond : SDTypeProfile<0, 3, [SDTCisVT<0, OtherVT>, SDTCisVT<1, i32>, SDTCisVT<2, i32>]>;
 def SDT_call : SDTypeProfile<0, -1, [SDTCisVT<0, iPTR>]>;
 def SDT_call_seq_start : SDCallSeqStart<[SDTCisVT<0, i32>]>;
 def SDT_call_seq_end : SDCallSeqEnd<[SDTCisVT<0, i32>, SDTCisVT<1, i32>]>;
 def SDT_call_ret_label : SDTypeProfile<0, 1, [SDTCisVT<0, i32>]>;
 def SDT_call_ret_label_operand : SDTypeProfile<1, 1, [SDTCisVT<0, i32>,
 							SDTCisVT<1, i32>]>;
-def SDT_tmsselect : SDTypeProfile<1, 4, [SDTCisVT<0, i32>, SDTCisVT<1, i32>,
-					SDTCisVT<2, i32>, SDTCisVT<3, OtherVT>,
-					SDTCisVT<4, OtherVT>]>;
-
-// This just copies the last two operands to the node being operated upon into
-// the output operands: this makes tablegen happy. Note that this will probably
-// explode if ever applied to an automagically generated node, should only be
-// used for custom-generated-nodes
-def predwrapper : ComplexPattern<OtherVT, 2, "bounce_predicate", [], []>;
+def SDT_tmsselect : SDTypeProfile<1, 6, [SDTCisVT<0, i32>, SDTCisVT<1, i32>,
+					SDTCisVT<2, i32>, SDTCisVT<3, i32>,
+					SDTCisVT<4, i32>, SDTCisVT<5, i32>,
+					SDTCisVT<6, i32>]>;
 
 def brcond_node : SDNode<"TMSISD::BRCOND", SDT_brcond, [SDNPHasChain]>;
 def callseq_start : SDNode<"ISD::CALLSEQ_START", SDT_call_seq_start,
@@ -274,7 +269,6 @@ def : Pat<(i32 (Wrapper tjumptable:$dst)),
 	(mvkh_p tjumptable:$dst, (mvkl_p tjumptable:$dst))>;
 
 
-
 let InOperandList = (ins call_ret_label_operand_operand:$imm, pred:$s),
 		AsmString = "mvkl\t.S1\t$imm,\t$dst" in {
 def mvkl_label : pseudo_rr<"mvkl", unit_s, add, 0> {
@@ -369,21 +363,17 @@ defm cmpltu : inst_rx<"cmpltu", unit_l, cmpltu_node, 0>;
 // To support select, we need two conditional instructions with the same
 // destination - copy what i32 loading does.
 
-def mvselect_a : inst<(outs GPRegs:$dst), (ins GPRegs:$reg, nodefault_pred:$s),
+def mvselect_a : nopred_inst<(outs GPRegs:$dst), (ins GPRegs:$reg),
 			"mv\t.S1\t$reg,\t$dst", [], 0, unit_s> {
-	let InOperandList = (ins GPRegs:$reg, nodefault_pred:$s);
 }
 
-
-def mvselect_b : inst<(outs GPRegs:$dst), (ins GPRegs:$reg, GPRegs:$src1, nodefault_pred:$s),
+def mvselect_b : nopred_inst<(outs GPRegs:$dst), (ins GPRegs:$reg, GPRegs:$src1),
 		"mv\t.S1\t$reg,\t$dst", [], 0, unit_s> {
 	let Constraints = "$src1 = $dst";
-	let InOperandList = (ins GPRegs:$reg, GPRegs:$src1, nodefault_pred:$s);
 }
 
-def : Pat<(tmsselect GPRegs:$true, GPRegs:$false, predwrapper:$truepred,
-						predwrapper:$falsepred),
-		(mvselect_b GPRegs:$false, (mvselect_a GPRegs:$true, predwrapper:$truepred), predwrapper:$falsepred)>;
+def : Pat<(tmsselect GPRegs:$true, GPRegs:$false, timm:$trueimm, predwrapper1:$truereg, timm:$falseimm, predwrapper1:$falsereg),
+		(mvselect_b GPRegs:$false, (mvselect_a GPRegs:$true, timm:$trueimm, predwrapper1:$truereg), timm:$falseimm, predwrapper1:$falsereg)>;
 
 def : Pat<(i32 mvk_all_pred:$val),
 	(mvkh_p mvk_all_pred:$val, (mvkl_p mvk_all_pred:$val))>;
@@ -400,15 +390,9 @@ def branch_1 : inst<(outs), (ins brtarget:$block), "b\t.S1\t$block",
 def branch_2 : inst<(outs), (ins brtarget:$block), "b\t.S2\t$block",
 				[(br bb:$block)], 1, unit_s>;
 
-let InOperandList = (ins brtarget:$block, nodefault_pred:$s) in {
-def brcond_p : inst<(outs), (ins), "b\t.S1\t$block",
-		[(brcond_node bb:$block, predwrapper:$s)], 0, unit_s> {
+def brcond_p : nopred_inst<(outs), (ins brtarget:$block), "b\t.S1\t$block",
+		[(brcond_node bb:$block, timm:$a, predwrapper1:$b)], 0, unit_s>{
 	let Pattern = sched_pattern;
-}
-def brcond_1 : inst<(outs), (ins), "b\t.S1\t$block",
-		[(brcond_node bb:$block, predwrapper:$bees)], 0, unit_s>;
-def brcond_2 : inst<(outs), (ins), "b\t.S2\t$block",
-		[(brcond_node bb:$block, predwrapper:$bees)], 1, unit_s>;
 }
 
 def bindirect_2 : inst<(outs), (ins BRegs:$reg), "b\t.S2\t$reg",
