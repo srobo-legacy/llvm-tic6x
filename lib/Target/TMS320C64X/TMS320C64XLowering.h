@@ -64,7 +64,7 @@ public:
 	unsigned getFunctionAlignment(const Function *F) const;
 	const char *getTargetNodeName(unsigned op) const;
 	SDValue LowerFormalArguments(SDValue Chain,
-				unsigned CallConv, bool isVarArg,
+				CallingConv::ID CallConv, bool isVarArg,
 				const SmallVectorImpl<ISD::InputArg> &Ins,
 				DebugLoc dl, SelectionDAG &DAG,
 				SmallVectorImpl<SDValue> &InVals);

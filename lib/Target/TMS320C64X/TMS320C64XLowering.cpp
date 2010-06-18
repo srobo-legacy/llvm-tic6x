@@ -171,7 +171,7 @@ TMS320C64XLowering::getFunctionAlignment(Function const*) const
 using namespace TMS320C64X;
 SDValue
 TMS320C64XLowering::LowerFormalArguments(SDValue Chain,
-				unsigned CallConv, bool isVarArg,
+				CallingConv::ID CallConv CallConv,bool isVarArg,
 				const SmallVectorImpl<ISD::InputArg> &Ins,
 				DebugLoc dl, SelectionDAG &DAG,
 				SmallVectorImpl<SDValue> &InVals)
