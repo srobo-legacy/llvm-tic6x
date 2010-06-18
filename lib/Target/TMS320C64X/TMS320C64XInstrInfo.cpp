@@ -178,9 +178,7 @@ TMS320C64XInstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
 
 		// If we're a predicated instruction and terminate the BB,
 		// we can be pretty sure we're a conditional branch
-		if (predicated && (opcode == TMS320C64X::brcond_p ||
-					opcode == TMS320C64X::brcond_1 ||
-					opcode == TMS320C64X::brcond_2)) {
+		if (predicated && (opcode == TMS320C64X::brcond_p)) {
 			// Two different conditions to consider - this is the
 			// only branch, in which case we fall through to the
 			// next, or it's a conditional before unconditional.
@@ -258,8 +256,6 @@ TMS320C64XInstrInfo::RemoveBranch(MachineBasicBlock &MBB) const
 				I->getOpcode() != TMS320C64X::branch_1 &&
 				I->getOpcode() != TMS320C64X::branch_2 &&
 				I->getOpcode() != TMS320C64X::brcond_p &&
-				I->getOpcode() != TMS320C64X::brcond_1 &&
-				I->getOpcode() != TMS320C64X::brcond_2 &&
 				I->getOpcode() != TMS320C64X::noop)
 			break;
 
