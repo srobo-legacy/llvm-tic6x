@@ -259,7 +259,8 @@ TMS320C64XLowering::LowerFormalArguments(SDValue Chain,
 }
 
 SDValue
-TMS320C64XLowering::LowerReturn(SDValue Chain, unsigned CallConv, bool isVarArg,
+TMS320C64XLowering::LowerReturn(SDValue Chain, CallingConv::ID CallConv,
+				bool isVarArg,
                                 const SmallVectorImpl<ISD::OutputArg> &Outs,
                                 DebugLoc dl, SelectionDAG &DAG)
 {
