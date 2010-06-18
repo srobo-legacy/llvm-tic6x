@@ -54,8 +54,8 @@ public:
 	unsigned int getSubReg(unsigned int, unsigned int) const;
 	bool hasFP(const MachineFunction &MF) const;
 	bool requiresRegisterScavenging(const MachineFunction &MF) const;
-	void eliminateFrameIndex(MachineBasicBlock::iterator I, int SPAdj,
-					RegScavenger *r) const;
+	unsigned eliminateFrameIndex(MachineBasicBlock::iterator I, int SPAdj,
+					int *Value, RegScavenger *r) const;
 	void emitPrologue(MachineFunction &MF) const;
 	void emitEpilogue(MachineFunction &MF, MachineBasicBlock &MBB) const;
 

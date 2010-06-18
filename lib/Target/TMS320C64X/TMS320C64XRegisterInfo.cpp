@@ -124,12 +124,15 @@ TMS320C64XRegisterInfo::requiresRegisterScavenging(const MachineFunction &MF) co
 	return true;
 }
 
-void
+unsigned
 TMS320C64XRegisterInfo::eliminateFrameIndex(
-	MachineBasicBlock::iterator MBBI, int SPAdj, RegScavenger *r) const
+	MachineBasicBlock::iterator MBBI, int SPAdj, int *Vaule,
+	RegScavenger *r) const
 {
 	unsigned i, frame_index, reg, access_alignment;
 	int offs;
+
+	/* XXX - Value turned up in 2.7, I don't know what it does. */
 
 	MachineInstr &MI = *MBBI;
 	MachineFunction &MF = *MI.getParent()->getParent();
@@ -199,6 +202,7 @@ TMS320C64XRegisterInfo::eliminateFrameIndex(
 		.addReg(reg, RegState::Define).addImm(offs));
 
 	MI.getOperand(i).ChangeToRegister(reg, false, false, true);
+	return 0;
 }
 
 void
