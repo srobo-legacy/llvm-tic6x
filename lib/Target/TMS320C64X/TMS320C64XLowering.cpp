@@ -44,10 +44,13 @@
 #include "llvm/CodeGen/PseudoSourceValue.h"
 #include "llvm/CodeGen/SelectionDAG.h"
 #include "llvm/CodeGen/SelectionDAGISel.h"
+#include "llvm/CallingConv.h"
 #include "llvm/CodeGen/SelectionDAGNodes.h"
 #include "llvm/CodeGen/ValueTypes.h"
+#include "llvm/CodeGen/TargetLoweringObjectFileImpl.h"
 #include "llvm/Target/TargetLoweringObjectFile.h"
 #include "llvm/ADT/VectorExtras.h"
+#include "llvm/Support/ErrorHandling.h"
 using namespace llvm;
 
 namespace llvm {
@@ -171,7 +174,7 @@ TMS320C64XLowering::getFunctionAlignment(Function const*) const
 using namespace TMS320C64X;
 SDValue
 TMS320C64XLowering::LowerFormalArguments(SDValue Chain,
-				CallingConv::ID CallConv CallConv,bool isVarArg,
+				CallingConv::ID CallConv,bool isVarArg,
 				const SmallVectorImpl<ISD::InputArg> &Ins,
 				DebugLoc dl, SelectionDAG &DAG,
 				SmallVectorImpl<SDValue> &InVals)
@@ -232,19 +235,23 @@ TMS320C64XLowering::LowerFormalArguments(SDValue Chain,
 				InVals.push_back(Arg);
 			} else {
 				// XXX - i64?
-				int frame_idx = MFI-> CreateFixedObject(4,
-								stack_offset);
+				int frame_idx = MFI->CreateFixedObject(4,
+						stack_offset, true, false);
 				SDValue FIPtr = DAG.getFrameIndex(frame_idx,
 								MVT::i32);
 				SDValue load;
 				if (ObjectVT == MVT::i32) {
+					// XXX - Non temporal? Eh?
 					load = DAG.getLoad(MVT::i32, dl, Chain,
-							FIPtr, NULL, 0);
+							FIPtr, NULL, 0, false,
+							false, 4);
 				} else {
+					// XXX - work out alignment
 					load = DAG.getExtLoad(ISD::SEXTLOAD,
 							dl, MVT::i32,  Chain,
 							FIPtr, NULL, 0,
-							ObjectVT);
+							ObjectVT, false, false,
+							4);
 					load = DAG.getNode(ISD::TRUNCATE, dl,
 							ObjectVT, load);
 				}
@@ -385,7 +392,8 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, CallingConv::ID
 				DAG.getIntPtrConstant(bytes));
 
 			SDValue store = DAG.getStore(Chain, dl, arg, addr,
-							NULL, 0);
+							NULL, 0, false, false,
+							4);
 			stack_args.push_back(store);
 		}
 	}
@@ -481,7 +489,7 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, CallingConv::ID
 
 SDValue
 TMS320C64XLowering::LowerCallResult(SDValue Chain, SDValue InFlag,
-				unsigned CallConv, bool isVarArg,
+				CallingConv::ID CallConv, bool isVarArg,
 				const SmallVectorImpl<ISD::InputArg> &Ins,
 				DebugLoc dl, SelectionDAG &DAG,
 				SmallVectorImpl<SDValue> &InVals)
@@ -557,7 +565,7 @@ TMS320C64XLowering::LowerExtLoad(SDValue op, SelectionDAG &DAG)
 	return DAG.getExtLoad(ISD::SEXTLOAD, op.getDebugLoc(), list.VTs[0],
 			l->getOperand(0), l->getOperand(1), l->getSrcValue(),
 			l->getSrcValueOffset(), l->getMemoryVT(),
-			l->isVolatile(), l->getAlignment());
+			l->isVolatile(), false, l->getAlignment());
 }
 
 SDValue
@@ -571,7 +579,7 @@ TMS320C64XLowering::LowerReturnAddr(SDValue op, SelectionDAG &DAG)
 	// Although it could be offset by something, not certain
 	SDValue retaddr = DAG.getFrameIndex(0, getPointerTy());
 	return DAG.getLoad(getPointerTy(), op.getDebugLoc(), DAG.getEntryNode(),
-							retaddr, NULL, 0);
+					retaddr, NULL, 0, false, false, 4);
 }
 
 SDValue
@@ -713,7 +721,7 @@ TMS320C64XLowering::LowerVASTART(SDValue op, SelectionDAG &DAG)
 				DAG.getConstant(stackgap, MVT::i32));
 	const Value *SV = cast<SrcValueSDNode>(op.getOperand(2))->getValue();
 	return DAG.getStore(op.getOperand(0), op.getDebugLoc(), Chain,
-						op.getOperand(1), SV, 0);
+				op.getOperand(1), SV, 0, false, false, 4);
 }
 
 SDValue
@@ -729,14 +737,15 @@ TMS320C64XLowering::LowerVAARG(SDValue op, SelectionDAG &DAG)
 
 	// Load point to vaarg list
 	SDValue loadptr = DAG.getLoad(MVT::i32, op.getDebugLoc(), chain,
-								valoc, SV, 0);
+					valoc, SV, 0, false, false, 4);
 	// Calculate address of next vaarg
 	SDValue newptr = DAG.getNode(ISD::ADD, op.getDebugLoc(), MVT::i32,
 			chain, DAG.getConstant(vt.getSizeInBits()/8, MVT::i32));
 	// Store that back to wherever we're storing the vaarg list
 	chain = DAG.getStore(loadptr.getValue(1), op.getDebugLoc(),
-						newptr, valoc, SV, 0);
+				newptr, valoc, SV, 0, false, false, 4);
 
 	// Actually load the argument
-	return DAG.getLoad(vt, op.getDebugLoc(), chain, loadptr, NULL, 0);
+	return DAG.getLoad(vt, op.getDebugLoc(), chain, loadptr, NULL, 0,
+					false, false, 4);
 }

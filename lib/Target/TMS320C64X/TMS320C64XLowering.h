@@ -79,7 +79,7 @@ public:
 				DebugLoc dl, SelectionDAG &DAG,
 				SmallVectorImpl<SDValue> &InVals);
 	SDValue LowerCallResult(SDValue Chain, SDValue InFlag,
-				unsigned CallConv, bool isVarArg,
+				CallingConv::ID CallConv, bool isVarArg,
 				const SmallVectorImpl<ISD::InputArg> &Ins,
 				DebugLoc dl, SelectionDAG &DAG,
 				SmallVectorImpl<SDValue> &InVals);
