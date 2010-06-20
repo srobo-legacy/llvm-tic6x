@@ -38,6 +38,7 @@
 #include "llvm/CodeGen/MachineConstantPool.h"
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/MC/MCStreamer.h"
+#include "llvm/MC/MCSymbol.h"
 #include "llvm/Target/TargetLoweringObjectFile.h"
 #include "llvm/Target/TargetRegistry.h"
 #include "llvm/Target/Mangler.h"
@@ -309,6 +310,7 @@ void
 TMS320C64XAsmPrinter::printOperand(const MachineInstr *MI, int op_num)
 {
 	SmallString<60> NameStr;
+	MCSymbol *sym;
 	const MachineOperand &MO = MI->getOperand(op_num);
 	const TargetRegisterInfo &RI = *TM.getRegisterInfo();
 
@@ -323,7 +325,8 @@ TMS320C64XAsmPrinter::printOperand(const MachineInstr *MI, int op_num)
 		O << (int)MO.getImm();
 		break;
 	case MachineOperand::MO_MachineBasicBlock:
-		EmitBasicBlockStart(MO.getMBB());
+		sym = MO.getMBB()->getSymbol(OutContext);
+		O << sym;
 		break;
 	case MachineOperand::MO_GlobalAddress:
 		Mang->getNameWithPrefix(NameStr, MO.getGlobal(), false);
