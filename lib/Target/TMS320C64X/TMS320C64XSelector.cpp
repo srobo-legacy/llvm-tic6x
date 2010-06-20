@@ -54,6 +54,9 @@ public:
 	bool select_addr_d2t2(SDNode *&op, SDValue &N, SDValue &R1,SDValue &R2);
 	bool select_addr_regspec(SDNode *&op, SDValue &N, SDValue &R1,
 						SDValue &R2, int regspec);
+
+	SDNode *get_memaccess_data_reg(SDNode &op);
+
 	const char *getPassName() const {
 		return "TMS320C64X Instruction Selection";
 	}
@@ -75,6 +78,33 @@ llvm::TMS320C64XCreateInstSelector(TargetMachine &TM)
 TMS320C64XInstSelectorPass::TMS320C64XInstSelectorPass(TargetMachine &TM)
 	: SelectionDAGISel(TM)
 {
+}
+
+SDNode *
+TMS320C64XInstSelectorPass::get_memaccess_data_reg(SDNode &op)
+{
+
+	// In a number of circumstances we need to retrieve the data register
+	// from a load or store operation, if the instruction lowering phase
+	// has emitted a node with a fixed data register (IE, we're writing
+	// to a function argument register). This affects what load/store
+	// instruction gets selected, as which data path is used is significant
+
+	if (op.getOpcode() == ISD::LOAD || op.getOpcode() == ISD::STORE) {
+		if (op.getOperand(0).getOpcode() == ISD::Register) {
+			return op.getOperand(0).getNode();
+		} else if (op.getOperand(0).getOpcode() == ISD::CopyFromReg &&
+			op.getOperand(0).getNode()->getOperand(1).getOpcode()
+			== ISD::Register) {
+			return op.getOperand(0).getNode()->
+				getOperand(1).getNode();
+		}
+
+		return NULL;
+	} else {
+		llvm_unreachable("Trying to extract data register from node "
+				"that is neither a load nor a store");
+	}
 }
 
 bool
@@ -144,7 +174,8 @@ TMS320C64XInstSelectorPass::select_addr_generic(SDNode *&op, SDValue &N,
 	}
 
 	if (N.getOperand(0).getOpcode() == ISD::Register ||
-				N.getOperand(1).getOpcode() == ISD::Register) {
+			N.getOperand(1).getOpcode() == ISD::Register ||
+			get_memaccess_data_reg(*op) != NULL) {
 		// Here, some part of lowering has generated a load/store node
 		// with a fixed register as an operands - an extra layer of
 		// checks needs to be applied to ensure we're picking the right
@@ -159,9 +190,10 @@ TMS320C64XInstSelectorPass::select_addr_generic(SDNode *&op, SDValue &N,
 
 	// The same sequence can be wrapped in CopyFromRegs
 	if ((N.getOperand(0).getOpcode() == ISD::CopyFromReg &&
-	N.getOperand(0).getNode()->getOperand(1).getOpcode() == ISD::Register)||
-	(N.getOperand(1).getOpcode() == ISD::CopyFromReg &&
-	N.getOperand(1).getNode()->getOperand(1).getOpcode() == ISD::Register)){
+	N.getOperand(0).getNode()->getOperand(1).getOpcode() == ISD::Register)
+	|| (N.getOperand(1).getOpcode() == ISD::CopyFromReg &&
+	N.getOperand(1).getNode()->getOperand(1).getOpcode() == ISD::Register)
+	|| get_memaccess_data_reg(*op) != NULL) {
 
 		if (!has_had_reg_check)
 			return false;
@@ -348,28 +380,37 @@ TMS320C64XInstSelectorPass::select_addr_d2t2(SDNode *&op, SDValue &N,
 
 bool
 TMS320C64XInstSelectorPass::select_addr_regspec(SDNode *&op, SDValue &N,
-				SDValue &base, SDValue &offs, int regspec) {
-	RegisterSDNode *r1, *r2;
+				SDValue &base_out, SDValue &offs_out,
+				int regspec) {
+	RegisterSDNode *base, *data;
+	SDNode *tmp;
 	unsigned int reg;
 
+	// NB: we make decisions on what the base register and data register
+	// are, as these determine the side of the instruction, and the data
+	// path used, respectively. We should also care about what the offset
+	// field is (if it isn't on the same side as the base reg, we use the
+	// xpath), but thats something which can be ignored for the moment
+
+	// regspec int: first bit is the datapath, 0 means side 1, 1 side 2.
+	// second bit is of the same form, but specifying execution unit side.
+
 	if (N.getOperand(0).getOpcode() == ISD::CopyFromReg)
-		r1 = dyn_cast<RegisterSDNode>
+		base = dyn_cast<RegisterSDNode>
 			(N.getOperand(0).getNode()->getOperand(1).getNode());
 	else if (N.getOperand(0).getOpcode() == ISD::Register)
-		r1 = dyn_cast<RegisterSDNode>(N.getOperand(0).getNode());
+		base = dyn_cast<RegisterSDNode>(N.getOperand(0).getNode());
 	else
-		r1 = NULL;
+		base = NULL;
 
-	if (N.getOperand(1).getOpcode() == ISD::CopyFromReg)
-		r2 = dyn_cast<RegisterSDNode>
-			(N.getOperand(1).getNode()->getOperand(1).getNode());
-	else if (N.getOperand(1).getOpcode() == ISD::Register)
-		r2 = dyn_cast<RegisterSDNode>(N.getOperand(1).getNode());
+	tmp = get_memaccess_data_reg(*op);
+	if (tmp != NULL)
+		data = dyn_cast<RegisterSDNode>(tmp);
 	else
-		r2 = NULL;
+		data = NULL;
 
-	if (r1 != NULL) {
-		reg = r1->getReg();
+	if (base != NULL) {
+		reg = base->getReg();
 		if (!TM.getRegisterInfo()->isVirtualRegister(reg)) {
 			if (regspec & 2) {
 				if (!TMS320C64X::BRegsRegClass.contains(reg))
@@ -379,11 +420,34 @@ TMS320C64XInstSelectorPass::select_addr_regspec(SDNode *&op, SDValue &N,
 					return false;
 			}
 		}
+	} else {
+		// No fixed base: it'll be allocated from A Regs. So, we should
+		// reject instructions on side 2/B right away
+		if (regspec & 2)
+			return false;
 	}
 
-	// Actually, we don't care about the offset operand; it's the base
-	// operand that determines which side of the processor we're on
-	return select_addr_generic(op, N, base, offs, true);
+	if (data != NULL) {
+		reg = data->getReg();
+		if (!TM.getRegisterInfo()->isVirtualRegister(reg)) {
+			if (regspec & 1) {
+				if (!TMS320C64X::BRegsRegClass.contains(reg))
+					return false;
+			} else {
+				if (!TMS320C64X::ARegsRegClass.contains(reg))
+					return false;
+			}
+		}
+	} else {
+		// No fixed data reg, gets allocated from set A, reject
+		// instructions with data path 2.
+		if (regspec & 1)
+			return false;
+	}
+
+	// So, this instruction has at least the correct side/datapath for the
+	// registers we are seeing.
+	return select_addr_generic(op, N, base_out, offs_out, true);
 }
 
 bool
