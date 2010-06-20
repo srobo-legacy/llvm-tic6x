@@ -316,6 +316,22 @@ multiclass meminst_load<string mnemonic, PatFrag op, dag ptr> {
 			let AsmString = !strconcat("ld",!strconcat(mnemonic,
 						"\t.D2T2\t$ptr,\t$dst"));
 		}
+	def _load1x : inst<(outs GPRegs:$dst), (ins mem_operand:$ptr), "",
+		[(set GPRegs:$dst, (op ptr))], 0, unit_d> {
+			let delay_slots = 4;
+			let hasDelaySlot = 1;
+			let mem_access = 1;
+			let AsmString = !strconcat("ld",!strconcat(mnemonic,
+						"\t.D1T2\t$ptr,\t$dst"));
+		}
+	def _load2x : inst<(outs GPRegs:$dst), (ins mem_operand:$ptr), "",
+		[(set GPRegs:$dst, (op ptr))], 1, unit_d> {
+			let delay_slots = 4;
+			let hasDelaySlot = 1;
+			let mem_access = 1;
+			let AsmString = !strconcat("ld",!strconcat(mnemonic,
+						"\t.D2T1\t$ptr,\t$dst"));
+		}
 }
 
 multiclass meminst_store<string mnemonic, PatFrag op, dag ptr> {
@@ -341,6 +357,20 @@ multiclass meminst_store<string mnemonic, PatFrag op, dag ptr> {
 			let mem_load_store = 1;
 			let AsmString = !strconcat("st",!strconcat(mnemonic,
 						"\t.D2T2\t$reg,\t$ptr"));
+		}
+	def _store1x : inst<(outs), (ins mem_operand:$ptr, GPRegs:$reg), "",
+		[(op GPRegs:$reg, ptr)], 0, unit_d> {
+			let mem_access = 1;
+			let mem_load_store = 1;
+			let AsmString = !strconcat("st",!strconcat(mnemonic,
+						"\t.D1T2\t$reg,\t$ptr"));
+		}
+	def _store2x : inst<(outs), (ins mem_operand:$ptr, GPRegs:$reg), "",
+		[(op GPRegs:$reg, ptr)], 1, unit_d> {
+			let mem_access = 1;
+			let mem_load_store = 1;
+			let AsmString = !strconcat("st",!strconcat(mnemonic,
+						"\t.D2T1\t$reg,\t$ptr"));
 		}
 }
 
