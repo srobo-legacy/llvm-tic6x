@@ -64,15 +64,13 @@ def Wrapper : SDNode<"TMSISD::WRAPPER", SDT_Wrapper>;
 
 // XXX These should probably be marked as for codegen modelling only.
 // Don't have flexibility to test right now though.
-def call_start_i : inst<(outs), (ins i32imm:$val),
-		"sub\t.D2\tB15,\t$val,\tB15",
+def call_start_i : inst<(outs), (ins i32imm:$val), "sub\t.D2\tB15,\t$val,\tB15",
 		[(callseq_start uconst5:$val)], 0, unit_d> {
 	let Pattern = sched_pattern;
 	let hasSideEffects = 1;
 }
 
-def call_start_r : inst<(outs), (ins GPRegs:$val),
-		"sub\t.D2\tB15,\t$val,\tB15",
+def call_start_r : inst<(outs), (ins GPRegs:$val), "sub\t.D2\tB15,\t$val,\tB15",
 		[(callseq_start GPRegs:$val)], 0, unit_d> {
 	let Pattern = sched_pattern;
 	let hasSideEffects = 1;
@@ -98,25 +96,25 @@ def TMS320C64Xcall : SDNode<"TMSISD::CALL", SDT_call,
 def retflag : SDNode<"TMSISD::RET_FLAG", SDTNone, [SDNPHasChain, SDNPOptInFlag]>;
 
 // FIXME: mv can be in any s/d/l slot
-def mv : inst<(outs GPRegs:$out), (ins GPRegs:$in), "mv\t.S1\t$in,\t$out", [],
-							0, unit_s>;
+let AsmString = "mv\t.S1\t$in,\t$out" in {
+def mv : inst<(outs GPRegs:$out), (ins GPRegs:$in), "", [], 0, unit_s>;
+def mv1 : inst<(outs GPRegs:$out), (ins GPRegs:$in), "", [], 0, unit_s>;
+}
 
-def mv1 : inst<(outs GPRegs:$out), (ins GPRegs:$in), "mv\t.S1\t$in,\t$out", [],
-							0, unit_s>;
-def mv2 : inst<(outs GPRegs:$out), (ins GPRegs:$in), "mv\t.S2\t$in,\t$out", [],
-							1, unit_s>;
+def mv2 : inst<(outs GPRegs:$out), (ins GPRegs:$in), "mv\t.S2\t$in,\t$out",
+				 [], 1, unit_s>;
 
-def noop : inst<(outs), (ins i32imm:$cycles), "nop\t.S1\t$cycles", [],0,unit_s>;
-
+def noop : inst<(outs), (ins i32imm:$cycles), "nop\t.S1\t$cycles", [],
+				0, unit_s>;
 
 // Shifts and rotates
 
-def srl_p_rr : pseudo_rr<"shru", unit_s, srl, 0>;
-def srl_p_ri : pseudo_ri<"shru", (i32 uconst5:$imm), unit_s, srl, 0>;
-def shl_p_rr : pseudo_rr<"shl", unit_s, shl, 0>;
-def shl_p_ri : pseudo_ri<"shl", (i32 uconst5:$imm), unit_s, shl, 0>;
-def shr_p_rr : pseudo_rr<"shr", unit_s, sra, 0>;
-def shr_p_ri : pseudo_ri<"shr", (i32 uconst5:$imm), unit_s, sra, 0>;
+def srl_p_rr : pseudo_rr<"shru", ".S1", unit_s, srl, 0>;
+def srl_p_ri : pseudo_ri<"shru", ".S1", (i32 uconst5:$imm), unit_s, srl, 0>;
+def shl_p_rr : pseudo_rr<"shl", ".S1", unit_s, shl, 0>;
+def shl_p_ri : pseudo_ri<"shl", ".S1", (i32 uconst5:$imm), unit_s, shl, 0>;
+def shr_p_rr : pseudo_rr<"shr", ".S1", unit_s, sra, 0>;
+def shr_p_ri : pseudo_ri<"shr", ".S1", (i32 uconst5:$imm), unit_s, sra, 0>;
 
 
 //Some arithmatic and logic
@@ -126,24 +124,24 @@ def shr_p_ri : pseudo_ri<"shr", (i32 uconst5:$imm), unit_s, sra, 0>;
 // and a constant.
 // XXX - for unit D, depending on the form the constant can be sign extended
 // or zero extended; potential for datasheet bugs or data entry bugs here
-def add_p_rr : pseudo_rr<"add", unit_l, add, 0>;
-def add_p_ri : pseudo_ri<"add", (i32 sconst5:$imm), unit_l, add, 0>;
+def add_p_rr : pseudo_rr<"add", ".L1", unit_l, add, 0>;
+def add_p_ri : pseudo_ri<"add", ".L1", (i32 sconst5:$imm), unit_l, add, 0>;
 
 let Constraints = "$src1 = $dst", AsmString = "addk\t.S1\t$imm,\t$dst" in {
-def addk_p : pseudo_ri<"addk", (i32 sconst16:$imm), unit_s, add, 0>;
+def addk_p : pseudo_ri<"addk", "", (i32 sconst16:$imm), unit_s, add, 0>;
 }
 
-def and_p_rr : pseudo_rr<"and", unit_l, and, 0>;
-def and_p_ri : pseudo_ri<"and", (i32 sconst5:$imm), unit_l, and, 1>;
+def and_p_rr : pseudo_rr<"and", ".L1", unit_l, and, 0>;
+def and_p_ri : pseudo_ri<"and", ".L1", (i32 sconst5:$imm), unit_l, and, 1>;
 
-def or_p_rr : pseudo_rr<"or", unit_d, or, 0>;
-def or_p_ri : pseudo_ri<"or", (i32 sconst5:$imm), unit_d, or, 1>;
+def or_p_rr : pseudo_rr<"or", ".D1", unit_d, or, 0>;
+def or_p_ri : pseudo_ri<"or", ".D1", (i32 sconst5:$imm), unit_d, or, 1>;
 
-def xor_p_rr : pseudo_rr<"xor", unit_d, xor, 0>;
-def xor_p_ri : pseudo_ri<"xor", (i32 sconst5:$imm), unit_d, xor, 1>;
+def xor_p_rr : pseudo_rr<"xor", ".D1", unit_d, xor, 0>;
+def xor_p_ri : pseudo_ri<"xor", ".D1", (i32 sconst5:$imm), unit_d, xor, 1>;
 
-def sub_p_rr : pseudo_rr<"sub", unit_l, sub, 0>;
-def sub_p_ri : pseudo_ri<"sub", (i32 uconst5:$imm), unit_d, sub, 0>;
+def sub_p_rr : pseudo_rr<"sub", ".L1", unit_l, sub, 0>;
+def sub_p_ri : pseudo_ri<"sub", ".D1", (i32 uconst5:$imm), unit_d, sub, 0>;
 
 
 // Multiplies - there are a million and one of them, so we'll just be using
@@ -154,7 +152,7 @@ def sub_p_ri : pseudo_ri<"sub", (i32 uconst5:$imm), unit_d, sub, 0>;
 // NB: mpy32 is c64x+ only
 
 let delay_slots = 3, hasDelaySlot = 1 in {
-def mpy32_p : pseudo_rr<"mpy32", unit_m, mul, 0>;
+def mpy32_p : pseudo_rr<"mpy32", ".M1", unit_m, mul, 0>;
 }
 
 
@@ -165,7 +163,7 @@ def mpy32_p : pseudo_rr<"mpy32", unit_m, mul, 0>;
 
 let InOperandList = (ins i32imm:$imm, pred:$s),
 			AsmString = "mvk\t.S1\t$imm,\t$dst" in {
-def mvk_p : pseudo_rr<"mvk", unit_s, add, 0> {
+def mvk_p : pseudo_rr<"mvk", ".S1", unit_s, add, 0> {
 	let Pattern = [];
 }
 }
@@ -181,7 +179,7 @@ def : Pat<(i32 mvk_pred:$val), (mvk_p imm:$val)>;
 
 let InOperandList = (ins i32imm:$imm, pred:$s),
 		AsmString = "mvkl\t.S1\t$imm,\t$dst" in {
-def mvkl_p : pseudo_rr<"mvkl", unit_s, add, 0> {
+def mvkl_p : pseudo_rr<"mvkl", "", unit_s, add, 0> {
 	let Pattern = [];
 }
 }
@@ -208,7 +206,7 @@ def : Pat<(i32 (Wrapper tjumptable:$dst)),
 
 let InOperandList = (ins call_ret_label_operand_operand:$imm, pred:$s),
 		AsmString = "mvkl\t.S1\t$imm,\t$dst" in {
-def mvkl_label : pseudo_rr<"mvkl", unit_s, add, 0> {
+def mvkl_label : pseudo_rr<"mvkl", "", unit_s, add, 0> {
 	let Pattern = [];
 }
 }
@@ -223,7 +221,7 @@ def : Pat<(call_ret_label_operand mvk_all_pred:$label),
 
 // FIXME: Work out what on earth to do with lea
 def lea_fail : inst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
-		"add\t.L1\t${ptr:facebees},\t$dst",
+		"add\t.L1\t$ptr,\t$dst",
 		[(set GPRegs:$dst, idxaddr:$ptr)],
 		0, unit_l> {
 	let Pattern = sched_pattern;
@@ -255,8 +253,9 @@ defm word_idx : meminst<"w", load, store, (i32 idxaddr:$ptr)>;
 
 // Comparisons
 
-def cmpeq_p_rr : pseudo_rr<"cmpeq", unit_l, cmpeq_node, 0>;
-def cmpeq_p_ri : pseudo_ri<"cmpeq", (i32 sconst5:$imm), unit_l, cmpeq_node, 1>;
+def cmpeq_p_rr : pseudo_rr<"cmpeq", ".L1", unit_l, cmpeq_node, 0>;
+def cmpeq_p_ri : pseudo_ri<"cmpeq", ".L1", (i32 sconst5:$imm), unit_l,
+				cmpeq_node, 1>;
 
 def : Pat<(cmpne_node GPRegs:$reg1, GPRegs:$reg2),
 		(xor_p_ri (cmpeq_p_rr GPRegs:$reg1, GPRegs:$reg2), (i32 1))>;
@@ -268,19 +267,21 @@ def : Pat<(cmpne_node GPRegs:$reg1, GPRegs:$reg2),
 // the polarity of any tests/whatevers based on this. Not sure how to do that.
 // Possibly it can't be done, we just have to handle it in some machdep fashion.
 
-def cmpgt_p_rr : pseudo_rr<"cmpgt", unit_l, cmpgt_node, 0>;
-//def cmpgt_p_ri : pseudo_ri<"cmpgt", (i32 sconst5:$imm), unit_l, cmpgt_node, 1>;
+def cmpgt_p_rr : pseudo_rr<"cmpgt", ".L1", unit_l, cmpgt_node, 0>;
+//def cmpgt_p_ri : pseudo_ri<"cmpgt", ".L1", (i32 sconst5:$imm), unit_l,
+//						cmpgt_node, 1>;
 
-def cmpgtu_p_rr : pseudo_rr<"cmpgtu", unit_l, cmpgtu_node, 0>;
-//def cmpgtu_p_ri : pseudo_ri<"cmpgtu", (i32 uconst4:$imm), unit_l, cmpgtu_node,
-//									1>;
+def cmpgtu_p_rr : pseudo_rr<"cmpgtu", ".L1", unit_l, cmpgtu_node, 0>;
+//def cmpgtu_p_ri : pseudo_ri<"cmpgtu", ".L1", (i32 uconst4:$imm), unit_l,
+//						cmpgtu_node, 1>;
 
-def cmplt_p_rr : pseudo_rr<"cmplt", unit_l, cmplt_node, 0>;
-//def cmplt_p_ri : pseudo_ri<"cmplt", (i32 sconst5:$imm), unit_l, cmplt_node, 1>;
+def cmplt_p_rr : pseudo_rr<"cmplt", ".L1", unit_l, cmplt_node, 0>;
+//def cmplt_p_ri : pseudo_ri<"cmplt", ".L1", (i32 sconst5:$imm), unit_l,
+//						cmplt_node, 1>;
 
-def cmpltu_p_rr : pseudo_rr<"cmpltu", unit_l, cmpltu_node, 0>;
-//def cmpltu_p_ri : pseudo_ri<"cmpltu", (i32 uconst4:$imm), unit_l, cmpltu_node,
-//									1>;
+def cmpltu_p_rr : pseudo_rr<"cmpltu", ".L1", unit_l, cmpltu_node, 0>;
+//def cmpltu_p_ri : pseudo_ri<"cmpltu", ".L1", (i32 uconst4:$imm), unit_l,
+//						cmpltu_node, 1>;
 
 // To support select, we need two conditional instructions with the same
 // destination - copy what i32 loading does.

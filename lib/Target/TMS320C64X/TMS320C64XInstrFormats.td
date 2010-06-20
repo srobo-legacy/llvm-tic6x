@@ -235,7 +235,7 @@ def predwrapper1 : ComplexPattern<i32, 1, "bounce_predicate", [], []>;
 
 
 
-class inst<dag outs, dag ins, string mnemonic, list<dag> pattern, bit side,
+class inst<dag outs, dag ins, string asm_str, list<dag> pattern, bit side,
 			InstUnit u> : Instruction {
 	// All insns are conditional unless stated otherwise
 	let isPredicable = 1;
@@ -244,7 +244,7 @@ class inst<dag outs, dag ins, string mnemonic, list<dag> pattern, bit side,
 	let Namespace = "TMS320C64X";
 	let OutOperandList = outs;
 	let InOperandList = !con(ins, (ops pred:$s));
-	let AsmString = mnemonic;
+	let AsmString = asm_str;
 
 	// Match nothing; set sched_pattern for a future tablegen backend
 	// to play with. pseudo instrs over-ride this behavior.
@@ -268,70 +268,82 @@ class nopred_inst<dag outs, dag ins, string mnemonic, list<dag> pattern,
 	let InOperandList = !con(ins, (ops nodefault_zflag:$a, nodefault_reg:$b));
 }
 
-class pseudo_rr<string mnemonic, InstUnit u, SDNode op, int swap> :
+class pseudo_rr<string mnemonic, string sidespec, InstUnit u, SDNode op,
+				int swap> :
 		inst<(outs ARegs:$dst), (ins ARegs:$src1, ARegs:$src2), "",
 		[(set ARegs:$dst, (op ARegs:$src1, ARegs:$src2))], 0, u> {
+			string comb_mnemonic = !strconcat(!strconcat(mnemonic,
+							"\t"), sidespec);
 			let AsmString = !if(swap,
-			!strconcat(mnemonic, "\t$s\t$src2,\t$src1,\t$dst"),
-			!strconcat(mnemonic, "\t$s\t$src1,\t$src2,\t$dst"));
+			!strconcat(comb_mnemonic,"\t$src2,\t$src1,\t$dst"),
+			!strconcat(comb_mnemonic, "\t$src1,\t$src2,\t$dst"));
 			let Pattern = sched_pattern;
 		}
 
-class pseudo_ri<string mnemonic, dag imm, InstUnit u, SDNode op, int swap> :
+class pseudo_ri<string mnemonic, string sidespec, dag imm, InstUnit u,
+				SDNode op, int swap> :
 		inst<(outs ARegs:$dst), (ins ARegs:$src1, i32imm:$imm), "",
 		[(set ARegs:$dst, (op ARegs:$src1, imm))], 0, u> {
+			string comb_mnemonic = !strconcat(!strconcat(mnemonic,
+							"\t"), sidespec);
 			let AsmString = !if(swap,
-			!strconcat(mnemonic, "\t$s\t$imm,\t$src1,\t$dst"),
-			!strconcat(mnemonic, "\t$s\t$src1,\t$imm,\t$dst"));
+			!strconcat(comb_mnemonic, "\t$imm,\t$src1,\t$dst"),
+			!strconcat(comb_mnemonic, "\t$src1,\t$imm,\t$dst"));
 			let Pattern = sched_pattern;
 		}
 
 multiclass meminst_load<string mnemonic, PatFrag op, dag ptr> {
-	def _load_p : inst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
-		!strconcat("ld",!strconcat(mnemonic, "\t$s\t$ptr,\t$dst")),
+	def _load_p : inst<(outs GPRegs:$dst), (ins mem_operand:$ptr), "",
 		[(set GPRegs:$dst, (op ptr))], 0, unit_d> {
 			let Pattern = sched_pattern;
 			let delay_slots = 4;
 			let hasDelaySlot = 1;
 			let mem_access = 1;
+			let AsmString = !strconcat("ld",!strconcat(mnemonic,
+						"\t.D1T1\t$ptr,\t$dst"));
 		}
 
-	def _load1 : inst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
-		!strconcat("ld",!strconcat(mnemonic, "\t$s\t$ptr,\t$dst")),
+	def _load1 : inst<(outs GPRegs:$dst), (ins mem_operand:$ptr), "",
 		[(set GPRegs:$dst, (op ptr))], 0, unit_d> {
 			let delay_slots = 4;
 			let hasDelaySlot = 1;
 			let mem_access = 1;
+			let AsmString = !strconcat("ld",!strconcat(mnemonic,
+						"\t.D1T1\t$ptr,\t$dst"));
 		}
-	def _load2 : inst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
-		!strconcat("ld",!strconcat(mnemonic, "\t$s\t$ptr,\t$dst")),
+	def _load2 : inst<(outs GPRegs:$dst), (ins mem_operand:$ptr), "",
 		[(set GPRegs:$dst, (op ptr))], 1, unit_d> {
 			let delay_slots = 4;
 			let hasDelaySlot = 1;
 			let mem_access = 1;
+			let AsmString = !strconcat("ld",!strconcat(mnemonic,
+						"\t.D2T2\t$ptr,\t$dst"));
 		}
 }
 
 multiclass meminst_store<string mnemonic, PatFrag op, dag ptr> {
-	def _store_p : inst<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
-		!strconcat("st",!strconcat(mnemonic, "\t$s\t$reg,\t$ptr")),
+	def _store_p : inst<(outs), (ins mem_operand:$ptr, GPRegs:$reg), "",
 		[(op GPRegs:$reg, ptr)], 0, unit_d> {
 			let Pattern = sched_pattern;
 			let mem_access = 1;
 			let mem_load_store = 1;
+			let AsmString = !strconcat("st",!strconcat(mnemonic,
+						"\t.D1T1\t$reg,\t$ptr"));
 		}
 
-	def _store1 : inst<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
-		!strconcat("st",!strconcat(mnemonic, "\t$s\t$reg,\t$ptr")),
+	def _store1 : inst<(outs), (ins mem_operand:$ptr, GPRegs:$reg), "",
 		[(op GPRegs:$reg, ptr)], 0, unit_d> {
 			let mem_access = 1;
 			let mem_load_store = 1;
+			let AsmString = !strconcat("st",!strconcat(mnemonic,
+						"\t.D1T1\t$reg,\t$ptr"));
 		}
-	def _store2 : inst<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
-		!strconcat("st",!strconcat(mnemonic, "\t$s\t$reg,\t$ptr")),
+	def _store2 : inst<(outs), (ins mem_operand:$ptr, GPRegs:$reg), "",
 		[(op GPRegs:$reg, ptr)], 1, unit_d> {
 			let mem_access = 1;
 			let mem_load_store = 1;
+			let AsmString = !strconcat("st",!strconcat(mnemonic,
+						"\t.D2T2\t$reg,\t$ptr"));
 		}
 }
 
