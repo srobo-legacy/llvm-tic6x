@@ -33,6 +33,7 @@
 #include "llvm/CodeGen/SelectionDAGISel.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/ErrorHandling.h"
 using namespace llvm;
 
 namespace {
@@ -40,11 +41,10 @@ class TMS320C64XInstSelectorPass : public SelectionDAGISel {
 public:
 	explicit TMS320C64XInstSelectorPass(TargetMachine &TM);
 
-	virtual void InstructionSelect();
-	SDNode *Select(SDValue op);
-	bool select_addr(SDValue op, SDValue N, SDValue &R1, SDValue &R2);
-	bool select_idxaddr(SDValue op, SDValue N, SDValue &R1, SDValue &R2);
-	bool bounce_predicate(SDValue op, SDValue N, SDValue &R1, SDValue &R2);
+	SDNode *Select(SDNode *op);
+	bool select_addr(SDNode *&op, SDValue &N, SDValue &R1, SDValue &R2);
+	bool select_idxaddr(SDNode *&op, SDValue &N, SDValue &R1, SDValue &R2);
+	bool bounce_predicate(SDNode *&op, SDValue &N, SDValue &R1);
 	const char *getPassName() const {
 		return "TMS320C64X Instruction Selection";
 	}
@@ -68,16 +68,8 @@ TMS320C64XInstSelectorPass::TMS320C64XInstSelectorPass(TargetMachine &TM)
 {
 }
 
-void
-TMS320C64XInstSelectorPass::InstructionSelect()
-{
-
-	SelectRoot(*CurDAG);
-	CurDAG->RemoveDeadNodes();
-}
-
 bool
-TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
+TMS320C64XInstSelectorPass::select_addr(SDNode *&op, SDValue &N, SDValue &base,
 					SDValue &offs)
 {
 	MemSDNode *mem;
@@ -110,8 +102,8 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 		want_align /= 8;
 
 		if (align < want_align) {
-			fprintf(stderr, "knobbling nonalign access\n");
-			return false;
+			llvm_unreachable("Insufficient alignment on "
+					"memory access");
 		}
 	}
 
@@ -178,7 +170,7 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 				// Ideally we should now morph to using a
 				// nonaligned memory instruction, but for now
 				// leave this as unsupported
-				fprintf(stderr, "jmorse: unaligned offset to "
+				llvm_unreachable("jmorse: unaligned offset to "
 					"memory access, implement swapping to "
 					"nonaligned instructions\n");
 				return false;
@@ -220,7 +212,7 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 		// That's a MI instruction and we're in the middle of depth
 		// first instruction selection, this won't get selected. So,
 		// make that happen manually.
-		offs = SDValue(SelectCode(offs), 0);
+		offs = SDValue(SelectCode(offs.getNode()), 0);
 		return true;
 	} else {
 		// Doesn't match anything we recognize at all, use address
@@ -238,14 +230,14 @@ TMS320C64XInstSelectorPass::select_addr(SDValue op, SDValue N, SDValue &base,
 }
 
 bool
-TMS320C64XInstSelectorPass::select_idxaddr(SDValue op, SDValue addr,
+TMS320C64XInstSelectorPass::select_idxaddr(SDNode *&op, SDValue &addr,
 					SDValue &base, SDValue &offs)
 {
 	MemSDNode *mem;
 	FrameIndexSDNode *FIN;
 	unsigned int align, want_align;
 
-	if (op.getOpcode() == ISD::FrameIndex) {
+	if (op->getOpcode() == ISD::FrameIndex) {
 		// Hackity hack: llvm wants the address of a stack slot. This
 		// is handled by returning the frame pointer as base and stack
 		// offset as offs; the "lea_fail" instruction then adds these
@@ -270,8 +262,8 @@ TMS320C64XInstSelectorPass::select_idxaddr(SDValue op, SDValue addr,
 		want_align /= 8;
 
 		if (align < want_align) {
-			fprintf(stderr, "knobbling nonalign access\n");
-			return false;
+			llvm_unreachable("Insufficient alignment on "
+					"memory access");
 		}
 	}
 
@@ -286,22 +278,21 @@ TMS320C64XInstSelectorPass::select_idxaddr(SDValue op, SDValue addr,
 }
 
 bool
-TMS320C64XInstSelectorPass::bounce_predicate(SDValue op, SDValue N, SDValue
-							&base, SDValue &offs)
+TMS320C64XInstSelectorPass::bounce_predicate(SDNode *&op, SDValue &N, SDValue
+								&out)
 {
 	int sz;
 
 	// We assume that whoever generated this knew what they were doing,
-	// and that they've placed the predecate operands in the last two
-	// operand positions. So just return those.
-	sz = op.getNumOperands();
-	base = op.getOperand(sz-2);
-	offs = op.getOperand(sz-1);
+	// and that they've placed the predecate operands in the last
+	// operand position. So just return those.
+	sz = op->getNumOperands();
+	out = op->getOperand(sz-1);
 	return true;
 }
 
 SDNode *
-TMS320C64XInstSelectorPass::Select(SDValue op)
+TMS320C64XInstSelectorPass::Select(SDNode *op)
 {
 
 	return SelectCode(op);
