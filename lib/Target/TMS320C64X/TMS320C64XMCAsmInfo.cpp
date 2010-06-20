@@ -1,4 +1,4 @@
-//====-- TMS320C64XTargetAsmInfo.h - TMS320C64X asm properties -*- C++ -*--===//
+//===-- TMS320C64XTargetAsmInfo.cpp - TMS320C64X asm properties -----------===//
 //
 // Copyright 2010 Jeremy Morse <jeremy.morse@gmail.com>. All rights reserved.
 //
@@ -24,17 +24,16 @@
 // THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_TARGET_TMS320C64X_ASMINFO_H
-#define LLVM_TARGET_TMS320C64X_ASMINFO_H
+#include "TMS320C64XMCAsmInfo.h"
+using namespace llvm;
 
-#include "llvm/Target/TargetAsmInfo.h"
+TMS320C64XMCAsmInfo::TMS320C64XMCAsmInfo(const Target &T,
+					const StringRef &TT) {
+	Data16bitsDirective = "\t.hword\t";
+	Data32bitsDirective = "\t.word\t";
+	Data64bitsDirective = "\t.dword\t";
+	ZeroDirective = "\t.zero\t";
+	CommentString = ";";
 
-namespace llvm {
-	class Target;
-	class StringRef;
-	struct TMS320C64XTargetAsmInfo : public TargetAsmInfo {
-	explicit TMS320C64XTargetAsmInfo(const Target &T, const StringRef &TT);
-};
-} // namespace llvm
-
-#endif
+	AlignmentIsInBytes = false;
+}

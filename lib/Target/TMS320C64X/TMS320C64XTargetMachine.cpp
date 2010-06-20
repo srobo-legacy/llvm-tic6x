@@ -26,17 +26,16 @@
 
 #include "TMS320C64X.h"
 #include "TMS320C64XTargetMachine.h"
-#include "TMS320C64XTargetAsmInfo.h"
+#include "TMS320C64XMCAsmInfo.h"
 #include "llvm/PassManager.h"
 #include "llvm/CodeGen/Passes.h"
-#include "llvm/Target/TargetAsmInfo.h"
 #include "llvm/Target/TargetRegistry.h"
 using namespace llvm;
 
 extern "C" void LLVMInitializeTMS320C64XTarget() {
 	// Register the target.
 	RegisterTargetMachine<TMS320C64XTargetMachine> X(TheTMS320C64XTarget);
-	RegisterAsmInfo<TMS320C64XTargetAsmInfo> Z(TheTMS320C64XTarget);
+	RegisterAsmInfo<TMS320C64XMCAsmInfo> Z(TheTMS320C64XTarget);
 }
 
 TMS320C64XTargetMachine::TMS320C64XTargetMachine(const Target &T,
