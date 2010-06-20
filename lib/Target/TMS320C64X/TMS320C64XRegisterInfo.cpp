@@ -99,7 +99,7 @@ unsigned int
 TMS320C64XRegisterInfo::getSubReg(unsigned int, unsigned int) const
 {
 
-	llvm_unreachable_internal("Unimplemented function getSubReg\n");
+	llvm_unreachable("Unimplemented function getSubReg\n");
 }
 
 bool
@@ -305,19 +305,19 @@ int
 TMS320C64XRegisterInfo::getDwarfRegNum(unsigned reg_num, bool isEH) const
 {
 
-	llvm_unreachable_internal("Unimplemented function getDwarfRegNum\n");
+	llvm_unreachable("Unimplemented function getDwarfRegNum\n");
 }
 
 unsigned int
 TMS320C64XRegisterInfo::getRARegister() const
 {
 
-	llvm_unreachable_internal("Unimplemented function getRARegister\n");
+	llvm_unreachable("Unimplemented function getRARegister\n");
 }
 
 unsigned int
 TMS320C64XRegisterInfo::getFrameRegister(const MachineFunction &MF) const
 {
 
-	llvm_unreachable_internal("Unimplemented function getFrameRegister\n");
+	llvm_unreachable("Unimplemented function getFrameRegister\n");
 }
