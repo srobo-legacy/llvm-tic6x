@@ -96,6 +96,7 @@ def TMS320C64Xcall : SDNode<"TMSISD::CALL", SDT_call,
 def retflag : SDNode<"TMSISD::RET_FLAG", SDTNone, [SDNPHasChain, SDNPOptInFlag]>;
 
 // FIXME: mv can be in any s/d/l slot
+let neverHasSideEffects = 1 in {
 let AsmString = "mv\t.S1\t$in,\t$out" in {
 def mv : inst<(outs GPRegs:$out), (ins GPRegs:$in), "", [], 0, unit_s>;
 def mv1 : inst<(outs GPRegs:$out), (ins GPRegs:$in), "", [], 0, unit_s>;
@@ -106,6 +107,7 @@ def mv2 : inst<(outs GPRegs:$out), (ins GPRegs:$in), "mv\t.S2\t$in,\t$out",
 
 def noop : inst<(outs), (ins i32imm:$cycles), "nop\t.S1\t$cycles", [],
 				0, unit_s>;
+}
 
 // Shifts and rotates
 
@@ -358,7 +360,7 @@ def call_indirect_2 : inst<(outs), (ins BRegs:$reg), "b\t.S2\t$reg",
 // So we have to work by loading the return address into B3 manually before
 // branching to the target. Which means injecting a label immediately after the
 // branch instruction itself. Which is what this is.
-def return_label : inst<(outs), (ins i32imm:$imm), ".ponylabel_$imm:",
+def return_label : inst<(outs), (ins i32imm:$imm), ".retaddr_$imm:",
 				[(call_ret_label imm:$imm)], 0, unit_m> {
 	let Pattern = sched_pattern;
 }

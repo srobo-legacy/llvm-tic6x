@@ -260,7 +260,7 @@ void
 TMS320C64XAsmPrinter::printRetLabel(const MachineInstr *MI, int op_num)
 {
 
-	O << ".ponylabel_";
+	O << ".retaddr_";
 	O << (int)MI->getOperand(op_num).getImm();
 	return;
 }

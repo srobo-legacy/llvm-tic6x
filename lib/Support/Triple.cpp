@@ -141,6 +141,8 @@ Triple::ArchType Triple::getArchTypeForLLVMName(StringRef Name) {
     return systemz;
   if (Name == "tce")
     return tce;
+  if (Name == "tms320c64x")
+    return tms320c64x;
   if (Name == "thumb")
     return thumb;
   if (Name == "x86")
@@ -272,6 +274,8 @@ void Triple::Parse() const {
     Arch = tce;
   else if (ArchName == "xcore")
     Arch = xcore;
+  else if (ArchName == "tms320c64x")
+    Arch = tms320c64x;
   else
     Arch = UnknownArch;
 
