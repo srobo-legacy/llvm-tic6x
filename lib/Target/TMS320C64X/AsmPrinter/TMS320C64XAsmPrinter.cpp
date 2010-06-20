@@ -238,7 +238,7 @@ TMS320C64XAsmPrinter::printOperand(const MachineInstr *MI, int op_num)
 		break;
 	case MachineOperand::MO_MachineBasicBlock:
 		sym = MO.getMBB()->getSymbol(OutContext);
-		O << sym;
+		O << (*sym);
 		break;
 	case MachineOperand::MO_GlobalAddress:
 		Mang->getNameWithPrefix(NameStr, MO.getGlobal(), false);
