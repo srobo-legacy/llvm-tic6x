@@ -118,13 +118,6 @@ def shl_p_ri : pseudo_ri<"shl", (i32 uconst5:$imm), unit_s, shl, 0>;
 def shr_p_rr : pseudo_rr<"shr", unit_s, sra, 0>;
 def shr_p_ri : pseudo_ri<"shr", (i32 uconst5:$imm), unit_s, sra, 0>;
 
-defm srl : inst_xr<"shru", unit_s, srl, 0>;
-defm srl : inst_xi<"shru", (i32 uconst5:$imm), unit_s, srl, 0>;
-defm shl : inst_xr<"shl", unit_s, shl, 0>;
-defm shl : inst_xi<"shl", (i32 uconst5:$imm), unit_s, shl, 0>;
-defm shr : inst_xr<"shr", unit_s, sra, 0>;
-defm shr : inst_xi<"shr", (i32 uconst5:$imm), unit_s, sra, 0>;
-
 
 //Some arithmatic and logic
 
@@ -136,68 +129,21 @@ defm shr : inst_xi<"shr", (i32 uconst5:$imm), unit_s, sra, 0>;
 def add_p_rr : pseudo_rr<"add", unit_l, add, 0>;
 def add_p_ri : pseudo_ri<"add", (i32 sconst5:$imm), unit_l, add, 0>;
 
-defm add_l : inst_rx<"add", unit_l, add, 0>;
-defm add_l : inst_xr<"add", unit_l, add, 1>;
-defm add_l : inst_xi<"add", (i32 sconst5:$imm), unit_l, add, 0>;
-defm add_s : inst_rx<"add", unit_s, add, 0>;
-defm add_s : inst_xr<"add", unit_s, add, 1>;
-defm add_s : inst_xi<"add", (i32 sconst5:$imm), unit_s, add, 0>;
-defm add_d : inst_rr<"add", unit_d, add, 0>;
-defm add_d : inst_ri<"add", (i32 uconst5:$imm), unit_d, add, 0>;
-defm add_d : inst_rx<"add", unit_d, add, 0>;
-defm add_d : inst_xr<"add", unit_d, add, 1>;
-defm add_d : inst_xi<"add", (i32 sconst5:$imm), unit_d, add, 0>;
-
 let Constraints = "$src1 = $dst", AsmString = "addk\t.S1\t$imm,\t$dst" in {
 def addk_p : pseudo_ri<"addk", (i32 sconst16:$imm), unit_s, add, 0>;
-defm addk : inst_ri<"addk", (i32 sconst16:$imm), unit_s, add, 0>;
 }
 
 def and_p_rr : pseudo_rr<"and", unit_l, and, 0>;
 def and_p_ri : pseudo_ri<"and", (i32 sconst5:$imm), unit_l, and, 1>;
 
-defm and_l : inst_rx<"and", unit_l, and, 0>;
-defm and_l : inst_xr<"and", unit_l, and, 1>;
-defm and_l : inst_xi<"and", (i32 sconst5:$imm), unit_l, and, 1>;
-defm and_s : inst_rx<"and", unit_s, and, 0>;
-defm and_s : inst_xr<"and", unit_s, and, 1>;
-defm and_s : inst_xi<"and", (i32 sconst5:$imm), unit_s, and, 1>;
-defm and_d : inst_rx<"and", unit_d, and, 0>;
-defm and_d : inst_xr<"and", unit_d, and, 1>;
-defm and_d : inst_xi<"and", (i32 sconst5:$imm), unit_d, and, 1>;
-
 def or_p_rr : pseudo_rr<"or", unit_d, or, 0>;
 def or_p_ri : pseudo_ri<"or", (i32 sconst5:$imm), unit_d, or, 1>;
-
-defm or_d : inst_rx<"or", unit_d, or, 0>;
-defm or_d : inst_xi<"or", (i32 sconst5:$imm), unit_d, or, 1>;
-defm or_l : inst_rx<"or", unit_l, or, 0>;
-defm or_l : inst_xi<"or", (i32 sconst5:$imm), unit_l, or, 1>;
-defm or_s : inst_rx<"or", unit_s, or, 0>;
-defm or_s : inst_xi<"or", (i32 sconst5:$imm), unit_s, or, 1>;
 
 def xor_p_rr : pseudo_rr<"xor", unit_d, xor, 0>;
 def xor_p_ri : pseudo_ri<"xor", (i32 sconst5:$imm), unit_d, xor, 1>;
 
-defm xor_d : inst_rx<"xor", unit_d, xor, 0>;
-defm xor_d : inst_xi<"xor", (i32 sconst5:$imm), unit_d, xor, 1>;
-defm xor_l : inst_rx<"xor", unit_l, xor, 0>;
-defm xor_l : inst_xi<"xor", (i32 sconst5:$imm), unit_l, xor, 1>;
-defm xor_s : inst_rx<"xor", unit_s, xor, 0>;
-defm xor_s : inst_xi<"xor", (i32 sconst5:$imm), unit_s, xor, 1>;
-
 def sub_p_rr : pseudo_rr<"sub", unit_l, sub, 0>;
 def sub_p_ri : pseudo_ri<"sub", (i32 uconst5:$imm), unit_d, sub, 0>;
-
-defm sub_l : inst_rx<"sub", unit_l, sub, 0>;
-defm sub_l : inst_xr<"sub", unit_l, sub, 0>;
-// l unit has a const form, but it's subtract-reg-from-const, which is
-// pretty useless, but also won't be swallowed by tablegen
-defm sub_s : inst_rx<"sub", unit_s, sub, 0>;
-// s unit also has subtract-from-const form
-defm sub_d : inst_rr<"sub", unit_d, sub, 0>;
-defm sub_d : inst_ri<"sub", (i32 uconst5:$imm), unit_d, sub, 0>;
-defm sub_d : inst_xr<"sub", unit_d, sub, 0>;
 
 
 // Multiplies - there are a million and one of them, so we'll just be using
@@ -209,10 +155,6 @@ defm sub_d : inst_xr<"sub", unit_d, sub, 0>;
 
 let delay_slots = 3, hasDelaySlot = 1 in {
 def mpy32_p : pseudo_rr<"mpy32", unit_m, mul, 0>;
-
-defm mpy32 : inst_rr<"mpy32", unit_m, mul, 0>;
-defm mpy32 : inst_rx<"mpy32", unit_m, mul, 0>;
-defm mpy32 : inst_xr<"mpy32", unit_m, mul, 0>;
 }
 
 
@@ -226,10 +168,6 @@ let InOperandList = (ins i32imm:$imm, pred:$s),
 def mvk_p : pseudo_rr<"mvk", unit_s, add, 0> {
 	let Pattern = [];
 }
-
-defm mvk_s : inst_rr<"mvk", unit_s, add, 0>;
-defm mvk_l : inst_rr<"mvk", unit_l, add, 0>;
-defm mvk_d : inst_rr<"mvk", unit_d, add, 0>;
 }
 
 // Match ints in the mvk range
@@ -246,7 +184,6 @@ let InOperandList = (ins i32imm:$imm, pred:$s),
 def mvkl_p : pseudo_rr<"mvkl", unit_s, add, 0> {
 	let Pattern = [];
 }
-defm mvkl_s : inst_rr<"mvkl", unit_s, add, 0>;
 }
 
 def mvkh_p : inst<(outs GPRegs:$dst), (ins i32imm:$imm, GPRegs:$src1),
@@ -320,9 +257,6 @@ defm word_idx : meminst<"w", load, store, (i32 idxaddr:$ptr)>;
 
 def cmpeq_p_rr : pseudo_rr<"cmpeq", unit_l, cmpeq_node, 0>;
 def cmpeq_p_ri : pseudo_ri<"cmpeq", (i32 sconst5:$imm), unit_l, cmpeq_node, 1>;
-defm cmpeq : inst_rx<"cmpeq", unit_l, cmpeq_node, 0>;
-defm cmpeq : inst_xr<"cmpeq", unit_l, cmpeq_node, 1>;
-defm cmpeq : inst_xi<"cmpeq", (i32 sconst5:$imm), unit_l, cmpeq_node, 1>;
 
 def : Pat<(cmpne_node GPRegs:$reg1, GPRegs:$reg2),
 		(xor_p_ri (cmpeq_p_rr GPRegs:$reg1, GPRegs:$reg2), (i32 1))>;
@@ -336,29 +270,17 @@ def : Pat<(cmpne_node GPRegs:$reg1, GPRegs:$reg2),
 
 def cmpgt_p_rr : pseudo_rr<"cmpgt", unit_l, cmpgt_node, 0>;
 //def cmpgt_p_ri : pseudo_ri<"cmpgt", (i32 sconst5:$imm), unit_l, cmpgt_node, 1>;
-defm cmpgt : inst_rx<"cmpgt", unit_l, cmpgt_node, 0>;
-//defm cmpgt : inst_xr<"cmpgt", unit_l, cmpgt_node, 1>;
-//defm cmpgt : inst_xi<"cmpgt", (i32 sconst5:$imm), unit_l, cmpgt_node, 1>;
 
 def cmpgtu_p_rr : pseudo_rr<"cmpgtu", unit_l, cmpgtu_node, 0>;
 //def cmpgtu_p_ri : pseudo_ri<"cmpgtu", (i32 uconst4:$imm), unit_l, cmpgtu_node,
 //									1>;
-defm cmpgtu : inst_rx<"cmpgtu", unit_l, cmpgtu_node, 0>;
-//defm cmpgtu : inst_xr<"cmpgtu", unit_l, cmpgtu_node, 1>;
-//defm cmpgtu : inst_xi<"cmpgtu", (i32 uconst4:$imm), unit_l, cmpgtu_node, 1>;
 
 def cmplt_p_rr : pseudo_rr<"cmplt", unit_l, cmplt_node, 0>;
 //def cmplt_p_ri : pseudo_ri<"cmplt", (i32 sconst5:$imm), unit_l, cmplt_node, 1>;
-defm cmplt : inst_rx<"cmplt", unit_l, cmplt_node, 0>;
-//defm cmplt : inst_xr<"cmplt", unit_l, cmplt_node, 1>;
-//defm cmplt : inst_xi<"cmplt", (i32 sconst5:$imm), unit_l, cmplt_node, 1>;
 
 def cmpltu_p_rr : pseudo_rr<"cmpltu", unit_l, cmpltu_node, 0>;
 //def cmpltu_p_ri : pseudo_ri<"cmpltu", (i32 uconst4:$imm), unit_l, cmpltu_node,
 //									1>;
-defm cmpltu : inst_rx<"cmpltu", unit_l, cmpltu_node, 0>;
-//defm cmpltu : inst_xr<"cmpltu", unit_l, cmpltu_node, 1>;
-//defm cmpltu : inst_xi<"cmpltu", (i32 uconst4:$imm), unit_l, cmpltu_node, 1>;
 
 // To support select, we need two conditional instructions with the same
 // destination - copy what i32 loading does.
