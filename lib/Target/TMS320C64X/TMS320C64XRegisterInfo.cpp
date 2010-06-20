@@ -263,7 +263,7 @@ TMS320C64XRegisterInfo::emitPrologue(MachineFunction &MF) const
 			.addImm(frame_size).addReg(TMS320C64X::A0));
 	}
 
-	addDefaultPred(BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::sub_p_rr),
+	addDefaultPred(BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::sub_l2x),
 		TMS320C64X::B15).addReg(TMS320C64X::B15)
 		.addReg(TMS320C64X::A0, RegState::Kill));
 }

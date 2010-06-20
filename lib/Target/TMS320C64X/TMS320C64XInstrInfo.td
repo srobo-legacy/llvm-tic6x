@@ -143,6 +143,10 @@ def xor_p_ri : pseudo_ri<"xor", ".D1", (i32 sconst5:$imm), unit_d, xor, 1>;
 def sub_p_rr : pseudo_rr<"sub", ".L1", unit_l, sub, 0>;
 def sub_p_ri : pseudo_ri<"sub", ".D1", (i32 uconst5:$imm), unit_d, sub, 0>;
 
+// Prolog asm requires some special cases:
+def sub_l2x : inst<(outs GPRegs:$dst), (ins GPRegs:$src1, GPRegs:$src2),
+			"sub\t.L2X\t$src1,\t$src2,\t$dst", [], 0, unit_l>;
+
 
 // Multiplies - there are a million and one of them, so we'll just be using
 // mpy32. It might be possible to apply various constraints to the size of
