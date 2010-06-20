@@ -267,3 +267,20 @@ TMS320C64XInstrInfo::RemoveBranch(MachineBasicBlock &MBB) const
 
 	return count;
 }
+
+bool
+TMS320C64XInstrInfo::isMoveInstr(const MachineInstr &MI, unsigned &src_reg,
+				unsigned &dst_reg, unsigned &src_sub_idx,
+				unsigned &dst_sub_idx) const
+{
+
+	if (MI.getDesc().getOpcode() == TMS320C64X::mv) {
+		src_sub_idx = 0;
+		dst_sub_idx = 0;
+		src_reg = MI.getOperand(1).getReg();
+		dst_reg = MI.getOperand(0).getReg();
+		return true;
+	}
+
+	return false;
+}

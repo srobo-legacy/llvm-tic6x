@@ -92,6 +92,10 @@ public:
 				const SmallVectorImpl<MachineOperand> &Cond)
 				const;
 	virtual unsigned RemoveBranch(MachineBasicBlock &MBB) const;
+
+	virtual bool isMoveInstr(const MachineInstr& MI,
+				unsigned& SrcReg, unsigned& DstReg,
+				unsigned& SrcSubIdx, unsigned& DstSubIdx) const;
 };
 
 inline const MachineInstrBuilder &addDefaultPred(const MachineInstrBuilder &MIB)
