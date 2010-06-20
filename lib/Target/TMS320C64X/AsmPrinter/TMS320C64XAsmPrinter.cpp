@@ -28,6 +28,7 @@
 #include "TMS320C64XInstrInfo.h"
 #include "TMS320C64XRegisterInfo.h"
 #include "TMS320C64XTargetMachine.h"
+#include "TMS320C64XMCAsmInfo.h"
 #include "llvm/Constants.h"
 #include "llvm/DerivedTypes.h"
 #include "llvm/Module.h"
@@ -37,23 +38,27 @@
 #include "llvm/CodeGen/MachineConstantPool.h"
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/MC/MCStreamer.h"
-#include "llvm/Target/TargetAsmInfo.h"
 #include "llvm/Target/TargetLoweringObjectFile.h"
 #include "llvm/Target/TargetRegistry.h"
+#include "llvm/Target/Mangler.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FormattedStream.h"
-#include "llvm/Support/Mangler.h"
 #include "llvm/Support/MathExtras.h"
+#include "llvm/ADT/SmallString.h"
 using namespace llvm;
 
 namespace llvm {
 	class TMS320C64XAsmPrinter : public AsmPrinter {
 public:
 	explicit TMS320C64XAsmPrinter(formatted_raw_ostream &O,
-		TargetMachine &TM, const TargetAsmInfo *T, bool V);
+		TargetMachine &TM, MCContext &Ctx, MCStreamer &Streamer,
+		const MCAsmInfo *Asm);
 
 	virtual const char *getPassName() const {
 		return "TMS320C64X Assembly Printer";
 	}
+
+	const char *getRegisterName(unsigned RegNo);
 
 	bool print_predicate(const MachineInstr *MI);
 	void printInstruction(const MachineInstr *MI);
@@ -76,9 +81,10 @@ public:
 #include "TMS320C64XGenAsmWriter.inc"
 
 TMS320C64XAsmPrinter::TMS320C64XAsmPrinter(formatted_raw_ostream &O,
-					TargetMachine &TM,
-					const TargetAsmInfo *T, bool V)
-      : AsmPrinter(O, TM, T, V) 
+					TargetMachine &TM, MCContext &Ctx,
+					MCStreamer &Streamer,
+					const MCAsmInfo *Asm)
+      : AsmPrinter(O, TM, Ctx, Streamer, Asm)
 {
 }
 
@@ -89,17 +95,20 @@ TMS320C64XAsmPrinter::runOnMachineFunction(MachineFunction &MF)
 	this->MF = &MF;
 
 	SetupMachineFunction(MF);
-	EmitConstantPool(MF.getConstantPool());
+	EmitConstantPool();
 	O << "\n\n";
 	EmitAlignment(F->getAlignment(), F);
-	O << "\t.globl\t" << CurrentFnName << "\n";
-	O << "\t" << CurrentFnName << ":\n";
-	printVisibility(CurrentFnName, F->getVisibility());
+	O << "\t.globl\t" << CurrentFnSym << "\n";
+	O << "\t" << CurrentFnSym << ":\n";
 
+	EmitFunctionHeader();
+
+	// Due to having to beat predecates manually, we don't use
+	// EmitFunctionBody, but instead pump out instructions manually
 	for (MachineFunction::const_iterator I = MF.begin(), E = MF.end();
 								I != E; ++I) {
 		if (I != MF.begin()) {
-			printBasicBlockLabel(I, true, true);
+			EmitBasicBlockStart(I);
 			O << "\n";
 		}
 
@@ -237,7 +246,7 @@ TMS320C64XAsmPrinter::print_predicate(const MachineInstr *MI)
 	if (!TargetRegisterInfo::isPhysicalRegister(reg))
 		llvm_unreachable("Nonphysical register used for predicate");
 
-	O << "\t[" << c << RI.get(reg).AsmName << "]";
+	O << "\t[" << c << RI.getName(reg) << "]";
 	return true;
 }
 
@@ -256,12 +265,12 @@ TMS320C64XAsmPrinter::PrintGlobalVariable(const GlobalVariable *GVar)
 		return;
 
 	O << "\n\n";
-	std::string name = Mang->getMangledName(GVar);
+
+	SmallString<60> NameStr;
+	Mang->getNameWithPrefix(NameStr, GVar, false);
 	Constant *C = GVar->getInitializer();
 	sz = td->getTypeAllocSize(C->getType());
 	align = td->getPreferredAlignment(GVar);
-
-	printVisibility(name, GVar->getVisibility());
 
 	OutStreamer.SwitchSection(getObjFileLowering().SectionForGlobal(GVar,
 								Mang, TM));
@@ -272,17 +281,8 @@ TMS320C64XAsmPrinter::PrintGlobalVariable(const GlobalVariable *GVar)
 			if (sz == 0)
 				sz = 1;
 
-// XXX - .local is only for ELF targets, we're using coff.
-// Best case commenting this out changes nothing; worst case it polutes
-// the global namespace and causes linking errors later on. Curses.
-#if 0
-			if (GVar->hasLocalLinkage())
-				O << "\t.local " << name << "\n";
-#endif
-
-			O << TAI->getCOMMDirective() << name << "," << sz;
-			if (TAI->getCOMMDirectiveTakesAlignment())
-				O << "," << (1 << align);
+			// XXX - .lcomm?
+			O << NameStr << "," << sz;
 
 			O << "\n";
 			return;
@@ -297,24 +297,26 @@ TMS320C64XAsmPrinter::PrintGlobalVariable(const GlobalVariable *GVar)
 
 	EmitAlignment(align, GVar);
 
-	if (TAI->hasDotTypeDotSizeDirective()) {
-		O << "\t.type " << name << ",#object\n";
-		O << "\t.size " << name << "," << sz << "\n";
+	if (MAI->hasDotTypeDotSizeDirective()) {
+		O << "\t.type " << NameStr << ",#object\n";
+		O << "\t.size " << NameStr << "," << sz << "\n";
 	}
 
-	O << name << ":\n";
+	O << NameStr << ":\n";
 	EmitGlobalConstant(C);
 }
 
 void
 TMS320C64XAsmPrinter::printOperand(const MachineInstr *MI, int op_num)
 {
+	SmallString<60> NameStr;
 	const MachineOperand &MO = MI->getOperand(op_num);
 	const TargetRegisterInfo &RI = *TM.getRegisterInfo();
+
 	switch(MO.getType()) {
 	case MachineOperand::MO_Register:
 		if (TargetRegisterInfo::isPhysicalRegister(MO.getReg()))
-			O << RI.get(MO.getReg()).AsmName;
+			O << RI.getName(MO.getReg());
 		else
 			llvm_unreachable("Nonphysical register being printed");
 		break;
@@ -322,10 +324,11 @@ TMS320C64XAsmPrinter::printOperand(const MachineInstr *MI, int op_num)
 		O << (int)MO.getImm();
 		break;
 	case MachineOperand::MO_MachineBasicBlock:
-		printBasicBlockLabel(MO.getMBB());
+		EmitBasicBlockStart(MO.getMBB());
 		break;
 	case MachineOperand::MO_GlobalAddress:
-		O << Mang->getMangledName(MO.getGlobal());
+		Mang->getNameWithPrefix(NameStr, MO.getGlobal(), false);
+		O << NameStr;
 		break;
 	case MachineOperand::MO_ExternalSymbol:
 		O << MO.getSymbolName();
