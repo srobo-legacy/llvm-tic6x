@@ -166,10 +166,6 @@ class llvm_gcc_based <string cmd_prefix, string in_lang,
          // Forwards
          (not_empty "Xpreprocessor"), (forward "Xpreprocessor"),
          (not_empty "include"), (forward "include"),
-<<<<<<< HEAD
-         (not_empty "I"), (forward "I"),
-	 (not_empty "isystem"), (forward "isystem"))),
-=======
          (not_empty "iquote"), (forward "iquote"),
          (not_empty "save-temps"), (append_cmd "-save-temps"),
          (not_empty "I"), (forward "I"),
@@ -190,8 +186,8 @@ class llvm_gcc_based <string cmd_prefix, string in_lang,
          (switch_on "fPIC"), (forward "fPIC"),
          (switch_on "mdynamic-no-pic"), (forward "mdynamic-no-pic"),
          (not_empty "MF"), (forward "MF"),
-         (not_empty "MT"), (forward "MT"))),
->>>>>>> master
+         (not_empty "MT"), (forward "MT"),
+	 (not_empty "isystem"), (forward "isystem"))),
  (sink)
 ]>;
 
