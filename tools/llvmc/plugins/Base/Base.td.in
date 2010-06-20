@@ -303,10 +303,10 @@ def llvm_host_assembler : Tool<
 [(in_language "assembler"),
  (out_language "object-code"),
  (output_suffix "o"),
- (cmd_line "$ENV(CROSS_COMPILE)as $INFILE -o $OUTFILE"),
+ (command "$ENV(CROSS_COMPILE)as"),
  (actions (case
           (switch_on "c"), (stop_compilation),
-          (not_empty "Wa,"), (unpack_values "Wa,")))
+          (not_empty "Wa,"), (forward_value "Wa,")))
 ]>;
 
 def llvm_host_linker : llvm_gcc_based_linker<"$ENV(CROSS_COMPILE)ld">;
