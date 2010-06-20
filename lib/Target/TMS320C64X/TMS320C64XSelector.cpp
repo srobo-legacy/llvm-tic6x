@@ -143,10 +143,8 @@ TMS320C64XInstSelectorPass::select_addr_generic(SDNode *&op, SDValue &N,
 		return true;
 	}
 
-	if ((N.getOperand(0).getOpcode() == ISD::CopyFromReg &&
-	N.getOperand(0).getNode()->getOperand(1).getOpcode() == ISD::Register)||
-	(N.getOperand(1).getOpcode() == ISD::Register &&
-	N.getOperand(1).getNode()->getOperand(1).getOpcode() == ISD::Register)){
+	if (N.getOperand(0).getOpcode() == ISD::Register ||
+				N.getOperand(1).getOpcode() == ISD::Register) {
 		// Here, some part of lowering has generated a load/store node
 		// with a fixed register as an operands - an extra layer of
 		// checks needs to be applied to ensure we're picking the right
@@ -155,6 +153,16 @@ TMS320C64XInstSelectorPass::select_addr_generic(SDNode *&op, SDValue &N,
 		// it becomes select_addr_generic, with a parameter indicating
 		// whether those checks occured. If they didn't, bail, and
 		// let a more specific memory instruction get picked.
+		if (!has_had_reg_check)
+			return false;
+	}
+
+	// The same sequence can be wrapped in CopyFromRegs
+	if ((N.getOperand(0).getOpcode() == ISD::CopyFromReg &&
+	N.getOperand(0).getNode()->getOperand(1).getOpcode() == ISD::Register)||
+	(N.getOperand(1).getOpcode() == ISD::CopyFromReg &&
+	N.getOperand(1).getNode()->getOperand(1).getOpcode() == ISD::Register)){
+
 		if (!has_had_reg_check)
 			return false;
 	}
@@ -346,13 +354,17 @@ TMS320C64XInstSelectorPass::select_addr_regspec(SDNode *&op, SDValue &N,
 
 	if (N.getOperand(0).getOpcode() == ISD::CopyFromReg)
 		r1 = dyn_cast<RegisterSDNode>
-				(N.getOperand(0).getNode()->getOperand(1));
+			(N.getOperand(0).getNode()->getOperand(1).getNode());
+	else if (N.getOperand(0).getOpcode() == ISD::Register)
+		r1 = dyn_cast<RegisterSDNode>(N.getOperand(0).getNode());
 	else
 		r1 = NULL;
 
 	if (N.getOperand(1).getOpcode() == ISD::CopyFromReg)
 		r2 = dyn_cast<RegisterSDNode>
-				(N.getOperand(1).getNode()->getOperand(1));
+			(N.getOperand(1).getNode()->getOperand(1).getNode());
+	else if (N.getOperand(1).getOpcode() == ISD::Register)
+		r2 = dyn_cast<RegisterSDNode>(N.getOperand(1).getNode());
 	else
 		r2 = NULL;
 
