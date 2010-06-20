@@ -98,8 +98,6 @@ TMS320C64XAsmPrinter::runOnMachineFunction(MachineFunction &MF)
 	EmitConstantPool();
 	O << "\n\n";
 	EmitAlignment(F->getAlignment(), F);
-	O << "\t.globl\t" << CurrentFnSym << "\n";
-	O << "\t" << CurrentFnSym << ":\n";
 
 	EmitFunctionHeader();
 
@@ -116,6 +114,7 @@ TMS320C64XAsmPrinter::runOnMachineFunction(MachineFunction &MF)
 				E = I->end(); II != E; ++II) {
 			print_predicate(II);
 			printInstruction(II);
+			O << "\n";
 		}
 	}
 
