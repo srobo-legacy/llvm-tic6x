@@ -36,6 +36,7 @@
 #include "llvm/CodeGen/RegisterScavenging.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
+#include "llvm/Support/ErrorHandling.h"
 
 using namespace llvm;
 
@@ -158,7 +159,7 @@ TMS320C64XRegisterInfo::eliminateFrameIndex(
 		// need to scavenge a register
 		if (check_sconst_fits(offs, 5)) {
 			MI.getOperand(i).ChangeToImmediate(offs);
-			return;
+			return 0;
 		}
 		access_alignment = 0;
 	// So for memory, will this frame index actually fit inside the
@@ -168,7 +169,7 @@ TMS320C64XRegisterInfo::eliminateFrameIndex(
 		// it'll be scaled appropriately
 
 		MI.getOperand(i).ChangeToImmediate(offs);
-		return;
+		return 0;
 	}
 
 	// Otherwise, we need to do some juggling to load that constant into
