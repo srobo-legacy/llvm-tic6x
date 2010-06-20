@@ -164,13 +164,10 @@ def set_hi : PatLeaf<(imm), [{
 def pred : PredicateOperand<OtherVT, (ops timm, PredRegs),
 			(ops (i32 -1), (i32 zero_reg))> {
 	// Predicate of -1 indicates that this is always-execute
-	let PrintMethod= "printUnitOperand";
 }
 
 def nodefault_pred : PredicateOperand<OtherVT, (ops timm, PredRegs),
-			(ops)> {
-	let PrintMethod = "printUnitOperand";
-}
+			(ops)>;
 
 def nodefault_zflag : PredicateOperand<i32, (ops timm), (ops)>;
 def nodefault_reg : PredicateOperand<i32, (ops PredRegs), (ops)>;

@@ -64,7 +64,6 @@ public:
 	bool print_predicate(const MachineInstr *MI);
 	void printInstruction(const MachineInstr *MI);
 	bool runOnMachineFunction(MachineFunction &F);
-	void printUnitOperand(const MachineInstr *MI, int op);
 	void PrintGlobalVariable(const GlobalVariable *GVar);
 	void printOperand(const MachineInstr *MI, int opNum);
 	void printMemOperand(const MachineInstr *MI, int opNum,
@@ -120,93 +119,6 @@ TMS320C64XAsmPrinter::runOnMachineFunction(MachineFunction &MF)
 	}
 
 	return false;
-}
-
-void
-TMS320C64XAsmPrinter::printUnitOperand(const MachineInstr *MI, int op_num)
-{
-	int i, top;
-	char n, u, t;
-	bool contains_xpath;
-	const TargetInstrDesc desc = MI->getDesc();
-
-	// For /all/ instructions, print unit and side specifier - at some
-	// point I might beat the assembler into not caring, but until then,
-	// it's obligatory
-
-	switch (GET_UNIT(desc.TSFlags)) {
-		case TMS320C64XII::unit_l:
-			u = 'L';
-			break;
-		case TMS320C64XII::unit_s:
-			u = 'S';
-			break;
-		case TMS320C64XII::unit_d:
-			u = 'D';
-			break;
-		case TMS320C64XII::unit_m:
-			u = 'M';
-			break;
-		default:
-			llvm_unreachable("unknown unit when printing insn");
-	}
-
-	if (GET_SIDE(desc.TSFlags) & TMS320C64XII::unit_2)
-		n = '2';
-	else
-		n = '1';
-
-	t = 0;
-	if (desc.TSFlags & TMS320C64XII::is_memaccess) {
-		unsigned reg;
-		if (desc.TSFlags & TMS320C64XII::is_store) {
-			const MachineOperand MO = MI->getOperand(2);
-			assert(MO.isReg() && "src/dst of memory access is not "
-						"a register");
-			reg = MO.getReg();
-		} else {
-			const MachineOperand MO = MI->getOperand(0);
-			assert(MO.isReg() && "src/dst of memory access is not "
-						"a register");
-			reg = MO.getReg();
-		}
-
-		if (findRegisterSide(reg, MF) == TMS320C64X::ARegsRegisterClass)
-			t = '1';
-		else
-			t = '2';
-	}
-
-	// We can't tell whether something uses the xpath from the instruction
-	// itself; instead look at registers
-	top = MI->findFirstPredOperandIdx();
-	if (top == -1)
-		top = MI->getNumOperands();
-
-	TargetRegisterClass *rc;
-	if (desc.TSFlags & TMS320C64XII::unit_2)
-		rc = TMS320C64X::BRegsRegisterClass;
-	else
-		rc = TMS320C64X::ARegsRegisterClass;
-
-	contains_xpath = false;
-	for (i = 0; i < top; ++i)
-		if (MI->getOperand(i).isReg())
-			if (findRegisterSide(MI->getOperand(i).getReg(), MF)
-									!= rc)
-				contains_xpath = true;
-
-	O << ".";
-	O << u;
-	O << n;
-	if (t != 0) {
-		O << "T";
-		O << t;
-	} else if (contains_xpath) {
-		O << "X";
-	}
-
-	return;
 }
 
 bool
