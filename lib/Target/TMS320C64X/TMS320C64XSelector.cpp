@@ -42,9 +42,18 @@ public:
 	explicit TMS320C64XInstSelectorPass(TargetMachine &TM);
 
 	SDNode *Select(SDNode *op);
+	bool select_addr_generic(SDNode *&op, SDValue &N, SDValue &R1,
+					SDValue &R2, bool has_had_reg_check);
 	bool select_addr(SDNode *&op, SDValue &N, SDValue &R1, SDValue &R2);
 	bool select_idxaddr(SDNode *&op, SDValue &N, SDValue &R1, SDValue &R2);
 	bool bounce_predicate(SDNode *&op, SDValue &N, SDValue &R1);
+
+	bool select_addr_d1t1(SDNode *&op, SDValue &N, SDValue &R1,SDValue &R2);
+	bool select_addr_d1t2(SDNode *&op, SDValue &N, SDValue &R1,SDValue &R2);
+	bool select_addr_d2t1(SDNode *&op, SDValue &N, SDValue &R1,SDValue &R2);
+	bool select_addr_d2t2(SDNode *&op, SDValue &N, SDValue &R1,SDValue &R2);
+	bool select_addr_regspec(SDNode *&op, SDValue &N, SDValue &R1,
+						SDValue &R2, int regspec);
 	const char *getPassName() const {
 		return "TMS320C64X Instruction Selection";
 	}
@@ -70,7 +79,16 @@ TMS320C64XInstSelectorPass::TMS320C64XInstSelectorPass(TargetMachine &TM)
 
 bool
 TMS320C64XInstSelectorPass::select_addr(SDNode *&op, SDValue &N, SDValue &base,
-					SDValue &offs)
+						SDValue &offs)
+{
+
+	return select_addr_generic(op, N, base, offs, false);
+}
+
+bool
+TMS320C64XInstSelectorPass::select_addr_generic(SDNode *&op, SDValue &N,
+					SDValue &base, SDValue &offs,
+					bool has_had_reg_check)
 {
 	MemSDNode *mem;
 	ConstantSDNode *CN;
@@ -123,6 +141,22 @@ TMS320C64XInstSelectorPass::select_addr(SDNode *&op, SDValue &N, SDValue &base,
 		base = N.getOperand(0);
 		offs = CurDAG->getTargetConstant(0, MVT::i32);
 		return true;
+	}
+
+	if ((N.getOperand(0).getOpcode() == ISD::CopyFromReg &&
+	N.getOperand(0).getNode()->getOperand(1).getOpcode() == ISD::Register)||
+	(N.getOperand(1).getOpcode() == ISD::Register &&
+	N.getOperand(1).getNode()->getOperand(1).getOpcode() == ISD::Register)){
+		// Here, some part of lowering has generated a load/store node
+		// with a fixed register as an operands - an extra layer of
+		// checks needs to be applied to ensure we're picking the right
+		// instruction.
+		// Rather than replicating select_addr everywhere, instead
+		// it becomes select_addr_generic, with a parameter indicating
+		// whether those checks occured. If they didn't, bail, and
+		// let a more specific memory instruction get picked.
+		if (!has_had_reg_check)
+			return false;
 	}
 
 	if (N.getOperand(1).getOpcode() == ISD::Constant &&
@@ -275,6 +309,69 @@ TMS320C64XInstSelectorPass::select_idxaddr(SDNode *&op, SDValue &addr,
 	offs = CurDAG->getTargetFrameIndex(FIN->getIndex(), MVT::i32);
 
 	return true;
+}
+bool
+TMS320C64XInstSelectorPass::select_addr_d1t1(SDNode *&op, SDValue &N,
+						SDValue &base, SDValue &offs) {
+
+	return select_addr_regspec(op, N, base, offs, 0);
+}
+
+bool
+TMS320C64XInstSelectorPass::select_addr_d1t2(SDNode *&op, SDValue &N,
+						SDValue &base, SDValue &offs) {
+
+	return select_addr_regspec(op, N, base, offs, 1);
+}
+
+bool
+TMS320C64XInstSelectorPass::select_addr_d2t1(SDNode *&op, SDValue &N,
+						SDValue &base, SDValue &offs) {
+
+	return select_addr_regspec(op, N, base, offs, 2);
+}
+
+bool
+TMS320C64XInstSelectorPass::select_addr_d2t2(SDNode *&op, SDValue &N,
+						SDValue &base, SDValue &offs) {
+
+	return select_addr_regspec(op, N, base, offs, 3);
+}
+
+bool
+TMS320C64XInstSelectorPass::select_addr_regspec(SDNode *&op, SDValue &N,
+				SDValue &base, SDValue &offs, int regspec) {
+	RegisterSDNode *r1, *r2;
+	unsigned int reg;
+
+	if (N.getOperand(0).getOpcode() == ISD::CopyFromReg)
+		r1 = dyn_cast<RegisterSDNode>
+				(N.getOperand(0).getNode()->getOperand(1));
+	else
+		r1 = NULL;
+
+	if (N.getOperand(1).getOpcode() == ISD::CopyFromReg)
+		r2 = dyn_cast<RegisterSDNode>
+				(N.getOperand(1).getNode()->getOperand(1));
+	else
+		r2 = NULL;
+
+	if (r1 != NULL) {
+		reg = r1->getReg();
+		if (!TM.getRegisterInfo()->isVirtualRegister(reg)) {
+			if (regspec & 2) {
+				if (!TMS320C64X::BRegsRegClass.contains(reg))
+					return false;
+			} else {
+				if (!TMS320C64X::ARegsRegClass.contains(reg))
+					return false;
+			}
+		}
+	}
+
+	// Actually, we don't care about the offset operand; it's the base
+	// operand that determines which side of the processor we're on
+	return select_addr_generic(op, N, base, offs, true);
 }
 
 bool

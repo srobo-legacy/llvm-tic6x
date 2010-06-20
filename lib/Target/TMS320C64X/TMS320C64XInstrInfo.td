@@ -237,22 +237,17 @@ def lea_fail : inst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
 // c) sign extension
 
 let mem_shift_amt = 0 in {
-defm byte_addr : meminst<"b", sextloadi8, truncstorei8, (i32 addr:$ptr)>;
-defm byte_idx : meminst<"b", sextloadi8, truncstorei8, (i32 idxaddr:$ptr)>;
-defm ubyte_addr : meminst_load<"bu", zextloadi8, (i32 addr:$ptr)>;
-defm ubyte_idx : meminst_load<"bu", zextloadi8, (i32 idxaddr:$ptr)>;
+defm byte : meminst<"b", sextloadi8, truncstorei8>;
+defm ubyte : meminst_load<"bu", zextloadi8>;
 }
 
 let mem_shift_amt = 1 in {
-defm hword_addr : meminst<"h", sextloadi16, truncstorei16, (i32 addr:$ptr)>;
-defm hword_idx : meminst<"h", sextloadi16, truncstorei16, (i32 idxaddr:$ptr)>;
-defm uhword_addr : meminst_load<"hu", zextloadi16, (i32 addr:$ptr)>;
-defm uhword_idx : meminst_load<"hu", zextloadi16, (i32 idxaddr:$ptr)>;
+defm hword : meminst<"h", sextloadi16, truncstorei16>;
+defm uhword : meminst_load<"hu", zextloadi16>;
 }
 
 let mem_shift_amt = 2 in {
-defm word_addr : meminst<"w", load, store, (i32 addr:$ptr)>;
-defm word_idx : meminst<"w", load, store, (i32 idxaddr:$ptr)>;
+defm word : meminst<"w", load, store>;
 }
 
 // Comparisons
