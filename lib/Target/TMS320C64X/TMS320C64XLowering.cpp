@@ -684,7 +684,7 @@ TMS320C64XLowering::LowerSETCC(SDValue op, SelectionDAG &DAG)
 SDValue
 TMS320C64XLowering::LowerSelect(SDValue op, SelectionDAG &DAG)
 {
-	SDValue ops[6];
+	SDValue ops[4];
 
 	// Operand 1 is true/false, selects operand 2 or 3 respectively
 	// We'll generate this with two conditional move instructions - moving
@@ -696,9 +696,7 @@ TMS320C64XLowering::LowerSelect(SDValue op, SelectionDAG &DAG)
 	ops[1] = op.getOperand(2);
 	ops[2] = DAG.getTargetConstant(0, MVT::i32);
 	ops[3] = op.getOperand(0);
-	ops[4] = DAG.getTargetConstant(1, MVT::i32);
-	ops[5] = op.getOperand(0);
-	return DAG.getNode(TMSISD::SELECT, op.getDebugLoc(), MVT::i32, ops, 6);
+	return DAG.getNode(TMSISD::SELECT, op.getDebugLoc(), MVT::i32, ops, 4);
 }
 
 SDValue

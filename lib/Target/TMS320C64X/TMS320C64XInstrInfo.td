@@ -34,10 +34,9 @@ def SDT_call_seq_end : SDCallSeqEnd<[SDTCisVT<0, i32>, SDTCisVT<1, i32>]>;
 def SDT_call_ret_label : SDTypeProfile<0, 1, [SDTCisVT<0, i32>]>;
 def SDT_call_ret_label_operand : SDTypeProfile<1, 1, [SDTCisVT<0, i32>,
 							SDTCisVT<1, i32>]>;
-def SDT_tmsselect : SDTypeProfile<1, 6, [SDTCisVT<0, i32>, SDTCisVT<1, i32>,
+def SDT_tmsselect : SDTypeProfile<1, 4, [SDTCisVT<0, i32>, SDTCisVT<1, i32>,
 					SDTCisVT<2, i32>, SDTCisVT<3, i32>,
-					SDTCisVT<4, i32>, SDTCisVT<5, i32>,
-					SDTCisVT<6, i32>]>;
+					SDTCisVT<4, i32>]>;
 
 def brcond_node : SDNode<"TMSISD::BRCOND", SDT_brcond, [SDNPHasChain]>;
 def callseq_start : SDNode<"ISD::CALLSEQ_START", SDT_call_seq_start,
@@ -284,20 +283,18 @@ def cmpltu_p_rr : pseudo_rr<"cmpltu", ".L1", unit_l, cmpltu_node, 0>;
 //def cmpltu_p_ri : pseudo_ri<"cmpltu", ".L1", (i32 uconst4:$imm), unit_l,
 //						cmpltu_node, 1>;
 
-// To support select, we need two conditional instructions with the same
-// destination - copy what i32 loading does.
+// Select - lowering loads one value into first reg, then we conditionally
+// move the other value into it. Having a pair of instructions both move into
+// the same register would achieve it with one cycle, but that involves touching
+// parallel stuff, which we're avoiding for now
 
-def mvselect_a : nopred_inst<(outs GPRegs:$dst), (ins GPRegs:$reg),
-			"mv\t.S1\t$reg,\t$dst", [], 0, unit_s> {
-}
-
-def mvselect_b : nopred_inst<(outs GPRegs:$dst), (ins GPRegs:$reg, GPRegs:$src1),
+def mvselect : nopred_inst<(outs GPRegs:$dst), (ins GPRegs:$reg, GPRegs:$src1),
 		"mv\t.S1\t$reg,\t$dst", [], 0, unit_s> {
 	let Constraints = "$src1 = $dst";
 }
 
-def : Pat<(tmsselect GPRegs:$true, GPRegs:$false, timm:$trueimm, predwrapper1:$truereg, timm:$falseimm, predwrapper1:$falsereg),
-		(mvselect_b GPRegs:$false, (mvselect_a GPRegs:$true, timm:$trueimm, predwrapper1:$truereg), timm:$falseimm, predwrapper1:$falsereg)>;
+def : Pat<(tmsselect GPRegs:$false, GPRegs:$true, timm:$trueimm, predwrapper1:$truereg),
+		(mvselect GPRegs:$true, GPRegs:$false, timm:$trueimm, predwrapper1:$truereg)>;
 
 def : Pat<(i32 mvk_all_pred:$val),
 	(mvkh_p mvk_all_pred:$val, (mvkl_p mvk_all_pred:$val))>;
