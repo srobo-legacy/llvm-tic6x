@@ -279,6 +279,27 @@ TMS320C64XInstrInfo::isMoveInstr(const MachineInstr &MI, unsigned &src_reg,
 		dst_sub_idx = 0;
 		src_reg = MI.getOperand(1).getReg();
 		dst_reg = MI.getOperand(0).getReg();
+
+		// If either of the source/destination registers is on the B
+		// side, then this isn't just a simple move instruction, it
+		// actually has some functionality, ie 1) actually moving the
+		// register from an inaccessable side to the accessable one, and
+		// 2) preventing me from stabing my eyes out
+		//
+		// Unfortunately it's even more complex than that: we want to
+		// coalesce moves of B15 so that we can make SP-relative loads
+		// and stores as normal; but we don't want to do that for any
+		// of the B-side argument registers, lest we end up with
+		// operations that write directly to the B side, which then
+		// touches the only-want-to-use-side-A situation.
+		
+		if ((TMS320C64X::BRegsRegClass.contains(src_reg) &&
+				src_reg != TMS320C64X::B15) ||
+				(TMS320C64X::BRegsRegClass.contains(dst_reg) &&
+				dst_reg != TMS320C64X::B15))
+				
+			return false;
+
 		return true;
 	}
 
