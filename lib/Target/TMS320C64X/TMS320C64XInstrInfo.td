@@ -338,18 +338,21 @@ let isCall = 1, isPredicable = 0,
 // upon. So callp .S1 puts ret in A3, which isn't consistent with the TI
 // calling convention.
 
-def callp_p : inst<(outs), (ins calltarget:$dst), "callp\t.S2\t$dst",
-			[(TMS320C64Xcall tglobaladdr:$dst)], 1, unit_s> {
+def callp_p : inst<(outs), (ins calltarget:$dst, variable_ops),
+			"callp\t.S2\t$dst", [(TMS320C64Xcall tglobaladdr:$dst)],
+			1, unit_s> {
 	let Pattern = sched_pattern;
 }
 
-def callp_e_p : inst<(outs), (ins calltarget:$dst), "callp\t.S2\t$dst",
+def callp_e_p : inst<(outs), (ins calltarget:$dst, variable_ops),
+			"callp\t.S2\t$dst",
 			[(TMS320C64Xcall texternalsym:$dst)], 1, unit_s> {
 	let Pattern = sched_pattern;
 }
 
-def call_indirect_2 : inst<(outs), (ins BRegs:$reg), "b\t.S2\t$reg",
-				[(TMS320C64Xcall BRegs:$reg)], 1, unit_s> {
+def call_indirect_2 : inst<(outs), (ins BRegs:$reg, variable_ops),
+				"b\t.S2\t$reg", [(TMS320C64Xcall BRegs:$reg)],
+				1, unit_s> {
 	let Pattern = sched_pattern;
 	let Uses = [B3];
 }
