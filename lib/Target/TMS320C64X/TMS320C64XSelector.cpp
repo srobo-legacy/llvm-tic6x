@@ -90,7 +90,7 @@ TMS320C64XInstSelectorPass::get_memaccess_data_reg(SDNode &op)
 	// to a function argument register). This affects what load/store
 	// instruction gets selected, as which data path is used is significant
 
-	if (op.getOpcode() == ISD::LOAD || op.getOpcode() == ISD::STORE) {
+	if (op.getOpcode() == ISD::STORE) {
 		if (op.getOperand(0).getOpcode() == ISD::Register) {
 			return op.getOperand(0).getNode();
 		} else if (op.getOperand(0).getOpcode() == ISD::CopyFromReg &&
@@ -99,6 +99,28 @@ TMS320C64XInstSelectorPass::get_memaccess_data_reg(SDNode &op)
 			return op.getOperand(0).getNode()->
 				getOperand(1).getNode();
 		}
+
+		return NULL;
+	} else if (op.getOpcode() == ISD::LOAD) {
+		// Oh. The Horror.
+		// So, we can derive the address-calculating operands just fine
+		// from this sdnode... however, we can't do the same for the
+		// result due to this being a DAG: the result is how this is
+		// used, not what its operands are.
+		// So we have to prod the uses to find out what register we
+		// may or may not be being written to. Yeouch.
+
+		// And that breaks down if we have more than one use
+		if (!op.hasOneUse())
+			return NULL;
+
+		SDNode::use_iterator i = op.use_begin();
+		SDNode *user = *i;
+
+		if (user->getOpcode() == ISD::CopyToReg &&
+			user->getOperand(1)->getOpcode() == ISD::Register)
+			return user->getOperand(1).getNode();
+
 
 		return NULL;
 	} else {
