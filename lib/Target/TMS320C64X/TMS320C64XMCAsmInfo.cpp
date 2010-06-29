@@ -36,4 +36,5 @@ TMS320C64XMCAsmInfo::TMS320C64XMCAsmInfo(const Target &T,
 	CommentString = ";";
 
 	AlignmentIsInBytes = false;
+	HasLCOMMDirective = true;
 }
