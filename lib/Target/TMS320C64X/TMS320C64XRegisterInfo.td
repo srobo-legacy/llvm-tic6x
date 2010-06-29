@@ -97,7 +97,7 @@ let MethodBodies = [{
 	PredRegsClass::iterator
 	PredRegsClass::allocation_order_end(const MachineFunction &MF)
 									const {
-		return end();
+		return end() - 3; // Don't allocate B predicate registers
 	}
 }];
 }
