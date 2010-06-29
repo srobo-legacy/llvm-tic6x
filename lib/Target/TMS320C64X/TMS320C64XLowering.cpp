@@ -97,6 +97,7 @@ TMS320C64XLowering::TMS320C64XLowering(TMS320C64XTargetMachine &tm) :
 	// Manually beat condition code setting into cmps
 	setOperationAction(ISD::SETCC, MVT::i32, Custom);
 	// We can emulate br_cc, maybe not brcond, do what works
+	setOperationAction(ISD::BRCOND, MVT::Other, Expand);
 	setOperationAction(ISD::BRCOND, MVT::i32, Expand);
 	setOperationAction(ISD::BR_CC, MVT::i32, Custom);
 	setOperationAction(ISD::BR_JT, MVT::Other, Expand);
