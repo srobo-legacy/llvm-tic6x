@@ -71,11 +71,10 @@ const unsigned *
 TMS320C64XRegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const
 {
 	static const unsigned nonvolatileRegs[] = {
-		TMS320C64X::A10, TMS320C64X::B10,
-		TMS320C64X::A11, TMS320C64X::B11,
-		TMS320C64X::A12, TMS320C64X::B12,
-		TMS320C64X::A13, TMS320C64X::B13,
-		TMS320C64X::B14,
+		TMS320C64X::A10,
+		TMS320C64X::A11,
+		TMS320C64X::A12,
+		TMS320C64X::A13
 	};
 
 	return nonvolatileRegs;
@@ -85,10 +84,6 @@ const TargetRegisterClass* const*
 TMS320C64XRegisterInfo::getCalleeSavedRegClasses(MachineFunction const*) const
 {
 	static const TargetRegisterClass *const calleeNonvolatileRegClasses[] ={
-		&TMS320C64X::GPRegsRegClass, &TMS320C64X::GPRegsRegClass,
-		&TMS320C64X::GPRegsRegClass, &TMS320C64X::GPRegsRegClass,
-		&TMS320C64X::GPRegsRegClass, &TMS320C64X::GPRegsRegClass,
-		&TMS320C64X::GPRegsRegClass, &TMS320C64X::GPRegsRegClass,
 		&TMS320C64X::GPRegsRegClass, &TMS320C64X::GPRegsRegClass,
 		&TMS320C64X::GPRegsRegClass, &TMS320C64X::GPRegsRegClass
 	};
