@@ -238,6 +238,10 @@ def lea_fail : inst<(outs GPRegs:$dst), (ins mem_operand:$ptr),
 // c) sign extension
 
 let mem_shift_amt = 0 in {
+defm u_i1 : meminst_load<"bu", zextloadi1>;
+}
+
+let mem_shift_amt = 0 in {
 defm byte : meminst<"b", sextloadi8, truncstorei8>;
 defm ubyte : meminst_load<"bu", zextloadi8>;
 }
