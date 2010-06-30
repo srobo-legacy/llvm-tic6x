@@ -199,7 +199,7 @@ TMS320C64XInstSelectorPass::select_addr(SDNode *&op, SDValue &N,
 				Predicate_const_is_positive(
 				N.getOperand(1).getNode()),
 				Predicate_uconst_n(N.getOperand(1).getNode(),
-				log2(want_align) + 15)) {
+				((int)log2(want_align)) + 15)) {
 			// We can use the uconst15 form of this instruction.
 			// Again, the assembler will scale this for us. Could
 			// put in some clauses to find sub insns with negative
