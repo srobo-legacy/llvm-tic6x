@@ -316,8 +316,8 @@ def brcond_p : nopred_inst<(outs), (ins brtarget:$block), "b\t.S1\t$block",
 	let Pattern = sched_pattern;
 }
 
-def bindirect_2 : inst<(outs), (ins BRegs:$reg), "b\t.S2\t$reg",
-				[(brind BRegs:$reg)], 1, unit_s> {
+def bindirect_2 : inst<(outs), (ins GPRegs:$reg), "b\t.S2X\t$reg",
+				[(brind GPRegs:$reg)], 1, unit_s> {
 	let Pattern = sched_pattern;
 }
 } // isBranch
@@ -347,8 +347,8 @@ def callp_e_p : inst<(outs), (ins calltarget:$dst, variable_ops),
 	let Pattern = sched_pattern;
 }
 
-def call_indirect_2 : inst<(outs), (ins BRegs:$reg, variable_ops),
-				"b\t.S2\t$reg", [(TMS320C64Xcall BRegs:$reg)],
+def call_indirect_2 : inst<(outs), (ins GPRegs:$reg, variable_ops),
+				"b\t.S2X\t$reg", [(TMS320C64Xcall GPRegs:$reg)],
 				1, unit_s> {
 	let Pattern = sched_pattern;
 	let Uses = [B3];
