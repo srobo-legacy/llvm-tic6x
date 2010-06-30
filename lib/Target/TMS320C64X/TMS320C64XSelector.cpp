@@ -449,6 +449,7 @@ TMS320C64XInstSelectorPass::select_addr_regspec(SDNode *&op, SDValue &N,
 			return false;
 	}
 
+#if 0
 	if (data != NULL) {
 		reg = data->getReg();
 		if (!TM.getRegisterInfo()->isVirtualRegister(reg)) {
@@ -466,6 +467,7 @@ TMS320C64XInstSelectorPass::select_addr_regspec(SDNode *&op, SDValue &N,
 		if (regspec & 1)
 			return false;
 	}
+#endif
 
 	// So, this instruction has at least the correct side/datapath for the
 	// registers we are seeing.
