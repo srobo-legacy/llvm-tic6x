@@ -96,7 +96,7 @@ def retflag : SDNode<"TMSISD::RET_FLAG", SDTNone, [SDNPHasChain, SDNPOptInFlag]>
 
 // FIXME: mv can be in any s/d/l slot
 let neverHasSideEffects = 1 in {
-let AsmString = "mv\t.S1\t$in,\t$out" in {
+let AsmString = "mv\t\t\t$in,\t$out" in {
 def mv : inst<(outs GPRegs:$out), (ins GPRegs:$in), "", [], 0, unit_s>;
 def mv1 : inst<(outs GPRegs:$out), (ins GPRegs:$in), "", [], 0, unit_s>;
 }
