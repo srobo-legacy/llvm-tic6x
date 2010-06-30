@@ -42,18 +42,9 @@ public:
 	explicit TMS320C64XInstSelectorPass(TargetMachine &TM);
 
 	SDNode *Select(SDNode *op);
-	bool select_addr_generic(SDNode *&op, SDValue &N, SDValue &R1,
-					SDValue &R2, bool has_had_reg_check);
 	bool select_addr(SDNode *&op, SDValue &N, SDValue &R1, SDValue &R2);
 	bool select_idxaddr(SDNode *&op, SDValue &N, SDValue &R1, SDValue &R2);
 	bool bounce_predicate(SDNode *&op, SDValue &N, SDValue &R1);
-
-	bool select_addr_d1t1(SDNode *&op, SDValue &N, SDValue &R1,SDValue &R2);
-	bool select_addr_d1t2(SDNode *&op, SDValue &N, SDValue &R1,SDValue &R2);
-	bool select_addr_d2t1(SDNode *&op, SDValue &N, SDValue &R1,SDValue &R2);
-	bool select_addr_d2t2(SDNode *&op, SDValue &N, SDValue &R1,SDValue &R2);
-	bool select_addr_regspec(SDNode *&op, SDValue &N, SDValue &R1,
-						SDValue &R2, int regspec);
 
 	SDNode *get_memaccess_data_reg(SDNode &op);
 
@@ -130,17 +121,8 @@ TMS320C64XInstSelectorPass::get_memaccess_data_reg(SDNode &op)
 }
 
 bool
-TMS320C64XInstSelectorPass::select_addr(SDNode *&op, SDValue &N, SDValue &base,
-						SDValue &offs)
-{
-
-	return select_addr_generic(op, N, base, offs, false);
-}
-
-bool
-TMS320C64XInstSelectorPass::select_addr_generic(SDNode *&op, SDValue &N,
-					SDValue &base, SDValue &offs,
-					bool has_had_reg_check)
+TMS320C64XInstSelectorPass::select_addr(SDNode *&op, SDValue &N,
+					SDValue &base, SDValue &offs)
 {
 	MemSDNode *mem;
 	ConstantSDNode *CN;
@@ -193,32 +175,6 @@ TMS320C64XInstSelectorPass::select_addr_generic(SDNode *&op, SDValue &N,
 		base = N.getOperand(0);
 		offs = CurDAG->getTargetConstant(0, MVT::i32);
 		return true;
-	}
-
-	if (N.getOperand(0).getOpcode() == ISD::Register ||
-			N.getOperand(1).getOpcode() == ISD::Register ||
-			get_memaccess_data_reg(*op) != NULL) {
-		// Here, some part of lowering has generated a load/store node
-		// with a fixed register as an operands - an extra layer of
-		// checks needs to be applied to ensure we're picking the right
-		// instruction.
-		// Rather than replicating select_addr everywhere, instead
-		// it becomes select_addr_generic, with a parameter indicating
-		// whether those checks occured. If they didn't, bail, and
-		// let a more specific memory instruction get picked.
-		if (!has_had_reg_check)
-			return false;
-	}
-
-	// The same sequence can be wrapped in CopyFromRegs
-	if ((N.getOperand(0).getOpcode() == ISD::CopyFromReg &&
-	N.getOperand(0).getNode()->getOperand(1).getOpcode() == ISD::Register)
-	|| (N.getOperand(1).getOpcode() == ISD::CopyFromReg &&
-	N.getOperand(1).getNode()->getOperand(1).getOpcode() == ISD::Register)
-	|| get_memaccess_data_reg(*op) != NULL) {
-
-		if (!has_had_reg_check)
-			return false;
 	}
 
 	if (N.getOperand(1).getOpcode() == ISD::Constant &&
@@ -371,107 +327,6 @@ TMS320C64XInstSelectorPass::select_idxaddr(SDNode *&op, SDValue &addr,
 	offs = CurDAG->getTargetFrameIndex(FIN->getIndex(), MVT::i32);
 
 	return true;
-}
-bool
-TMS320C64XInstSelectorPass::select_addr_d1t1(SDNode *&op, SDValue &N,
-						SDValue &base, SDValue &offs) {
-
-	return select_addr_regspec(op, N, base, offs, 0);
-}
-
-bool
-TMS320C64XInstSelectorPass::select_addr_d1t2(SDNode *&op, SDValue &N,
-						SDValue &base, SDValue &offs) {
-
-	return select_addr_regspec(op, N, base, offs, 1);
-}
-
-bool
-TMS320C64XInstSelectorPass::select_addr_d2t1(SDNode *&op, SDValue &N,
-						SDValue &base, SDValue &offs) {
-
-	return select_addr_regspec(op, N, base, offs, 2);
-}
-
-bool
-TMS320C64XInstSelectorPass::select_addr_d2t2(SDNode *&op, SDValue &N,
-						SDValue &base, SDValue &offs) {
-
-	return select_addr_regspec(op, N, base, offs, 3);
-}
-
-bool
-TMS320C64XInstSelectorPass::select_addr_regspec(SDNode *&op, SDValue &N,
-				SDValue &base_out, SDValue &offs_out,
-				int regspec) {
-	RegisterSDNode *base, *data;
-	SDNode *tmp;
-	unsigned int reg;
-
-	// NB: we make decisions on what the base register and data register
-	// are, as these determine the side of the instruction, and the data
-	// path used, respectively. We should also care about what the offset
-	// field is (if it isn't on the same side as the base reg, we use the
-	// xpath), but thats something which can be ignored for the moment
-
-	// regspec int: first bit is the datapath, 0 means side 1, 1 side 2.
-	// second bit is of the same form, but specifying execution unit side.
-
-	if (N.getOperand(0).getOpcode() == ISD::CopyFromReg)
-		base = dyn_cast<RegisterSDNode>
-			(N.getOperand(0).getNode()->getOperand(1).getNode());
-	else if (N.getOperand(0).getOpcode() == ISD::Register)
-		base = dyn_cast<RegisterSDNode>(N.getOperand(0).getNode());
-	else
-		base = NULL;
-
-	tmp = get_memaccess_data_reg(*op);
-	if (tmp != NULL)
-		data = dyn_cast<RegisterSDNode>(tmp);
-	else
-		data = NULL;
-
-	if (base != NULL) {
-		reg = base->getReg();
-		if (!TM.getRegisterInfo()->isVirtualRegister(reg)) {
-			if (regspec & 2) {
-				if (!TMS320C64X::BRegsRegClass.contains(reg))
-					return false;
-			} else {
-				if (!TMS320C64X::ARegsRegClass.contains(reg))
-					return false;
-			}
-		}
-	} else {
-		// No fixed base: it'll be allocated from A Regs. So, we should
-		// reject instructions on side 2/B right away
-		if (regspec & 2)
-			return false;
-	}
-
-#if 0
-	if (data != NULL) {
-		reg = data->getReg();
-		if (!TM.getRegisterInfo()->isVirtualRegister(reg)) {
-			if (regspec & 1) {
-				if (!TMS320C64X::BRegsRegClass.contains(reg))
-					return false;
-			} else {
-				if (!TMS320C64X::ARegsRegClass.contains(reg))
-					return false;
-			}
-		}
-	} else {
-		// No fixed data reg, gets allocated from set A, reject
-		// instructions with data path 2.
-		if (regspec & 1)
-			return false;
-	}
-#endif
-
-	// So, this instruction has at least the correct side/datapath for the
-	// registers we are seeing.
-	return select_addr_generic(op, N, base_out, offs_out, true);
 }
 
 bool

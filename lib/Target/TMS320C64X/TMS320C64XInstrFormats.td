@@ -96,10 +96,6 @@ def i32index : PatLeaf<(imm), [{
 
 def addr : ComplexPattern<i32, 2, "select_addr", [], []>;
 def idxaddr : ComplexPattern<i32, 2, "select_idxaddr", [frameindex], []>;
-def addr_d1t1 : ComplexPattern<i32, 2, "select_addr_d1t1", [], []>;
-def addr_d2t2 : ComplexPattern<i32, 2, "select_addr_d2t2", [], []>;
-def addr_d1t2 : ComplexPattern<i32, 2, "select_addr_d1t2", [], []>;
-def addr_d2t1 : ComplexPattern<i32, 2, "select_addr_d2t1", [], []>;
 
 def uconst4_xform : SDNodeXForm<imm, [{
 	return CurDAG->getTargetConstant((int)N->getSExtValue(), MVT::i32);
@@ -312,38 +308,14 @@ multiclass meminst_load<string mnemonic, PatFrag op> {
 		[(set GPRegs:$dst, (op addr:$ptr))], 0, unit_d> {
 			let Pattern = sched_pattern;
 			let AsmString = !strconcat("ld",!strconcat(mnemonic,
-						"\t.D1T1\t$ptr,\t$dst"));
+						"\t\t\t$ptr,\t$dst"));
 		}
 	def _load_p_idx : memload<(outs GPRegs:$dst), (ins mem_operand:$ptr),
 		[(set GPRegs:$dst, (op idxaddr:$ptr))], 0, unit_d> {
 			let Pattern = sched_pattern;
 			let AsmString = !strconcat("ld",!strconcat(mnemonic,
-						"\t.D1T1\t$ptr,\t$dst"));
+						"\t\t\t$ptr,\t$dst"));
 	}
-
-	def _load1 : memload<(outs GPRegs:$dst), (ins mem_operand:$ptr),
-		[(set GPRegs:$dst, (op addr_d1t1:$ptr))], 0, unit_d> {
-			let Pattern = sched_pattern;
-			let AsmString = !strconcat("ld",!strconcat(mnemonic,
-						"\t.D1T1\t$ptr,\t$dst"));
-		}
-	def _load2 : memload<(outs GPRegs:$dst), (ins mem_operand:$ptr),
-		[(set GPRegs:$dst, (op addr_d2t2:$ptr))], 1, unit_d> {
-			let Pattern = sched_pattern;
-			let AsmString = !strconcat("ld",!strconcat(mnemonic,
-						"\t.D2T2\t$ptr,\t$dst"));
-		}
-	def _load1x : memload<(outs GPRegs:$dst), (ins mem_operand:$ptr),
-		[(set GPRegs:$dst, (op addr_d1t2:$ptr))], 0, unit_d> {
-			let AsmString = !strconcat("ld",!strconcat(mnemonic,
-						"\t.D1T2\t$ptr,\t$dst"));
-		}
-	def _load2x : memload<(outs GPRegs:$dst), (ins mem_operand:$ptr),
-		[(set GPRegs:$dst, (op addr_d2t1:$ptr))], 1, unit_d> {
-			let Pattern = sched_pattern;
-			let AsmString = !strconcat("ld",!strconcat(mnemonic,
-						"\t.D2T1\t$ptr,\t$dst"));
-		}
 }
 
 multiclass meminst_store<string mnemonic, PatFrag op> {
@@ -351,39 +323,15 @@ multiclass meminst_store<string mnemonic, PatFrag op> {
 		[(op GPRegs:$reg, addr:$ptr)], 0, unit_d> {
 			let Pattern = sched_pattern;
 			let AsmString = !strconcat("st",!strconcat(mnemonic,
-						"\t.D1T1\t$reg,\t$ptr"));
+						"\t\t\t$reg,\t$ptr"));
 		}
 
 	def _store_p_idxaddr : memstore<(outs), (ins mem_operand:$ptr,
 		GPRegs:$reg), [(op GPRegs:$reg, idxaddr:$ptr)], 0, unit_d> {
 			let Pattern = sched_pattern;
 			let AsmString = !strconcat("st",!strconcat(mnemonic,
-						"\t.D1T1\t$reg,\t$ptr"));
+						"\t\t\t$reg,\t$ptr"));
 	}
-
-	def _store1 : memstore<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
-		[(op GPRegs:$reg, addr_d1t1:$ptr)], 0, unit_d> {
-			let Pattern = sched_pattern;
-			let AsmString = !strconcat("st",!strconcat(mnemonic,
-						"\t.D1T1\t$reg,\t$ptr"));
-		}
-	def _store2 : memstore<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
-		[(op GPRegs:$reg, addr_d2t2:$ptr)], 1, unit_d> {
-			let Pattern = sched_pattern;
-			let AsmString = !strconcat("st",!strconcat(mnemonic,
-						"\t.D2T2\t$reg,\t$ptr"));
-		}
-	def _store1x : memstore<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
-		[(op GPRegs:$reg, addr_d1t2:$ptr)], 0, unit_d> {
-			let AsmString = !strconcat("st",!strconcat(mnemonic,
-						"\t.D1T2\t$reg,\t$ptr"));
-		}
-	def _store2x : memstore<(outs), (ins mem_operand:$ptr, GPRegs:$reg),
-		[(op GPRegs:$reg, addr_d2t1:$ptr)], 1, unit_d> {
-			let Pattern = sched_pattern;
-			let AsmString = !strconcat("st",!strconcat(mnemonic,
-						"\t.D2T1\t$reg,\t$ptr"));
-		}
 }
 
 multiclass meminst<string mnemonic, PatFrag loadop, PatFrag storeop> :
