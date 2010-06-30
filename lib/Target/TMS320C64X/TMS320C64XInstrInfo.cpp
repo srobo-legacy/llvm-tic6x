@@ -106,7 +106,7 @@ TMS320C64XInstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
 {
 	DebugLoc DL = DebugLoc::getUnknownLoc();
 
-	addDefaultPred(BuildMI(MBB, I, DL, get(TMS320C64X::word_store1))
+	addDefaultPred(BuildMI(MBB, I, DL, get(TMS320C64X::word_store_p_addr))
 		.addReg(TMS320C64X::A15).addFrameIndex(FI)
 		.addReg(src_reg, getKillRegState(is_kill)));
 }
@@ -118,7 +118,7 @@ TMS320C64XInstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
 {
 	DebugLoc DL = DebugLoc::getUnknownLoc();
 
-	addDefaultPred(BuildMI(MBB, MI, DL, get(TMS320C64X::word_load1))
+	addDefaultPred(BuildMI(MBB, MI, DL, get(TMS320C64X::word_load_p_addr))
 		.addReg(dst_reg, RegState::Define)
 		.addReg(TMS320C64X::A15).addFrameIndex(frame_idx));
 }
