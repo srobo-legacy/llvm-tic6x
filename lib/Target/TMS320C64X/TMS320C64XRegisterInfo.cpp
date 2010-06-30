@@ -74,7 +74,8 @@ TMS320C64XRegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const
 		TMS320C64X::A10,
 		TMS320C64X::A11,
 		TMS320C64X::A12,
-		TMS320C64X::A13
+		TMS320C64X::A13,
+		0
 	};
 
 	return nonvolatileRegs;
