@@ -29,7 +29,8 @@ def RetCC_TMS320C64X : CallingConv<[
 	CCIfType<[i8,i16], CCPromoteToType<i32>>,
 	// XXX - for 64 bit returns I assume we use the A4/A5 pair.. uh..
 	// need to actually check this in spec though
-	CCIfType<[i32, f32], CCAssignToReg<[A4,A5]>>
+	CCIfType<[i32, f32], CCAssignToReg<[A4,A5]>>,
+	CCIfType<[i64, f64], CCAssignToRegWithShadow<[A4], [A5]>>
 ]>;
 
 def CC_TMS320C64X : CallingConv<[
