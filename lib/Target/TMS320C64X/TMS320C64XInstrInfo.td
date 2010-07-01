@@ -58,6 +58,7 @@ def cmpgt_node : SDNode<"TMSISD::CMPGT", SDTIntBinOp, [SDNPOutFlag]>;
 def cmpgtu_node : SDNode<"TMSISD::CMPGTU", SDTIntBinOp, [SDNPOutFlag]>;
 def cmplt_node : SDNode<"TMSISD::CMPLT", SDTIntBinOp, [SDNPOutFlag]>;
 def cmpltu_node : SDNode<"TMSISD::CMPLTU", SDTIntBinOp, [SDNPOutFlag]>;
+def tms_vastart: SDNode<"TMSISD::VASTART", SDTIntBinOp, [SDNPOutFlag]>;
 def tmsselect : SDNode<"TMSISD::SELECT", SDT_tmsselect>;
 def Wrapper : SDNode<"TMSISD::WRAPPER", SDT_Wrapper>;
 
@@ -147,6 +148,9 @@ def sub_p_ri : pseudo_ri<"sub", ".D1", (i32 uconst5:$imm), unit_d, sub, 0>;
 // Prolog asm requires some special cases:
 def sub_l2x : inst<(outs GPRegs:$dst), (ins GPRegs:$src1, GPRegs:$src2),
 			"sub\t.L2X\t$src1,\t$src2,\t$dst", [], 0, unit_l>;
+
+def vastart_add : pseudo_ri<"add", ".D1X", (i32 uconst5:$imm), unit_l,
+							tms_vastart, 1>;
 
 
 // Multiplies - there are a million and one of them, so we'll just be using

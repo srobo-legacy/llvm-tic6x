@@ -715,7 +715,7 @@ TMS320C64XLowering::LowerVASTART(SDValue op, SelectionDAG &DAG)
 		stackgap = (num_normal_params - 10) * 4;
 	}
 
-	SDValue Chain = DAG.getNode(ISD::ADD, op.getDebugLoc(), MVT::i32,
+	SDValue Chain = DAG.getNode(TMSISD::VASTART, op.getDebugLoc(), MVT::i32,
 				DAG.getRegister(TMS320C64X::B15, MVT::i32),
 				DAG.getConstant(stackgap, MVT::i32));
 	const Value *SV = cast<SrcValueSDNode>(op.getOperand(2))->getValue();
