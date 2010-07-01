@@ -739,7 +739,8 @@ TMS320C64XLowering::LowerVAARG(SDValue op, SelectionDAG &DAG)
 					valoc, SV, 0, false, false, 4);
 	// Calculate address of next vaarg
 	SDValue newptr = DAG.getNode(ISD::ADD, op.getDebugLoc(), MVT::i32,
-			chain, DAG.getConstant(vt.getSizeInBits()/8, MVT::i32));
+			loadptr, DAG.getConstant(vt.getSizeInBits()/8,
+			MVT::i32));
 	// Store that back to wherever we're storing the vaarg list
 	chain = DAG.getStore(loadptr.getValue(1), op.getDebugLoc(),
 				newptr, valoc, SV, 0, false, false, 4);
