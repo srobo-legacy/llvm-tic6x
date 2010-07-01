@@ -147,7 +147,7 @@ def sub_p_ri : pseudo_ri<"sub", ".D1", (i32 uconst5:$imm), unit_d, sub, 0>;
 
 // Prolog asm requires some special cases:
 def sub_l2x : inst<(outs GPRegs:$dst), (ins GPRegs:$src1, GPRegs:$src2),
-			"sub\t.L2X\t$src1,\t$src2,\t$dst", [], 0, unit_l>;
+			"sub\t.L2X\t$src1,\t$src2,\t$dst", [], 1, unit_l>;
 
 def vastart_add : pseudo_ri<"add", ".D1X", (i32 uconst5:$imm), unit_l,
 							tms_vastart, 1>;
