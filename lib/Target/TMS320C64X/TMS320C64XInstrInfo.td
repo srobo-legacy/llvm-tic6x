@@ -146,9 +146,17 @@ def sub_p_rr : pseudo_rr<"sub", ".L1", unit_l, sub, 0>;
 def sub_p_ri : pseudo_ri<"sub", ".D1", (i32 uconst5:$imm), unit_d, sub, 0>;
 
 // Prolog asm requires some special cases:
+
+// This specific one is used for subtracting the size of the stack from the
+// stack pointer, when it's contained in a register, which will have been
+// allocated from side A; hence a need for the cross path and executing on side
+// two.
 def sub_l2x : inst<(outs GPRegs:$dst), (ins GPRegs:$src1, GPRegs:$src2),
 			"sub\t.L2X\t$src1,\t$src2,\t$dst", [], 1, unit_l>;
 
+// For varargs, we have to calculate a pointer onto the stack argument area
+// using the stack pointer; thats best achieved with just "add 4, B15, dst",
+// however that requires the use of the Xpath, hence this special case insn
 def vastart_add : pseudo_ri<"add", ".D1X", (i32 uconst5:$imm), unit_l,
 							tms_vastart, 1>;
 
