@@ -82,6 +82,7 @@ bool AlignmentFixing::mayBeUnaligned(Value &V) {
     if (TD->getABITypeAlignment(SourceType) <
         TD->getABITypeAlignment(DestType))
       return true;
+    return mayBeUnaligned(*BCI->getOperand(0));
   }
   return false;
 }
