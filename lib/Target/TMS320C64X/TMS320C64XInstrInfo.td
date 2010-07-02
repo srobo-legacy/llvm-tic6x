@@ -70,8 +70,8 @@ def call_start_i : inst<(outs), (ins i32imm:$val), "sub\t.D2\tB15,\t$val,\tB15",
 	let hasSideEffects = 1;
 }
 
-def call_start_r : inst<(outs), (ins GPRegs:$val), "sub\t.D2\tB15,\t$val,\tB15",
-		[(callseq_start GPRegs:$val)], 1, unit_d> {
+def call_start_r : inst<(outs), (ins GPRegs:$val), "sub\t.D2X\tB15,\t$val,\tB15"
+		,[(callseq_start GPRegs:$val)], 1, unit_d> {
 	let Pattern = sched_pattern;
 	let hasSideEffects = 1;
 }
@@ -84,7 +84,7 @@ def call_end_i : inst<(outs), (ins i32imm:$val, i32imm:$val2),
 }
 
 def call_end_r : inst<(outs), (ins GPRegs:$val, i32imm:$val2),
-		"add\t.D2\t$val,\tB15,\tB15",
+		"add\t.D2X\t$val,\tB15,\tB15",
 		[(callseq_end GPRegs:$val, timm:$val2)], 1, unit_d> {
 	let Pattern = sched_pattern;
 	let hasSideEffects = 1;
