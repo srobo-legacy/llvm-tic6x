@@ -46,6 +46,7 @@ namespace {
       (void) llvm::createAggressiveDCEPass();
       (void) llvm::createAliasAnalysisCounterPass();
       (void) llvm::createAliasDebugger();
+      (void) llvm::createAlignmentFixingPass();
       (void) llvm::createArgumentPromotionPass();
       (void) llvm::createStructRetPromotionPass();
       (void) llvm::createBasicAliasAnalysisPass();
