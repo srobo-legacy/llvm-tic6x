@@ -88,7 +88,12 @@ bool AlignmentFixing::mayBeUnaligned(Value &V) {
 }
 
 bool AlignmentFixing::fixMemoryInstruction(Instruction &I) {
-  bool potentialUnalignment = mayBeUnaligned(*(I.getOperand(0)));
+  llvm::Value* Target;
+  if (I.getOpcode() == Instruction::Load)
+    Target = I.getOperand(0);
+  else
+    Target = I.getOperand(1);
+  bool potentialUnalignment = mayBeUnaligned(*Target);
   if (potentialUnalignment) {
     if (I.getOpcode() == Instruction::Load)
       cast<LoadInst>(&I)->setAlignment(1);
