@@ -14,6 +14,7 @@
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallSet.h"
 #include <algorithm>
 using namespace llvm;
 
@@ -43,18 +44,25 @@ FunctionPass *llvm::createAlignmentFixingPass() {
 }
 
 namespace {
-  bool containsPackedStruct(const Type *T) {
+  bool containsPackedStruct(const Type *T, SmallSet<const Type*, 8>& CT) {
+    if (CT.count(T)) return false;
+    CT.insert(T);
     if (const SequentialType *ST = dyn_cast<SequentialType>(T))
-      return containsPackedStruct(ST->getElementType());
+      return containsPackedStruct(ST->getElementType(), CT);
     if (const StructType *ST = dyn_cast<StructType>(T)) {
       if (ST->isPacked())
         return true;
       for (unsigned i = 0, e = ST->getNumElements(); i != e; ++i) {
-        if (containsPackedStruct(ST->getTypeAtIndex(i)))
+        if (containsPackedStruct(ST->getTypeAtIndex(i), CT))
           return true;
       }
     }
     return false;
+  }
+
+  bool containsPackedStruct(const Type *T) {
+    SmallSet<const Type*, 8> CT;
+    return containsPackedStruct(T, CT);
   }
 }
 
