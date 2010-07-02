@@ -348,8 +348,8 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, CallingConv::ID
 		stacksize = (ArgLocs.size() - fixed_args + 1) * 4;
 	}
 
-	Chain = DAG.getCALLSEQ_START(Chain, DAG.getTargetConstant(stacksize,
-						MVT::i32));
+	Chain = DAG.getCALLSEQ_START(Chain, DAG.getConstant(stacksize,
+							MVT::i32));
 
 	SmallVector<std::pair<unsigned int, SDValue>, 16> reg_args;
 	SmallVector<SDValue, 16> stack_args;
@@ -479,7 +479,7 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, CallingConv::ID
 	}
 
 	Chain = DAG.getCALLSEQ_END(Chain,
-			DAG.getTargetConstant(stacksize, MVT::i32),
+			DAG.getConstant(stacksize, MVT::i32),
 			DAG.getTargetConstant(0, MVT::i32),
 			in_flag);
 	in_flag = Chain.getValue(1);
