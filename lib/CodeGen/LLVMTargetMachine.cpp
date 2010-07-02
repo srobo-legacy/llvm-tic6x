@@ -284,6 +284,8 @@ bool LLVMTargetMachine::addCommonCodeGenPasses(PassManagerBase &PM,
   if (OptLevel != CodeGenOpt::None && !DisableCGP)
     PM.add(createCodeGenPreparePass(getTargetLowering()));
 
+  PM.add(createAlignmentFixingPass());
+
   PM.add(createStackProtectorPass(getTargetLowering()));
 
   if (PrintISelInput)
