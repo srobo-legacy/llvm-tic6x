@@ -15,6 +15,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallSet.h"
+#include "llvm/Target/TargetData.h"
 #include <algorithm>
 using namespace llvm;
 
@@ -22,9 +23,11 @@ STATISTIC(NumFixAlign, "Number of alignments fixed");
 
 namespace {
   class AlignmentFixing : public FunctionPass {
+  private:
+    const TargetData* TD;
   public:
     static char ID;
-    AlignmentFixing() : FunctionPass(&ID) {}
+    AlignmentFixing() : FunctionPass(&ID), TD(0) {}
 
     bool mayBeUnaligned(Value &V);
     bool fixMemoryInstruction(Instruction &I);
@@ -71,6 +74,14 @@ bool AlignmentFixing::mayBeUnaligned(Value &V) {
     llvm::Value& Operand = *GEPI->getPointerOperand();
     return containsPackedStruct(Operand.getType()) ||
            mayBeUnaligned(Operand);
+  } else if (BitCastInst* BCI = dyn_cast<BitCastInst>(&V)) {
+    const Type* DestType = cast<PointerType>(BCI->getDestTy())->getElementType();
+    const Type* SourceType = cast<PointerType>(BCI->getSrcTy())->getElementType();
+    if (!TD)
+      return true;
+    if (TD->getABITypeAlignment(SourceType) <
+        TD->getABITypeAlignment(DestType))
+      return true;
   }
   return false;
 }
@@ -91,6 +102,7 @@ bool AlignmentFixing::fixMemoryInstruction(Instruction &I) {
 }
 
 bool AlignmentFixing::runOnFunction(Function &F) {
+  TD = getAnalysisIfAvailable<TargetData>();
   bool MadeChange = false;
   for (Function::iterator FI = F.begin(), FE = F.end(); FI != FE; ++FI) {
     BasicBlock &BB = *FI;
