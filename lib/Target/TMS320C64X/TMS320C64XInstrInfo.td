@@ -84,7 +84,7 @@ def call_end_i : inst<(outs), (ins i32imm:$val, i32imm:$val2),
 }
 
 def call_end_r : inst<(outs), (ins GPRegs:$val, i32imm:$val2),
-		"add\t.D2X\t$val,\tB15,\tB15",
+		"add\t.D2X\tB15,\t$val,\tB15",
 		[(callseq_end GPRegs:$val, timm:$val2)], 1, unit_d> {
 	let Pattern = sched_pattern;
 	let hasSideEffects = 1;
