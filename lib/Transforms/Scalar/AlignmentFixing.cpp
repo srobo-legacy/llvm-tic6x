@@ -26,13 +26,13 @@ namespace {
   class AlignmentFixing : public ModulePass {
   private:
     const TargetData* TD;
-    //ValueMap<unsigned> KnownAlignments;
+    typedef ValueMap<Value*, unsigned> AlignmentMap;
+    AlignmentMap KnownAlignments;
   public:
     static char ID;
     AlignmentFixing() : ModulePass(&ID), TD(0) {}
 
     unsigned minimumAlignmentOfValue(Value &V);
-    bool mayBeUnaligned(Value &V);
     bool fixMemoryInstruction(Instruction &I);
     bool runOnModule(Module &M);
     virtual void getAnalysisUsage(AnalysisUsage &AU) const {
@@ -70,29 +70,70 @@ namespace {
     SmallSet<const Type*, 8> CT;
     return containsPackedStruct(T, CT);
   }
-}
 
-bool AlignmentFixing::mayBeUnaligned(Value &V) {
-  if (GetElementPtrInst* GEPI = dyn_cast<GetElementPtrInst>(&V)) {
-    llvm::Value& Operand = *GEPI->getPointerOperand();
-    return containsPackedStruct(Operand.getType()) ||
-           mayBeUnaligned(Operand);
-  } else if (BitCastInst* BCI = dyn_cast<BitCastInst>(&V)) {
-    const Type* DestType = cast<PointerType>(BCI->getDestTy())->getElementType();
-    const Type* SourceType = cast<PointerType>(BCI->getSrcTy())->getElementType();
-    if (!TD)
-      return true;
-    if (TD->getABITypeAlignment(SourceType) <
-        TD->getABITypeAlignment(DestType))
-      return true;
-    return mayBeUnaligned(*BCI->getOperand(0));
+  unsigned smallerAlignment(unsigned A, unsigned B) {
+    if (A == 0) return B;
+    if (B == 0) return A;
+    return std::min(A, B);
   }
-  return false;
 }
 
 unsigned AlignmentFixing::minimumAlignmentOfValue(Value &V) {
-  // TODO: fill in properly
-  return mayBeUnaligned(V) ? 1 : 0;
+  // check if we have a known alignment
+  AlignmentMap::iterator AI = KnownAlignments.find(&V);
+  if (AI != KnownAlignments.end())
+    return AI->second;
+  // mark as 1-byte aligned, in case of some recursion death
+  KnownAlignments.insert(std::make_pair(&V, 1));
+  // calculate properly
+  unsigned Alignment;
+  // here we go!
+  if (GlobalValue *GV = dyn_cast<GlobalValue>(&V))
+    Alignment = GV->getAlignment();
+  else if (AllocaInst *AI = dyn_cast<AllocaInst>(&V))
+    Alignment = AI->getAlignment();
+  else if (SelectInst *SI = dyn_cast<SelectInst>(&V))
+    Alignment = smallerAlignment(minimumAlignmentOfValue(*SI->getTrueValue()),
+                                 minimumAlignmentOfValue(*SI->getFalseValue()));
+  else if (PHINode *PN = dyn_cast<PHINode>(&V)) {
+    Alignment = 0;
+    for (unsigned i = 0, n = PN->getNumIncomingValues(); i != n; ++i) {
+      Alignment = smallerAlignment(Alignment,
+                       minimumAlignmentOfValue(*PN->getIncomingValue(i)));
+    }
+  }
+  else if (GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(&V)) {
+    llvm::Value &Operand = *GEP->getPointerOperand();
+    if (containsPackedStruct(Operand.getType()))
+      Alignment = 1;
+    else
+      Alignment = minimumAlignmentOfValue(Operand);
+  }
+  else if (isa<IntToPtrInst>(&V))
+    Alignment = 1;
+  else if (BitCastInst *BCI = dyn_cast<BitCastInst>(&V)) {
+    const PointerType *DestPtrType = cast<PointerType>(BCI->getDestTy());
+    const PointerType *SrcPtrType  = cast<PointerType>(BCI->getSrcTy());
+    const Type *DestType = DestPtrType->getElementType();
+    const Type *SrcType  = SrcPtrType->getElementType();
+    if (!TD)
+      Alignment = 1;
+    unsigned DestAlign = TD->getABITypeAlignment(DestType);
+    unsigned SrcAlign  = TD->getABITypeAlignment(SrcType);
+    if (SrcAlign < DestAlign)
+      Alignment = smallerAlignment(SrcAlign,
+                                minimumAlignmentOfValue(*BCI->getOperand(0)));
+    else
+      Alignment = minimumAlignmentOfValue(*BCI->getOperand(0));
+  }
+  else if (isa<Argument>(&V))
+    Alignment = 1; // be pessimistic, for now
+  else if (isa<LoadInst>(&V))
+    Alignment = 1; // again, pessimism, lots of it!
+  else
+    Alignment = 0;
+  KnownAlignments.insert(std::make_pair(&V, Alignment));
+  return Alignment;
 }
 
 bool AlignmentFixing::fixMemoryInstruction(Instruction &I) {
