@@ -23,18 +23,18 @@ using namespace llvm;
 STATISTIC(NumFixAlign, "Number of alignments fixed");
 
 namespace {
-  class AlignmentFixing : public ModulePass {
+  class AlignmentFixing : public FunctionPass {
   private:
     const TargetData* TD;
     typedef ValueMap<Value*, unsigned> AlignmentMap;
     AlignmentMap KnownAlignments;
   public:
     static char ID;
-    AlignmentFixing() : ModulePass(&ID), TD(0) {}
+    AlignmentFixing() : FunctionPass(&ID), TD(0) {}
 
     unsigned minimumAlignmentOfValue(Value &V);
     bool fixMemoryInstruction(Instruction &I);
-    bool runOnModule(Module &M);
+    bool runOnFunction(Function &F);
     virtual void getAnalysisUsage(AnalysisUsage &AU) const {
       AU.setPreservesCFG();
     }
@@ -170,19 +170,15 @@ bool AlignmentFixing::fixMemoryInstruction(Instruction &I) {
   return MadeChange;
 }
 
-bool AlignmentFixing::runOnModule(Module &M) {
+bool AlignmentFixing::runOnFunction(Function &F) {
   TD = getAnalysisIfAvailable<TargetData>();
   bool MadeChange = false;
-  for (Module::iterator MI = M.begin(), ME = M.end(); MI != ME; ++MI) {
-    Function &F = *MI;
-    for (Function::iterator FI = F.begin(), FE = F.end(); FI != FE; ++FI) {
-      BasicBlock &BB = *FI;
-      for (BasicBlock::iterator BI = BB.begin(), BE = BB.end(); BI != BE; ++BI)
-        if (BI->getOpcode() == Instruction::Load ||
-            BI->getOpcode() == Instruction::Store) {
-          MadeChange |= fixMemoryInstruction(*BI);
-        }
-    }
+  for (Function::iterator FI = F.begin(), FE = F.end(); FI != FE; ++FI) {
+    BasicBlock &BB = *FI;
+    for (BasicBlock::iterator BI = BB.begin(), BE = BB.end(); BI != BE; ++BI)
+      if (BI->getOpcode() == Instruction::Load ||
+          BI->getOpcode() == Instruction::Store)
+        MadeChange |= fixMemoryInstruction(*BI);
   }
   return MadeChange;
 }
