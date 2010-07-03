@@ -83,8 +83,8 @@ unsigned AlignmentFixing::minimumAlignmentOfValue(Value &V) {
   AlignmentMap::iterator AI = KnownAlignments.find(&V);
   if (AI != KnownAlignments.end())
     return AI->second;
-  // mark as 1-byte aligned, in case of some recursion death
-  KnownAlignments.insert(std::make_pair(&V, 1));
+  // mark as naturally aligned, in case of self-reference by phis/recursion
+  KnownAlignments.insert(std::make_pair(&V, 0));
   // calculate properly
   unsigned Alignment;
   // here we go!
