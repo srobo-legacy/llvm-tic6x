@@ -101,7 +101,7 @@ FunctionPass *createInstructionCombiningPass();
 // AlignmentFixing - This pass finds alleged aligned loads from packed structs
 // and corrects them to be 1-byte aligned.
 //
-FunctionPass *createAlignmentFixingPass();
+Pass *createAlignmentFixingPass();
 
 //===----------------------------------------------------------------------===//
 //

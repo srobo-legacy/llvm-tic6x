@@ -5,6 +5,7 @@
 #include "llvm/Function.h"
 #include "llvm/Instructions.h"
 #include "llvm/IntrinsicInst.h"
+#include "llvm/Module.h"
 #include "llvm/Pass.h"
 #include "llvm/Assembly/Writer.h"
 #include "llvm/Support/CFG.h"
@@ -13,7 +14,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/ValueMap.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/Target/TargetData.h"
 #include <algorithm>
@@ -22,16 +23,18 @@ using namespace llvm;
 STATISTIC(NumFixAlign, "Number of alignments fixed");
 
 namespace {
-  class AlignmentFixing : public FunctionPass {
+  class AlignmentFixing : public ModulePass {
   private:
     const TargetData* TD;
+    //ValueMap<unsigned> KnownAlignments;
   public:
     static char ID;
-    AlignmentFixing() : FunctionPass(&ID), TD(0) {}
+    AlignmentFixing() : ModulePass(&ID), TD(0) {}
 
+    unsigned minimumAlignmentOfValue(Value &V);
     bool mayBeUnaligned(Value &V);
     bool fixMemoryInstruction(Instruction &I);
-    bool runOnFunction(Function &F);
+    bool runOnModule(Module &M);
     virtual void getAnalysisUsage(AnalysisUsage &AU) const {
       AU.setPreservesCFG();
     }
@@ -42,7 +45,7 @@ char AlignmentFixing::ID = 0;
 static RegisterPass<AlignmentFixing> X("alignment-fix", "Fix alignments");
 
 // Public interface to the AlignmentFixing pass
-FunctionPass *llvm::createAlignmentFixingPass() {
+Pass *llvm::createAlignmentFixingPass() {
   return new AlignmentFixing();
 }
 
@@ -87,36 +90,58 @@ bool AlignmentFixing::mayBeUnaligned(Value &V) {
   return false;
 }
 
+unsigned AlignmentFixing::minimumAlignmentOfValue(Value &V) {
+  // TODO: fill in properly
+  return mayBeUnaligned(V) ? 1 : 0;
+}
+
 bool AlignmentFixing::fixMemoryInstruction(Instruction &I) {
   llvm::Value* Target;
+  bool MadeChange = false;
   if (I.getOpcode() == Instruction::Load)
     Target = I.getOperand(0);
   else
     Target = I.getOperand(1);
-  bool potentialUnalignment = mayBeUnaligned(*Target);
-  if (potentialUnalignment) {
-    if (I.getOpcode() == Instruction::Load)
-      cast<LoadInst>(&I)->setAlignment(1);
-    else if (I.getOpcode() == Instruction::Store)
-      cast<StoreInst>(&I)->setAlignment(1);
+  unsigned minAlignment = minimumAlignmentOfValue(*Target);
+  if (minAlignment > 0) {
+    if (I.getOpcode() == Instruction::Load) {
+      LoadInst& LI = *cast<LoadInst>(&I);
+      if (LI.getAlignment() > minAlignment ||
+          LI.getAlignment() == 0) {
+        LI.setAlignment(minAlignment);
+        MadeChange = true;
+      }
+    }
+    else if (I.getOpcode() == Instruction::Store) {
+      StoreInst& SI = *cast<StoreInst>(&I);
+      if (SI.getAlignment() > minAlignment ||
+          SI.getAlignment() == 0) {
+        SI.setAlignment(minAlignment);
+        MadeChange = true;
+      }
+    }
     else
       assert(0 && "giant death cakes of deathly death");
     ++NumFixAlign;
-    return true;
   }
-  return false;
+  if (MadeChange)
+    ++NumFixAlign;
+  return MadeChange;
 }
 
-bool AlignmentFixing::runOnFunction(Function &F) {
+bool AlignmentFixing::runOnModule(Module &M) {
   TD = getAnalysisIfAvailable<TargetData>();
   bool MadeChange = false;
-  for (Function::iterator FI = F.begin(), FE = F.end(); FI != FE; ++FI) {
-    BasicBlock &BB = *FI;
-    for (BasicBlock::iterator BI = BB.begin(), BE = BB.end(); BI != BE; ++BI)
-      if (BI->getOpcode() == Instruction::Load ||
-          BI->getOpcode() == Instruction::Store) {
-        MadeChange |= fixMemoryInstruction(*BI);
-      }
+  for (Module::iterator MI = M.begin(), ME = M.end(); MI != ME; ++MI) {
+    Function &F = *MI;
+    for (Function::iterator FI = F.begin(), FE = F.end(); FI != FE; ++FI) {
+      BasicBlock &BB = *FI;
+      for (BasicBlock::iterator BI = BB.begin(), BE = BB.end(); BI != BE; ++BI)
+        if (BI->getOpcode() == Instruction::Load ||
+            BI->getOpcode() == Instruction::Store) {
+          MadeChange |= fixMemoryInstruction(*BI);
+        }
+    }
   }
   return MadeChange;
 }
