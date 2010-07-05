@@ -222,6 +222,10 @@ TMS320C64XRegisterInfo::emitPrologue(MachineFunction &MF) const
 	frame_size = MFI->getStackSize();
 	frame_size += 8;
 
+	// Align the size of the stack - has to remain double word aligned.
+	frame_size += 7;
+	frame_size &= ~7;
+
 	// Emit setup instructions
 	// Store return pointer - we could use the correct addressing mode
 	// to decrement SP for us, but I don't know the infrastructure well

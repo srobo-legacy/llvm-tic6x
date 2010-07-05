@@ -348,6 +348,11 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, CallingConv::ID
 		stacksize = (ArgLocs.size() - fixed_args + 1) * 4;
 	}
 
+	// Round the amount of stack we allocate to hold stack-arguments up to
+	// an 8 byte alignment - it turns out the stack on the DSP side needs
+	// to remain dword aligned.
+	stacksize = (stacksize + 7) & ~7;
+
 	Chain = DAG.getCALLSEQ_START(Chain, DAG.getConstant(stacksize,
 							MVT::i32));
 
