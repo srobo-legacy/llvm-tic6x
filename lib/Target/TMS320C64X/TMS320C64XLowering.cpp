@@ -90,6 +90,14 @@ TMS320C64XLowering::TMS320C64XLowering(TMS320C64XTargetMachine &tm) :
 	setOperationAction(ISD::UDIVREM, MVT::i32, Expand);
 	setOperationAction(ISD::SDIVREM, MVT::i32, Expand);
 
+	// On dspbridge, divides and remainders are implemented by these two
+	// routines. Possibly in the future we should check the target triple
+	// to see whether we're targeting something with a real libc, and make
+	// a choice about what divide/modulus libcalls to make. Until then,
+	// assume we're always on dspbridge.
+	setLibcallName(RTLIB::UDIV_I32, "__divu");
+	setLibcallName(RTLIB::UREM_I32, "__remu");
+
 	// We can generate two conditional instructions for select, not so
 	// easy for select_cc
 	setOperationAction(ISD::SELECT, MVT::i32, Custom);
