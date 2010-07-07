@@ -18,7 +18,6 @@
 #include "X86.h"
 #include "X86RegisterInfo.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/Target/TargetRegisterInfo.h"
 
 namespace llvm {
   class X86RegisterInfo;
@@ -74,31 +73,31 @@ namespace X86II {
     //===------------------------------------------------------------------===//
     // X86 Specific MachineOperand flags.
     
-    MO_NO_FLAG = 0,
+    MO_NO_FLAG,
     
     /// MO_GOT_ABSOLUTE_ADDRESS - On a symbol operand, this represents a
     /// relocation of:
     ///    SYMBOL_LABEL + [. - PICBASELABEL]
-    MO_GOT_ABSOLUTE_ADDRESS = 1,
+    MO_GOT_ABSOLUTE_ADDRESS,
     
     /// MO_PIC_BASE_OFFSET - On a symbol operand this indicates that the
     /// immediate should get the value of the symbol minus the PIC base label:
     ///    SYMBOL_LABEL - PICBASELABEL
-    MO_PIC_BASE_OFFSET = 2,
+    MO_PIC_BASE_OFFSET,
 
     /// MO_GOT - On a symbol operand this indicates that the immediate is the
     /// offset to the GOT entry for the symbol name from the base of the GOT.
     ///
     /// See the X86-64 ELF ABI supplement for more details. 
     ///    SYMBOL_LABEL @GOT
-    MO_GOT = 3,
+    MO_GOT,
     
     /// MO_GOTOFF - On a symbol operand this indicates that the immediate is
     /// the offset to the location of the symbol name from the base of the GOT. 
     ///
     /// See the X86-64 ELF ABI supplement for more details. 
     ///    SYMBOL_LABEL @GOTOFF
-    MO_GOTOFF = 4,
+    MO_GOTOFF,
     
     /// MO_GOTPCREL - On a symbol operand this indicates that the immediate is
     /// offset to the GOT entry for the symbol name from the current code
@@ -106,80 +105,75 @@ namespace X86II {
     ///
     /// See the X86-64 ELF ABI supplement for more details. 
     ///    SYMBOL_LABEL @GOTPCREL
-    MO_GOTPCREL = 5,
+    MO_GOTPCREL,
     
     /// MO_PLT - On a symbol operand this indicates that the immediate is
     /// offset to the PLT entry of symbol name from the current code location. 
     ///
     /// See the X86-64 ELF ABI supplement for more details. 
     ///    SYMBOL_LABEL @PLT
-    MO_PLT = 6,
+    MO_PLT,
     
     /// MO_TLSGD - On a symbol operand this indicates that the immediate is
     /// some TLS offset.
     ///
     /// See 'ELF Handling for Thread-Local Storage' for more details. 
     ///    SYMBOL_LABEL @TLSGD
-    MO_TLSGD = 7,
+    MO_TLSGD,
     
     /// MO_GOTTPOFF - On a symbol operand this indicates that the immediate is
     /// some TLS offset.
     ///
     /// See 'ELF Handling for Thread-Local Storage' for more details. 
     ///    SYMBOL_LABEL @GOTTPOFF
-    MO_GOTTPOFF = 8,
+    MO_GOTTPOFF,
    
     /// MO_INDNTPOFF - On a symbol operand this indicates that the immediate is
     /// some TLS offset.
     ///
     /// See 'ELF Handling for Thread-Local Storage' for more details. 
     ///    SYMBOL_LABEL @INDNTPOFF
-    MO_INDNTPOFF = 9,
+    MO_INDNTPOFF,
     
     /// MO_TPOFF - On a symbol operand this indicates that the immediate is
     /// some TLS offset.
     ///
     /// See 'ELF Handling for Thread-Local Storage' for more details. 
     ///    SYMBOL_LABEL @TPOFF
-    MO_TPOFF = 10,
+    MO_TPOFF,
     
     /// MO_NTPOFF - On a symbol operand this indicates that the immediate is
     /// some TLS offset.
     ///
     /// See 'ELF Handling for Thread-Local Storage' for more details. 
     ///    SYMBOL_LABEL @NTPOFF
-    MO_NTPOFF = 11,
+    MO_NTPOFF,
     
     /// MO_DLLIMPORT - On a symbol operand "FOO", this indicates that the
     /// reference is actually to the "__imp_FOO" symbol.  This is used for
     /// dllimport linkage on windows.
-    MO_DLLIMPORT = 12,
+    MO_DLLIMPORT,
     
     /// MO_DARWIN_STUB - On a symbol operand "FOO", this indicates that the
     /// reference is actually to the "FOO$stub" symbol.  This is used for calls
     /// and jumps to external functions on Tiger and before.
-    MO_DARWIN_STUB = 13,
+    MO_DARWIN_STUB,
     
     /// MO_DARWIN_NONLAZY - On a symbol operand "FOO", this indicates that the
     /// reference is actually to the "FOO$non_lazy_ptr" symbol, which is a
     /// non-PIC-base-relative reference to a non-hidden dyld lazy pointer stub.
-    MO_DARWIN_NONLAZY = 14,
+    MO_DARWIN_NONLAZY,
 
     /// MO_DARWIN_NONLAZY_PIC_BASE - On a symbol operand "FOO", this indicates
     /// that the reference is actually to "FOO$non_lazy_ptr - PICBASE", which is
     /// a PIC-base-relative reference to a non-hidden dyld lazy pointer stub.
-    MO_DARWIN_NONLAZY_PIC_BASE = 15,
-    
-    /// MO_DARWIN_HIDDEN_NONLAZY - On a symbol operand "FOO", this indicates
-    /// that the reference is actually to the "FOO$non_lazy_ptr" symbol, which
-    /// is a non-PIC-base-relative reference to a hidden dyld lazy pointer stub.
-    MO_DARWIN_HIDDEN_NONLAZY = 16,
+    MO_DARWIN_NONLAZY_PIC_BASE,
     
     /// MO_DARWIN_HIDDEN_NONLAZY_PIC_BASE - On a symbol operand "FOO", this
     /// indicates that the reference is actually to "FOO$non_lazy_ptr -PICBASE",
     /// which is a PIC-base-relative reference to a hidden dyld lazy pointer
     /// stub.
-    MO_DARWIN_HIDDEN_NONLAZY_PIC_BASE = 17
+    MO_DARWIN_HIDDEN_NONLAZY_PIC_BASE
   };
 }
 
@@ -193,7 +187,6 @@ inline static bool isGlobalStubReference(unsigned char TargetFlag) {
   case X86II::MO_DARWIN_NONLAZY_PIC_BASE:        // Normal $non_lazy_ptr ref.
   case X86II::MO_DARWIN_NONLAZY:                 // Normal $non_lazy_ptr ref.
   case X86II::MO_DARWIN_HIDDEN_NONLAZY_PIC_BASE: // Hidden $non_lazy_ptr ref.
-  case X86II::MO_DARWIN_HIDDEN_NONLAZY:          // Hidden $non_lazy_ptr ref.
     return true;
   default:
     return false;
@@ -275,6 +268,18 @@ namespace X86II {
     // MRMInitReg - This form is used for instructions whose source and
     // destinations are the same register.
     MRMInitReg = 32,
+    
+    //// MRM_C1 - A mod/rm byte of exactly 0xC1.
+    MRM_C1 = 33,
+    MRM_C2 = 34,
+    MRM_C3 = 35,
+    MRM_C4 = 36,
+    MRM_C8 = 37,
+    MRM_C9 = 38,
+    MRM_E8 = 39,
+    MRM_F0 = 40,
+    MRM_F8 = 41,
+    MRM_F9 = 42,
 
     FormMask       = 63,
 
@@ -338,11 +343,13 @@ namespace X86II {
     // This three-bit field describes the size of an immediate operand.  Zero is
     // unused so that we can tell if we forgot to set a value.
     ImmShift = 13,
-    ImmMask  = 7 << ImmShift,
-    Imm8     = 1 << ImmShift,
-    Imm16    = 2 << ImmShift,
-    Imm32    = 3 << ImmShift,
-    Imm64    = 4 << ImmShift,
+    ImmMask    = 7 << ImmShift,
+    Imm8       = 1 << ImmShift,
+    Imm8PCRel  = 2 << ImmShift,
+    Imm16      = 3 << ImmShift,
+    Imm32      = 4 << ImmShift,
+    Imm32PCRel = 5 << ImmShift,
+    Imm64      = 6 << ImmShift,
 
     //===------------------------------------------------------------------===//
     // FP Instruction Classification...  Zero is non-fp instruction.
@@ -395,6 +402,47 @@ namespace X86II {
     OpcodeShift   = 24,
     OpcodeMask    = 0xFF << OpcodeShift
   };
+  
+  // getBaseOpcodeFor - This function returns the "base" X86 opcode for the
+  // specified machine instruction.
+  //
+  static inline unsigned char getBaseOpcodeFor(unsigned TSFlags) {
+    return TSFlags >> X86II::OpcodeShift;
+  }
+  
+  static inline bool hasImm(unsigned TSFlags) {
+    return (TSFlags & X86II::ImmMask) != 0;
+  }
+  
+  /// getSizeOfImm - Decode the "size of immediate" field from the TSFlags field
+  /// of the specified instruction.
+  static inline unsigned getSizeOfImm(unsigned TSFlags) {
+    switch (TSFlags & X86II::ImmMask) {
+    default: assert(0 && "Unknown immediate size");
+    case X86II::Imm8:
+    case X86II::Imm8PCRel:  return 1;
+    case X86II::Imm16:      return 2;
+    case X86II::Imm32:
+    case X86II::Imm32PCRel: return 4;
+    case X86II::Imm64:      return 8;
+    }
+  }
+  
+  /// isImmPCRel - Return true if the immediate of the specified instruction's
+  /// TSFlags indicates that it is pc relative.
+  static inline unsigned isImmPCRel(unsigned TSFlags) {
+    switch (TSFlags & X86II::ImmMask) {
+      default: assert(0 && "Unknown immediate size");
+      case X86II::Imm8PCRel:
+      case X86II::Imm32PCRel:
+        return true;
+      case X86II::Imm8:
+      case X86II::Imm16:
+      case X86II::Imm32:
+      case X86II::Imm64:
+        return false;
+    }
+  }    
 }
 
 const int X86AddrNumOperands = 5;
@@ -454,15 +502,57 @@ public:
                            unsigned &SrcReg, unsigned &DstReg,
                            unsigned &SrcSubIdx, unsigned &DstSubIdx) const;
 
-  unsigned isLoadFromStackSlot(const MachineInstr *MI, int &FrameIndex) const;
-  unsigned isStoreToStackSlot(const MachineInstr *MI, int &FrameIndex) const;
+  /// isCoalescableExtInstr - Return true if the instruction is a "coalescable"
+  /// extension instruction. That is, it's like a copy where it's legal for the
+  /// source to overlap the destination. e.g. X86::MOVSX64rr32. If this returns
+  /// true, then it's expected the pre-extension value is available as a subreg
+  /// of the result register. This also returns the sub-register index in
+  /// SubIdx.
+  virtual bool isCoalescableExtInstr(const MachineInstr &MI,
+                                     unsigned &SrcReg, unsigned &DstReg,
+                                     unsigned &SubIdx) const;
 
-  bool isReallyTriviallyReMaterializable(const MachineInstr *MI) const;
+  unsigned isLoadFromStackSlot(const MachineInstr *MI, int &FrameIndex) const;
+  /// isLoadFromStackSlotPostFE - Check for post-frame ptr elimination
+  /// stack locations as well.  This uses a heuristic so it isn't
+  /// reliable for correctness.
+  unsigned isLoadFromStackSlotPostFE(const MachineInstr *MI,
+                                     int &FrameIndex) const;
+
+  /// hasLoadFromStackSlot - If the specified machine instruction has
+  /// a load from a stack slot, return true along with the FrameIndex
+  /// of the loaded stack slot and the machine mem operand containing
+  /// the reference.  If not, return false.  Unlike
+  /// isLoadFromStackSlot, this returns true for any instructions that
+  /// loads from the stack.  This is a hint only and may not catch all
+  /// cases.
+  bool hasLoadFromStackSlot(const MachineInstr *MI,
+                            const MachineMemOperand *&MMO,
+                            int &FrameIndex) const;
+
+  unsigned isStoreToStackSlot(const MachineInstr *MI, int &FrameIndex) const;
+  /// isStoreToStackSlotPostFE - Check for post-frame ptr elimination
+  /// stack locations as well.  This uses a heuristic so it isn't
+  /// reliable for correctness.
+  unsigned isStoreToStackSlotPostFE(const MachineInstr *MI,
+                                    int &FrameIndex) const;
+
+  /// hasStoreToStackSlot - If the specified machine instruction has a
+  /// store to a stack slot, return true along with the FrameIndex of
+  /// the loaded stack slot and the machine mem operand containing the
+  /// reference.  If not, return false.  Unlike isStoreToStackSlot,
+  /// this returns true for any instructions that loads from the
+  /// stack.  This is a hint only and may not catch all cases.
+  bool hasStoreToStackSlot(const MachineInstr *MI,
+                           const MachineMemOperand *&MMO,
+                           int &FrameIndex) const;
+
+  bool isReallyTriviallyReMaterializable(const MachineInstr *MI,
+                                         AliasAnalysis *AA) const;
   void reMaterialize(MachineBasicBlock &MBB, MachineBasicBlock::iterator MI,
                      unsigned DestReg, unsigned SubIdx,
-                     const MachineInstr *Orig) const;
-
-  bool isInvariantLoad(const MachineInstr *MI) const;
+                     const MachineInstr *Orig,
+                     const TargetRegisterInfo *TRI) const;
 
   /// convertToThreeAddress - This method must be implemented by targets that
   /// set the M_CONVERTIBLE_TO_3_ADDR flag.  When this flag is set, the target
@@ -506,6 +596,8 @@ public:
   virtual void storeRegToAddr(MachineFunction &MF, unsigned SrcReg, bool isKill,
                               SmallVectorImpl<MachineOperand> &Addr,
                               const TargetRegisterClass *RC,
+                              MachineInstr::mmo_iterator MMOBegin,
+                              MachineInstr::mmo_iterator MMOEnd,
                               SmallVectorImpl<MachineInstr*> &NewMIs) const;
 
   virtual void loadRegFromStackSlot(MachineBasicBlock &MBB,
@@ -516,6 +608,8 @@ public:
   virtual void loadRegFromAddr(MachineFunction &MF, unsigned DestReg,
                                SmallVectorImpl<MachineOperand> &Addr,
                                const TargetRegisterClass *RC,
+                               MachineInstr::mmo_iterator MMOBegin,
+                               MachineInstr::mmo_iterator MMOEnd,
                                SmallVectorImpl<MachineInstr*> &NewMIs) const;
   
   virtual bool spillCalleeSavedRegisters(MachineBasicBlock &MBB,
@@ -563,11 +657,33 @@ public:
   /// getOpcodeAfterMemoryUnfold - Returns the opcode of the would be new
   /// instruction after load / store are unfolded from an instruction of the
   /// specified opcode. It returns zero if the specified unfolding is not
-  /// possible.
+  /// possible. If LoadRegIndex is non-null, it is filled in with the operand
+  /// index of the operand which will hold the register holding the loaded
+  /// value.
   virtual unsigned getOpcodeAfterMemoryUnfold(unsigned Opc,
-                                      bool UnfoldLoad, bool UnfoldStore) const;
+                                      bool UnfoldLoad, bool UnfoldStore,
+                                      unsigned *LoadRegIndex = 0) const;
   
-  virtual bool BlockHasNoFallThrough(const MachineBasicBlock &MBB) const;
+  /// areLoadsFromSameBasePtr - This is used by the pre-regalloc scheduler
+  /// to determine if two loads are loading from the same base address. It
+  /// should only return true if the base pointers are the same and the
+  /// only differences between the two addresses are the offset. It also returns
+  /// the offsets by reference.
+  virtual bool areLoadsFromSameBasePtr(SDNode *Load1, SDNode *Load2,
+                                       int64_t &Offset1, int64_t &Offset2) const;
+
+  /// shouldScheduleLoadsNear - This is a used by the pre-regalloc scheduler to
+  /// determine (in conjuction with areLoadsFromSameBasePtr) if two loads should
+  /// be scheduled togther. On some targets if two loads are loading from
+  /// addresses in the same cache line, it's better if they are scheduled
+  /// together. This function takes two integers that represent the load offsets
+  /// from the common base address. It returns true if it decides it's desirable
+  /// to schedule the two loads together. "NumLoads" is the number of loads that
+  /// have already been scheduled after Load1.
+  virtual bool shouldScheduleLoadsNear(SDNode *Load1, SDNode *Load2,
+                                       int64_t Offset1, int64_t Offset2,
+                                       unsigned NumLoads) const;
+
   virtual
   bool ReverseBranchCondition(SmallVectorImpl<MachineOperand> &Cond) const;
 
@@ -575,24 +691,20 @@ public:
   /// instruction that defines the specified register class.
   bool isSafeToMoveRegClassDefs(const TargetRegisterClass *RC) const;
 
-  // getBaseOpcodeFor - This function returns the "base" X86 opcode for the
-  // specified machine instruction.
-  //
-  unsigned char getBaseOpcodeFor(const TargetInstrDesc *TID) const {
-    return TID->TSFlags >> X86II::OpcodeShift;
-  }
-  unsigned char getBaseOpcodeFor(unsigned Opcode) const {
-    return getBaseOpcodeFor(&get(Opcode));
-  }
-  
   static bool isX86_64NonExtLowByteReg(unsigned reg) {
     return (reg == X86::SPL || reg == X86::BPL ||
           reg == X86::SIL || reg == X86::DIL);
   }
   
-  static unsigned sizeOfImm(const TargetInstrDesc *Desc);
-  static bool isX86_64ExtendedReg(const MachineOperand &MO);
+  static bool isX86_64ExtendedReg(const MachineOperand &MO) {
+    if (!MO.isReg()) return false;
+    return isX86_64ExtendedReg(MO.getReg());
+  }
   static unsigned determineREX(const MachineInstr &MI);
+
+  /// isX86_64ExtendedReg - Is the MachineOperand a x86-64 extended (r8 or
+  /// higher) register?  e.g. r8, xmm8, xmm13, etc.
+  static bool isX86_64ExtendedReg(unsigned RegNo);
 
   /// GetInstSize - Returns the size of the specified MachineInstr.
   ///
@@ -605,11 +717,21 @@ public:
   unsigned getGlobalBaseReg(MachineFunction *MF) const;
 
 private:
+  MachineInstr * convertToThreeAddressWithLEA(unsigned MIOpc,
+                                              MachineFunction::iterator &MFI,
+                                              MachineBasicBlock::iterator &MBBI,
+                                              LiveVariables *LV) const;
+
   MachineInstr* foldMemoryOperandImpl(MachineFunction &MF,
                                      MachineInstr* MI,
                                      unsigned OpNum,
                                      const SmallVectorImpl<MachineOperand> &MOs,
-                                     unsigned Alignment) const;
+                                     unsigned Size, unsigned Alignment) const;
+
+  /// isFrameOperand - Return true and the FrameIndex if the specified
+  /// operand and follow operands form a reference to the stack frame.
+  bool isFrameOperand(const MachineInstr *MI, unsigned int Op,
+                      int &FrameIndex) const;
 };
 
 } // End llvm namespace

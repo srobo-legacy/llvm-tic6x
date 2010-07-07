@@ -2,8 +2,8 @@
 ; figure out that loop "Inner" should be nested inside of leep "LoopHeader", 
 ; and instead nests it just inside loop "Top"
 ;
-; RUN: llvm-as < %s | opt -analyze -loops | \
-; RUN:   grep {     Loop at depth 3 containing: %Inner<header><latch><exit>}
+; RUN: opt < %s -analyze -loops | \
+; RUN:   grep {     Loop at depth 3 containing: %Inner<header><latch><exiting>}
 ;
 define void @test() {
         br label %Top

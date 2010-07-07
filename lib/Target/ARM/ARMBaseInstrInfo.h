@@ -1,4 +1,4 @@
-//===- ARMBaseInstrInfo.h - ARM Base Instruction Information -------------*- C++ -*-===//
+//===- ARMBaseInstrInfo.h - ARM Base Instruction Information ----*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -92,6 +92,8 @@ namespace ARMII {
     StMiscFrm     = 9  << FormShift,
     LdStMulFrm    = 10 << FormShift,
 
+    LdStExFrm     = 28 << FormShift,
+
     // Miscellaneous arithmetic instructions
     ArithMiscFrm  = 11 << FormShift,
 
@@ -131,6 +133,14 @@ namespace ARMII {
     Xform16Bit    = 1 << 16,
 
     //===------------------------------------------------------------------===//
+    // Code domain.
+    DomainShift   = 17,
+    DomainMask    = 3 << DomainShift,
+    DomainGeneral = 0 << DomainShift,
+    DomainVFP     = 1 << DomainShift,
+    DomainNEON    = 2 << DomainShift,
+
+    //===------------------------------------------------------------------===//
     // Field shifts - such shifts are used to set field while generating
     // machine instructions.
     M_BitShift     = 5,
@@ -154,25 +164,40 @@ namespace ARMII {
     I_BitShift     = 25,
     CondShift      = 28
   };
+
+  /// Target Operand Flag enum.
+  enum TOF {
+    //===------------------------------------------------------------------===//
+    // ARM Specific MachineOperand flags.
+
+    MO_NO_FLAG,
+
+    /// MO_LO16 - On a symbol operand, this represents a relocation containing
+    /// lower 16 bit of the address. Used only via movw instruction.
+    MO_LO16,
+
+    /// MO_HI16 - On a symbol operand, this represents a relocation containing
+    /// higher 16 bit of the address. Used only via movt instruction.
+    MO_HI16
+  };
 }
 
 class ARMBaseInstrInfo : public TargetInstrInfoImpl {
+  const ARMSubtarget& Subtarget;
 protected:
   // Can be only subclassed.
-  explicit ARMBaseInstrInfo();
+  explicit ARMBaseInstrInfo(const ARMSubtarget &STI);
 public:
   // Return the non-pre/post incrementing version of 'Opc'. Return 0
   // if there is not such an opcode.
   virtual unsigned getUnindexedOpcode(unsigned Opc) const =0;
-
-  // Return true if the block does not fall through.
-  virtual bool BlockHasNoFallThrough(const MachineBasicBlock &MBB) const =0;
 
   virtual MachineInstr *convertToThreeAddress(MachineFunction::iterator &MFI,
                                               MachineBasicBlock::iterator &MBBI,
                                               LiveVariables *LV) const;
 
   virtual const ARMBaseRegisterInfo &getRegisterInfo() const =0;
+  const ARMSubtarget &getSubtarget() const { return Subtarget; }
 
   // Branch analysis.
   virtual bool AnalyzeBranch(MachineBasicBlock &MBB, MachineBasicBlock *&TBB,
@@ -209,6 +234,8 @@ public:
 
   virtual bool DefinesPredicate(MachineInstr *MI,
                                 std::vector<MachineOperand> &Pred) const;
+
+  virtual bool isPredicable(MachineInstr *MI) const;
 
   /// GetInstSize - Returns the size of the specified MachineInstr.
   ///
@@ -251,9 +278,19 @@ public:
 
   virtual MachineInstr* foldMemoryOperandImpl(MachineFunction &MF,
                                               MachineInstr* MI,
-                                              const SmallVectorImpl<unsigned> &Ops,
+                                           const SmallVectorImpl<unsigned> &Ops,
                                               MachineInstr* LoadMI) const;
 
+  virtual void reMaterialize(MachineBasicBlock &MBB,
+                             MachineBasicBlock::iterator MI,
+                             unsigned DestReg, unsigned SubIdx,
+                             const MachineInstr *Orig,
+                             const TargetRegisterInfo *TRI) const;
+
+  MachineInstr *duplicate(MachineInstr *Orig, MachineFunction &MF) const;
+
+  virtual bool produceSameValue(const MachineInstr *MI0,
+                                const MachineInstr *MI1) const;
 };
 
 static inline
@@ -293,10 +330,15 @@ bool isJumpTableBranchOpcode(int Opc) {
     Opc == ARM::tBR_JTr || Opc == ARM::t2BR_JT;
 }
 
+static inline
+bool isIndirectBranchOpcode(int Opc) {
+  return Opc == ARM::BRIND || Opc == ARM::MOVPCRX || Opc == ARM::tBRIND;
+}
+
 /// getInstrPredicate - If instruction is predicated, returns its predicate
 /// condition, otherwise returns AL. It also returns the condition code
 /// register by reference.
-ARMCC::CondCodes getInstrPredicate(MachineInstr *MI, unsigned &PredReg);
+ARMCC::CondCodes getInstrPredicate(const MachineInstr *MI, unsigned &PredReg);
 
 int getMatchingCondBranchOpcode(int Opc);
 
@@ -317,15 +359,16 @@ void emitT2RegPlusImmediate(MachineBasicBlock &MBB,
 
 
 /// rewriteARMFrameIndex / rewriteT2FrameIndex -
-/// Rewrite MI to access 'Offset' bytes from the FP. Return the offset that
-/// could not be handled directly in MI.
-int rewriteARMFrameIndex(MachineInstr &MI, unsigned FrameRegIdx,
-                               unsigned FrameReg, int Offset,
-                               const ARMBaseInstrInfo &TII);
+/// Rewrite MI to access 'Offset' bytes from the FP. Return false if the
+/// offset could not be handled directly in MI, and return the left-over
+/// portion by reference.
+bool rewriteARMFrameIndex(MachineInstr &MI, unsigned FrameRegIdx,
+                          unsigned FrameReg, int &Offset,
+                          const ARMBaseInstrInfo &TII);
 
-int rewriteT2FrameIndex(MachineInstr &MI, unsigned FrameRegIdx,
-                        unsigned FrameReg, int Offset,
-                        const ARMBaseInstrInfo &TII);
+bool rewriteT2FrameIndex(MachineInstr &MI, unsigned FrameRegIdx,
+                         unsigned FrameReg, int &Offset,
+                         const ARMBaseInstrInfo &TII);
 
 } // End llvm namespace
 

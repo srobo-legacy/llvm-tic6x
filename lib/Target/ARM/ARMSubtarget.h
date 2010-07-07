@@ -15,7 +15,9 @@
 #define ARMSUBTARGET_H
 
 #include "llvm/Target/TargetInstrItineraries.h"
+#include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetSubtarget.h"
+#include "ARMBaseRegisterInfo.h"
 #include <string>
 
 namespace llvm {
@@ -24,7 +26,7 @@ class GlobalValue;
 class ARMSubtarget : public TargetSubtarget {
 protected:
   enum ARMArchEnum {
-    V4T, V5T, V5TE, V6, V6T2, V7A
+    V4, V4T, V5T, V5TE, V6, V6T2, V7A
   };
 
   enum ARMFPEnum {
@@ -36,7 +38,7 @@ protected:
     Thumb2
   };
 
-  /// ARMArchVersion - ARM architecture version: V4T (base), V5T, V5TE,
+  /// ARMArchVersion - ARM architecture version: V4, V4T (base), V5T, V5TE,
   /// V6, V6T2, V7A.
   ARMArchEnum ARMArchVersion;
 
@@ -54,8 +56,15 @@ protected:
   /// ThumbMode - Indicates supported Thumb version.
   ThumbTypeEnum ThumbMode;
 
+  /// PostRAScheduler - True if using post-register-allocation scheduler.
+  bool PostRAScheduler;
+
   /// IsR9Reserved - True if R9 is a not available as general purpose register.
   bool IsR9Reserved;
+
+  /// UseMovt - True if MOVT / MOVW pairs are used for materialization of 32-bit
+  /// imms (including global addresses).
+  bool UseMovt;
 
   /// stackAlignment - The minimum alignment known to hold of the stack frame on
   /// entry to the function and which must be maintained by every function.
@@ -120,7 +129,14 @@ protected:
 
   bool isR9Reserved() const { return IsR9Reserved; }
 
+  bool useMovt() const { return UseMovt && hasV6T2Ops(); }
+
   const std::string & getCPUString() const { return CPUString; }
+
+  /// enablePostRAScheduler - True at 'More' optimization.
+  bool enablePostRAScheduler(CodeGenOpt::Level OptLevel,
+                             TargetSubtarget::AntiDepBreakMode& Mode,
+                             RegClassVector& CriticalPathRCs) const;
 
   /// getInstrItins - Return the instruction itineraies based on subtarget
   /// selection.
@@ -133,7 +149,7 @@ protected:
 
   /// GVIsIndirectSymbol - true if the GV will be accessed via an indirect
   /// symbol.
-  bool GVIsIndirectSymbol(GlobalValue *GV, bool isStatic) const;
+  bool GVIsIndirectSymbol(GlobalValue *GV, Reloc::Model RelocM) const;
 };
 } // End llvm namespace
 

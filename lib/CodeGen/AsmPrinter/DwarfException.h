@@ -24,32 +24,38 @@ namespace llvm {
 
 struct LandingPadInfo;
 class MachineModuleInfo;
-class TargetAsmInfo;
+class MCAsmInfo;
+class MCExpr;
 class Timer;
 class raw_ostream;
 
 //===----------------------------------------------------------------------===//
 /// DwarfException - Emits Dwarf exception handling directives.
 ///
-class VISIBILITY_HIDDEN DwarfException : public Dwarf {
+class DwarfException : public DwarfPrinter {
   struct FunctionEHFrameInfo {
-    std::string FnName;
+    MCSymbol *FunctionEHSym;  // L_foo.eh
     unsigned Number;
     unsigned PersonalityIndex;
     bool hasCalls;
     bool hasLandingPads;
     std::vector<MachineMove> Moves;
-    const Function * function;
+    const Function *function;
 
-    FunctionEHFrameInfo(const std::string &FN, unsigned Num, unsigned P,
+    FunctionEHFrameInfo(MCSymbol *EHSym, unsigned Num, unsigned P,
                         bool hC, bool hL,
                         const std::vector<MachineMove> &M,
                         const Function *f):
-      FnName(FN), Number(Num), PersonalityIndex(P),
+      FunctionEHSym(EHSym), Number(Num), PersonalityIndex(P),
       hasCalls(hC), hasLandingPads(hL), Moves(M), function (f) { }
   };
 
   std::vector<FunctionEHFrameInfo> EHFrames;
+
+  /// UsesLSDA - Indicates whether an FDE that uses the CIE at the given index
+  /// uses an LSDA. If so, then we need to encode that information in the CIE's
+  /// augmentation.
+  DenseMap<unsigned, bool> UsesLSDA;
 
   /// shouldEmitTable - Per-function flag to indicate if EH tables should
   /// be emitted.
@@ -70,13 +76,13 @@ class VISIBILITY_HIDDEN DwarfException : public Dwarf {
   /// ExceptionTimer - Timer for the Dwarf exception writer.
   Timer *ExceptionTimer;
 
-  /// EmitCommonEHFrame - Emit the common eh unwind frame.
-  ///
-  void EmitCommonEHFrame(const Function *Personality, unsigned Index);
+  /// EmitCIE - Emit a Common Information Entry (CIE). This holds information
+  /// that is shared among many Frame Description Entries.  There is at least
+  /// one CIE in every non-empty .debug_frame section.
+  void EmitCIE(const Function *Personality, unsigned Index);
 
-  /// EmitEHFrame - Emit function exception frame information.
-  ///
-  void EmitEHFrame(const FunctionEHFrameInfo &EHFrameInfo);
+  /// EmitFDE - Emit the Frame Description Entry (FDE) for the function.
+  void EmitFDE(const FunctionEHFrameInfo &EHFrameInfo);
 
   /// EmitExceptionTable - Emit landing pads and actions.
   ///
@@ -94,7 +100,7 @@ class VISIBILITY_HIDDEN DwarfException : public Dwarf {
   ///     exception.  If it matches then the exception and type id are passed
   ///     on to the landing pad.  Otherwise the next action is looked up.  This
   ///     chain is terminated with a next action of zero.  If no type id is
-  ///     found the the frame is unwound and handling continues.
+  ///     found the frame is unwound and handling continues.
   ///  3. Type id table contains references to all the C++ typeinfo for all
   ///     catches in the function.  This tables is reversed indexed base 1.
 
@@ -110,7 +116,6 @@ class VISIBILITY_HIDDEN DwarfException : public Dwarf {
     static inline unsigned getTombstoneKey() { return -2U; }
     static unsigned getHashValue(const unsigned &Key) { return Key; }
     static bool isEqual(unsigned LHS, unsigned RHS) { return LHS == RHS; }
-    static bool isPod() { return true; }
   };
 
   /// PadRange - Structure holding a try-range and the associated landing pad.
@@ -127,7 +132,7 @@ class VISIBILITY_HIDDEN DwarfException : public Dwarf {
   struct ActionEntry {
     int ValueForTypeID; // The value to write - may not be equal to the type id.
     int NextAction;
-    struct ActionEntry *Previous;
+    unsigned Previous;
   };
 
   /// CallSiteEntry - Structure describing an entry in the call-site table.
@@ -147,6 +152,10 @@ class VISIBILITY_HIDDEN DwarfException : public Dwarf {
                                SmallVectorImpl<ActionEntry> &Actions,
                                SmallVectorImpl<unsigned> &FirstActions);
 
+  /// CallToNoUnwindFunction - Return `true' if this is a call to a function
+  /// marked `nounwind'. Return `false' otherwise.
+  bool CallToNoUnwindFunction(const MachineInstr *MI);
+
   /// ComputeCallSiteTable - Compute the call-site table.  The entry for an
   /// invoke has a try-range containing the call, a non-zero landing pad and an
   /// appropriate action.  The entry for an ordinary call has a try-range
@@ -160,11 +169,16 @@ class VISIBILITY_HIDDEN DwarfException : public Dwarf {
                             const SmallVectorImpl<unsigned> &FirstActions);
   void EmitExceptionTable();
 
+  /// CreateLabelDiff - Emit a label and subtract it from the expression we
+  /// already have.  This is equivalent to emitting "foo - .", but we have to
+  /// emit the label for "." directly.
+  const MCExpr *CreateLabelDiff(const MCExpr *ExprRef, const char *LabelName,
+                                unsigned Index);
 public:
   //===--------------------------------------------------------------------===//
   // Main entry points.
   //
-  DwarfException(raw_ostream &OS, AsmPrinter *A, const TargetAsmInfo *T);
+  DwarfException(raw_ostream &OS, AsmPrinter *A, const MCAsmInfo *T);
   virtual ~DwarfException();
 
   /// BeginModule - Emit all exception information that should come prior to the
@@ -180,7 +194,7 @@ public:
 
   /// BeginFunction - Gather pre-function exception information.  Assumes being
   /// emitted immediately after the function entry point.
-  void BeginFunction(MachineFunction *MF);
+  void BeginFunction(const MachineFunction *MF);
 
   /// EndFunction - Gather and emit post-function exception information.
   void EndFunction();

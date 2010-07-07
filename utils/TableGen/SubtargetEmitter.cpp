@@ -413,7 +413,7 @@ void SubtargetEmitter::EmitProcessorData(raw_ostream &OS,
     
     // For each itinerary class
     std::vector<InstrItinerary> &ItinList = *ProcListIter++;
-    for (unsigned j = 0, M = ItinList.size(); j < M;) {
+    for (unsigned j = 0, M = ItinList.size(); j < M; ++j) {
       InstrItinerary &Intinerary = ItinList[j];
       
       // Emit in the form of 
@@ -427,13 +427,11 @@ void SubtargetEmitter::EmitProcessorData(raw_ostream &OS,
           Intinerary.LastOperandCycle << " }";
       }
       
-      // If more in list add comma
-      if (++j < M) OS << ",";
-      
-      OS << " // " << (j - 1) << "\n";
+      OS << ", // " << j << "\n";
     }
     
     // End processor itinerary table
+    OS << "  { ~0U, ~0U, ~0U, ~0U } // end marker\n";
     OS << "};\n";
   }
 }
@@ -521,6 +519,8 @@ void SubtargetEmitter::ParseFeaturesFunction(raw_ostream &OS) {
   OS << Target;
   OS << "Subtarget::ParseSubtargetFeatures(const std::string &FS,\n"
      << "                                  const std::string &CPU) {\n"
+     << "  DEBUG(dbgs() << \"\\nFeatures:\" << FS);\n"
+     << "  DEBUG(dbgs() << \"\\nCPU:\" << CPU);\n"
      << "  SubtargetFeatures Features(FS);\n"
      << "  Features.setCPUIfNone(CPU);\n"
      << "  uint32_t Bits =  Features.getBits(SubTypeKV, SubTypeKVSize,\n"
@@ -560,6 +560,8 @@ void SubtargetEmitter::run(raw_ostream &OS) {
 
   EmitSourceFileHeader("Subtarget Enumeration Source Fragment", OS);
 
+  OS << "#include \"llvm/Support/Debug.h\"\n";
+  OS << "#include \"llvm/Support/raw_ostream.h\"\n";
   OS << "#include \"llvm/Target/SubtargetFeature.h\"\n";
   OS << "#include \"llvm/Target/TargetInstrItineraries.h\"\n\n";
   

@@ -33,16 +33,46 @@ const char *Triple::getArchTypeName(ArchType Kind) {
   case ppc64:   return "powerpc64";
   case ppc:     return "powerpc";
   case sparc:   return "sparc";
+  case sparcv9: return "sparcv9";
   case systemz: return "s390x";
   case tce:     return "tce";
   case thumb:   return "thumb";
   case x86:     return "i386";
   case x86_64:  return "x86_64";
   case xcore:   return "xcore";
+  case mblaze:  return "mblaze";
   case tms320c64x: return "tms320c64x";
   }
 
   return "<invalid>";
+}
+
+const char *Triple::getArchTypePrefix(ArchType Kind) {
+  switch (Kind) {
+  default:
+    return 0;
+
+  case alpha:   return "alpha";
+
+  case arm:
+  case thumb:   return "arm";
+
+  case bfin:    return "bfin";
+
+  case cellspu: return "spu";
+
+  case ppc64:
+  case ppc:     return "ppc";
+
+  case mblaze:  return "mblaze";
+
+  case sparcv9:
+  case sparc:   return "sparc";
+
+  case x86:
+  case x86_64:  return "x86";
+  case xcore:   return "xcore";
+  }
 }
 
 const char *Triple::getVendorTypeName(VendorType Kind) {
@@ -66,18 +96,21 @@ const char *Triple::getOSTypeName(OSType Kind) {
   case DragonFly: return "dragonfly";
   case FreeBSD: return "freebsd";
   case Linux: return "linux";
+  case Lv2: return "lv2";
   case MinGW32: return "mingw32";
   case MinGW64: return "mingw64";
   case NetBSD: return "netbsd";
   case OpenBSD: return "openbsd";
+  case Psp: return "psp";
   case Solaris: return "solaris";
   case Win32: return "win32";
+  case Haiku: return "haiku";
   }
 
   return "<invalid>";
 }
 
-Triple::ArchType Triple::getArchTypeForLLVMName(const StringRef &Name) {
+Triple::ArchType Triple::getArchTypeForLLVMName(StringRef Name) {
   if (Name == "alpha")
     return alpha;
   if (Name == "arm")
@@ -98,12 +131,18 @@ Triple::ArchType Triple::getArchTypeForLLVMName(const StringRef &Name) {
     return ppc64;
   if (Name == "ppc")
     return ppc;
+  if (Name == "mblaze")
+    return mblaze;
   if (Name == "sparc")
     return sparc;
+  if (Name == "sparcv9")
+    return sparcv9;
   if (Name == "systemz")
     return systemz;
   if (Name == "tce")
     return tce;
+  if (Name == "tms320c64x")
+    return tms320c64x;
   if (Name == "thumb")
     return thumb;
   if (Name == "x86")
@@ -114,6 +153,72 @@ Triple::ArchType Triple::getArchTypeForLLVMName(const StringRef &Name) {
     return xcore;
 
   return UnknownArch;
+}
+
+Triple::ArchType Triple::getArchTypeForDarwinArchName(StringRef Str) {
+  // See arch(3) and llvm-gcc's driver-driver.c. We don't implement support for
+  // archs which Darwin doesn't use.
+
+  // The matching this routine does is fairly pointless, since it is neither the
+  // complete architecture list, nor a reasonable subset. The problem is that
+  // historically the driver driver accepts this and also ties its -march=
+  // handling to the architecture name, so we need to be careful before removing
+  // support for it.
+
+  // This code must be kept in sync with Clang's Darwin specific argument
+  // translation.
+
+  if (Str == "ppc" || Str == "ppc601" || Str == "ppc603" || Str == "ppc604" ||
+      Str == "ppc604e" || Str == "ppc750" || Str == "ppc7400" ||
+      Str == "ppc7450" || Str == "ppc970")
+    return Triple::ppc;
+
+  if (Str == "ppc64")
+    return Triple::ppc64;
+
+  if (Str == "i386" || Str == "i486" || Str == "i486SX" || Str == "pentium" ||
+      Str == "i586" || Str == "pentpro" || Str == "i686" || Str == "pentIIm3" ||
+      Str == "pentIIm5" || Str == "pentium4")
+    return Triple::x86;
+
+  if (Str == "x86_64")
+    return Triple::x86_64;
+
+  // This is derived from the driver driver.
+  if (Str == "arm" || Str == "armv4t" || Str == "armv5" || Str == "xscale" ||
+      Str == "armv6" || Str == "armv7")
+    return Triple::arm;
+
+  return Triple::UnknownArch;
+}
+
+// Returns architecture name that is unsderstood by the target assembler.
+const char *Triple::getArchNameForAssembler() {
+  if (getOS() != Triple::Darwin && getVendor() != Triple::Apple)
+    return NULL;
+
+  StringRef Str = getArchName();
+  if (Str == "i386")
+    return "i386";
+  if (Str == "x86_64")
+    return "x86_64";
+  if (Str == "powerpc")
+    return "ppc";
+  if (Str == "powerpc64")
+    return "ppc64";
+  if (Str == "mblaze" || Str == "microblaze")
+    return "mblaze";
+  if (Str == "arm")
+    return "arm";
+  if (Str == "armv4t" || Str == "thumbv4t")
+    return "armv4t";
+  if (Str == "armv5" || Str == "armv5e" || Str == "thumbv5" || Str == "thumbv5e")
+    return "armv5";
+  if (Str == "armv6" || Str == "thumbv6")
+    return "armv6";
+  if (Str == "armv7" || Str == "thumbv7")
+    return "armv7";
+  return NULL;
 }
 
 //
@@ -137,8 +242,10 @@ void Triple::Parse() const {
     Arch = pic16;
   else if (ArchName == "powerpc")
     Arch = ppc;
-  else if (ArchName == "powerpc64")
+  else if ((ArchName == "powerpc64") || (ArchName == "ppu"))
     Arch = ppc64;
+  else if (ArchName == "mblaze")
+    Arch = mblaze;
   else if (ArchName == "arm" ||
            ArchName.startswith("armv") ||
            ArchName == "xscale")
@@ -159,10 +266,16 @@ void Triple::Parse() const {
     Arch = mipsel;
   else if (ArchName == "sparc")
     Arch = sparc;
+  else if (ArchName == "sparcv9")
+    Arch = sparcv9;
   else if (ArchName == "s390x")
     Arch = systemz;
   else if (ArchName == "tce")
     Arch = tce;
+  else if (ArchName == "xcore")
+    Arch = xcore;
+  else if (ArchName == "tms320c64x")
+    Arch = tms320c64x;
   else
     Arch = UnknownArch;
 
@@ -201,6 +314,8 @@ void Triple::Parse() const {
     OS = FreeBSD;
   else if (OSName.startswith("linux"))
     OS = Linux;
+  else if (OSName.startswith("lv2"))
+    OS = Lv2;
   else if (OSName.startswith("mingw32"))
     OS = MinGW32;
   else if (OSName.startswith("mingw64"))
@@ -209,10 +324,14 @@ void Triple::Parse() const {
     OS = NetBSD;
   else if (OSName.startswith("openbsd"))
     OS = OpenBSD;
+  else if (OSName.startswith("psp"))
+    OS = Psp;
   else if (OSName.startswith("solaris"))
     OS = Solaris;
   else if (OSName.startswith("win32"))
     OS = Win32;
+  else if (OSName.startswith("haiku"))
+  	OS = Haiku;
   else
     OS = UnknownOS;
 
@@ -327,7 +446,7 @@ void Triple::setOS(OSType Kind) {
   setOSName(getOSTypeName(Kind));
 }
 
-void Triple::setArchName(const StringRef &Str) {
+void Triple::setArchName(StringRef Str) {
   // Work around a miscompilation bug for Twines in gcc 4.0.3.
   SmallString<64> Triple;
   Triple += Str;
@@ -338,11 +457,11 @@ void Triple::setArchName(const StringRef &Str) {
   setTriple(Triple.str());
 }
 
-void Triple::setVendorName(const StringRef &Str) {
+void Triple::setVendorName(StringRef Str) {
   setTriple(getArchName() + "-" + Str + "-" + getOSAndEnvironmentName());
 }
 
-void Triple::setOSName(const StringRef &Str) {
+void Triple::setOSName(StringRef Str) {
   if (hasEnvironment())
     setTriple(getArchName() + "-" + getVendorName() + "-" + Str +
               "-" + getEnvironmentName());
@@ -350,11 +469,11 @@ void Triple::setOSName(const StringRef &Str) {
     setTriple(getArchName() + "-" + getVendorName() + "-" + Str);
 }
 
-void Triple::setEnvironmentName(const StringRef &Str) {
-  setTriple(getArchName() + "-" + getVendorName() + "-" + getOSName() + 
+void Triple::setEnvironmentName(StringRef Str) {
+  setTriple(getArchName() + "-" + getVendorName() + "-" + getOSName() +
             "-" + Str);
 }
 
-void Triple::setOSAndEnvironmentName(const StringRef &Str) {
+void Triple::setOSAndEnvironmentName(StringRef Str) {
   setTriple(getArchName() + "-" + getVendorName() + "-" + Str);
 }

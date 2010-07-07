@@ -1,6 +1,6 @@
 ; This test makes sure that these instructions are properly eliminated.
 ;
-; RUN: llvm-as < %s | opt -instcombine | llvm-dis | not grep load
+; RUN: opt < %s -instcombine -S | not grep load
 
 @X = constant i32 42		; <i32*> [#uses=2]
 @X2 = constant i32 47		; <i32*> [#uses=1]
@@ -75,4 +75,13 @@ define double @test11(double* %p) {
   %t1 = getelementptr double* %p, i32 1
   %x = load double* %t1
   ret double %x
+}
+
+define i32 @test12(i32* %P) {
+        %A = alloca i32
+        store i32 123, i32* %A
+        ; Cast the result of the load not the source
+        %Q = bitcast i32* %A to i32*
+        %V = load i32* %Q
+        ret i32 %V
 }

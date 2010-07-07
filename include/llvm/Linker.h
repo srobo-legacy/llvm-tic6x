@@ -14,11 +14,12 @@
 #ifndef LLVM_LINKER_H
 #define LLVM_LINKER_H
 
-#include "llvm/System/Path.h"
 #include <memory>
 #include <vector>
+#include "llvm/ADT/StringRef.h"
 
 namespace llvm {
+  namespace sys { class Path; }
 
 class Module;
 class LLVMContext;
@@ -64,17 +65,16 @@ class Linker {
     /// Construct the Linker with an empty module which will be given the
     /// name \p progname. \p progname will also be used for error messages.
     /// @brief Construct with empty module
-    Linker(
-        const StringRef& progname, ///< name of tool running linker
-        const StringRef& modulename, ///< name of linker's end-result module
-        LLVMContext& C, ///< Context for global info
-        unsigned Flags = 0  ///< ControlFlags (one or more |'d together)
+    Linker(StringRef progname, ///< name of tool running linker
+           StringRef modulename, ///< name of linker's end-result module
+           LLVMContext &C, ///< Context for global info
+           unsigned Flags = 0  ///< ControlFlags (one or more |'d together)
     );
 
     /// Construct the Linker with a previously defined module, \p aModule. Use
     /// \p progname for the name of the program in error messages.
     /// @brief Construct with existing module
-    Linker(const StringRef& progname, Module* aModule, unsigned Flags = 0);
+    Linker(StringRef progname, Module* aModule, unsigned Flags = 0);
 
     /// Destruct the Linker.
     /// @brief Destructor
@@ -214,8 +214,8 @@ class Linker {
     /// @returns true if an error occurs, false otherwise
     /// @brief Link one library into the module
     bool LinkInLibrary (
-      const StringRef &Library, ///< The library to link in
-      bool& is_native             ///< Indicates if lib a native library
+      StringRef Library, ///< The library to link in
+      bool& is_native    ///< Indicates if lib a native library
     );
 
     /// This function links one bitcode archive, \p Filename, into the module.
@@ -223,7 +223,7 @@ class Linker {
     /// the archive that resolve outstanding symbols will be linked in. The
     /// library is searched repeatedly until no more modules that resolve
     /// symbols can be found. If an error occurs, the error string is  set.
-    /// To speed up this function, ensure the the archive has been processed
+    /// To speed up this function, ensure the archive has been processed
     /// llvm-ranlib or the S option was given to llvm-ar when the archive was
     /// created. These tools add a symbol table to the archive which makes the
     /// search for undefined symbols much faster.
@@ -267,7 +267,7 @@ class Linker {
     /// will be empty (i.e. sys::Path::isEmpty() will return true).
     /// @returns A sys::Path to the found library
     /// @brief Find a library from its short name.
-    sys::Path FindLib(const StringRef &Filename);
+    sys::Path FindLib(StringRef Filename);
 
   /// @}
   /// @name Implementation
@@ -277,9 +277,9 @@ class Linker {
     /// Module it contains (wrapped in an auto_ptr), or 0 if an error occurs.
     std::auto_ptr<Module> LoadObject(const sys::Path& FN);
 
-    bool warning(const StringRef &message);
-    bool error(const StringRef &message);
-    void verbose(const StringRef &message);
+    bool warning(StringRef message);
+    bool error(StringRef message);
+    void verbose(StringRef message);
 
   /// @}
   /// @name Data

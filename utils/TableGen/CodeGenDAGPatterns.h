@@ -35,24 +35,24 @@ namespace llvm {
 
 /// EEVT::DAGISelGenValueType - These are some extended forms of
 /// MVT::SimpleValueType that we use as lattice values during type inference.
+/// The existing MVT iAny, fAny and vAny types suffice to represent
+/// arbitrary integer, floating-point, and vector types, so only an unknown
+/// value is needed.
 namespace EEVT {
   enum DAGISelGenValueType {
-    isFP  = MVT::LAST_VALUETYPE,
-    isInt,
-    isVec,
-    isUnknown
+    isUnknown  = MVT::LAST_VALUETYPE
   };
 
   /// isExtIntegerInVTs - Return true if the specified extended value type
-  /// vector contains isInt or an integer value type.
+  /// vector contains iAny or an integer value type.
   bool isExtIntegerInVTs(const std::vector<unsigned char> &EVTs);
 
   /// isExtFloatingPointInVTs - Return true if the specified extended value
-  /// type vector contains isFP or a FP value type.
+  /// type vector contains fAny or a FP value type.
   bool isExtFloatingPointInVTs(const std::vector<unsigned char> &EVTs);
 
   /// isExtVectorinVTs - Return true if the specified extended value type 
-  /// vector contains isVec or a vector value type.
+  /// vector contains vAny or a vector value type.
   bool isExtVectorInVTs(const std::vector<unsigned char> &EVTs);
 }
 
@@ -124,6 +124,11 @@ public:
   const std::vector<SDTypeConstraint> &getTypeConstraints() const {
     return TypeConstraints;
   }
+  
+  /// getKnownType - If the type constraints on this node imply a fixed type
+  /// (e.g. all stores return void, etc), then return it as an
+  /// MVT::SimpleValueType.  Otherwise, return EEVT::isUnknown.
+  unsigned getKnownType() const;
   
   /// hasProperty - Return true if this node has the specified property.
   ///
@@ -216,8 +221,15 @@ public:
   void setChild(unsigned i, TreePatternNode *N) {
     Children[i] = N;
   }
+  
+  /// hasChild - Return true if N is any of our children.
+  bool hasChild(const TreePatternNode *N) const {
+    for (unsigned i = 0, e = Children.size(); i != e; ++i)
+      if (Children[i] == N) return true;
+    return false;
+  }
 
-  const std::vector<std::string> &getPredicateFns() const { return PredicateFns; }
+  const std::vector<std::string> &getPredicateFns() const {return PredicateFns;}
   void clearPredicateFns() { PredicateFns.clear(); }
   void setPredicateFns(const std::vector<std::string> &Fns) {
     assert(PredicateFns.empty() && "Overwriting non-empty predicate list!");
@@ -237,6 +249,18 @@ public:
   /// CodeGenIntrinsic information for it, otherwise return a null pointer.
   const CodeGenIntrinsic *getIntrinsicInfo(const CodeGenDAGPatterns &CDP) const;
 
+  /// getComplexPatternInfo - If this node corresponds to a ComplexPattern,
+  /// return the ComplexPattern information, otherwise return null.
+  const ComplexPattern *
+  getComplexPatternInfo(const CodeGenDAGPatterns &CGP) const;
+
+  /// NodeHasProperty - Return true if this node has the specified property.
+  bool NodeHasProperty(SDNP Property, const CodeGenDAGPatterns &CGP) const;
+  
+  /// TreeHasProperty - Return true if any node in this tree has the specified
+  /// property.
+  bool TreeHasProperty(SDNP Property, const CodeGenDAGPatterns &CGP) const;
+  
   /// isCommutativeIntrinsic - Return true if the node is an intrinsic which is
   /// marked isCommutative.
   bool isCommutativeIntrinsic(const CodeGenDAGPatterns &CDP) const;
@@ -249,6 +273,9 @@ public:   // Higher level manipulation routines.
   /// clone - Return a new copy of this tree.
   ///
   TreePatternNode *clone() const;
+
+  /// RemoveAllTypes - Recursively strip all the types of this tree.
+  void RemoveAllTypes();
   
   /// isIsomorphicTo - Return true if this node is recursively isomorphic to
   /// the specified node.  For this comparison, all of the state of the node
@@ -298,6 +325,11 @@ public:   // Higher level manipulation routines.
   bool canPatternMatch(std::string &Reason, const CodeGenDAGPatterns &CDP);
 };
 
+inline raw_ostream &operator<<(raw_ostream &OS, const TreePatternNode &TPN) {
+  TPN.print(OS);
+  return OS;
+}
+  
 
 /// TreePattern - Represent a pattern, used for instructions, pattern
 /// fragments, etc.
@@ -439,19 +471,21 @@ public:
   
 /// PatternToMatch - Used by CodeGenDAGPatterns to keep tab of patterns
 /// processed to produce isel.
-struct PatternToMatch {
+class PatternToMatch {
+public:
   PatternToMatch(ListInit *preds,
                  TreePatternNode *src, TreePatternNode *dst,
                  const std::vector<Record*> &dstregs,
-                 unsigned complexity):
-    Predicates(preds), SrcPattern(src), DstPattern(dst), Dstregs(dstregs),
-    AddedComplexity(complexity) {};
+                 unsigned complexity, unsigned uid)
+    : Predicates(preds), SrcPattern(src), DstPattern(dst),
+      Dstregs(dstregs), AddedComplexity(complexity), ID(uid) {}
 
   ListInit        *Predicates;  // Top level predicate conditions to match.
   TreePatternNode *SrcPattern;  // Source pattern to match.
   TreePatternNode *DstPattern;  // Resulting pattern.
   std::vector<Record*> Dstregs; // Physical register defs being matched.
   unsigned         AddedComplexity; // Add to matching pattern complexity.
+  unsigned         ID;          // Unique ID for the record.
 
   ListInit        *getPredicates() const { return Predicates; }
   TreePatternNode *getSrcPattern() const { return SrcPattern; }
@@ -547,7 +581,7 @@ public:
     abort();
   }
   
-  const DAGDefaultOperand &getDefaultOperand(Record *R) {
+  const DAGDefaultOperand &getDefaultOperand(Record *R) const {
     assert(DefaultOperands.count(R) &&"Isn't an analyzed default operand!");
     return DefaultOperands.find(R)->second;
   }
@@ -584,6 +618,8 @@ public:
     return intrinsic_wo_chain_sdnode;
   }
   
+  bool hasTargetIntrinsics() { return !TgtIntrinsics.empty(); }
+
 private:
   void ParseNodeInfo();
   void ParseNodeTransforms();
@@ -595,6 +631,7 @@ private:
   void InferInstructionFlags();
   void GenerateVariants();
   
+  void AddPatternToMatch(const TreePattern *Pattern, const PatternToMatch &PTM);
   void FindPatternInputsAndOutputs(TreePattern *I, TreePatternNode *Pat,
                                    std::map<std::string,
                                    TreePatternNode*> &InstInputs,

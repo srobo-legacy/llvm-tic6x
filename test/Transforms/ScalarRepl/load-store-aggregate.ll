@@ -1,8 +1,9 @@
 ; This testcase shows that scalarrepl is able to replace struct alloca's which
 ; are directly loaded from or stored to (using the first class aggregates
 ; feature).
+target datalayout = "E-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:32:64-f32:32:32-f64:64:64-v64:64:64-v128:128:128-a0:0:64"
 
-; RUN: llvm-as < %s | opt -scalarrepl | llvm-dis > %t
+; RUN: opt < %s -scalarrepl -S > %t
 ; RUN: cat %t | not grep alloca
 
 %struct.foo = type { i32, i32 }

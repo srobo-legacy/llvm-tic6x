@@ -106,7 +106,7 @@ TMS320C64XInstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
 {
 	DebugLoc DL = DebugLoc::getUnknownLoc();
 
-	addDefaultPred(BuildMI(MBB, I, DL, get(TMS320C64X::word_idx_store_p))
+	addDefaultPred(BuildMI(MBB, I, DL, get(TMS320C64X::word_store_p_addr))
 		.addReg(TMS320C64X::A15).addFrameIndex(FI)
 		.addReg(src_reg, getKillRegState(is_kill)));
 }
@@ -118,7 +118,7 @@ TMS320C64XInstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
 {
 	DebugLoc DL = DebugLoc::getUnknownLoc();
 
-	addDefaultPred(BuildMI(MBB, MI, DL, get(TMS320C64X::word_idx_load_p))
+	addDefaultPred(BuildMI(MBB, MI, DL, get(TMS320C64X::word_load_p_addr))
 		.addReg(dst_reg, RegState::Define)
 		.addReg(TMS320C64X::A15).addFrameIndex(frame_idx));
 }
@@ -178,9 +178,7 @@ TMS320C64XInstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
 
 		// If we're a predicated instruction and terminate the BB,
 		// we can be pretty sure we're a conditional branch
-		if (predicated && (opcode == TMS320C64X::brcond_p ||
-					opcode == TMS320C64X::brcond_1 ||
-					opcode == TMS320C64X::brcond_2)) {
+		if (predicated && (opcode == TMS320C64X::brcond_p)) {
 			// Two different conditions to consider - this is the
 			// only branch, in which case we fall through to the
 			// next, or it's a conditional before unconditional.
@@ -258,8 +256,6 @@ TMS320C64XInstrInfo::RemoveBranch(MachineBasicBlock &MBB) const
 				I->getOpcode() != TMS320C64X::branch_1 &&
 				I->getOpcode() != TMS320C64X::branch_2 &&
 				I->getOpcode() != TMS320C64X::brcond_p &&
-				I->getOpcode() != TMS320C64X::brcond_1 &&
-				I->getOpcode() != TMS320C64X::brcond_2 &&
 				I->getOpcode() != TMS320C64X::noop)
 			break;
 
@@ -283,80 +279,29 @@ TMS320C64XInstrInfo::isMoveInstr(const MachineInstr &MI, unsigned &src_reg,
 		dst_sub_idx = 0;
 		src_reg = MI.getOperand(1).getReg();
 		dst_reg = MI.getOperand(0).getReg();
+
+		// If either of the source/destination registers is on the B
+		// side, then this isn't just a simple move instruction, it
+		// actually has some functionality, ie 1) actually moving the
+		// register from an inaccessable side to the accessable one, and
+		// 2) preventing me from stabing my eyes out
+		//
+		// Unfortunately it's even more complex than that: we want to
+		// coalesce moves of B15 so that we can make SP-relative loads
+		// and stores as normal; but we don't want to do that for any
+		// of the B-side argument registers, lest we end up with
+		// operations that write directly to the B side, which then
+		// touches the only-want-to-use-side-A situation.
+		
+		if ((TMS320C64X::BRegsRegClass.contains(src_reg) &&
+				src_reg != TMS320C64X::B15) ||
+				(TMS320C64X::BRegsRegClass.contains(dst_reg) &&
+				dst_reg != TMS320C64X::B15))
+				
+			return false;
+
 		return true;
 	}
 
 	return false;
-}
-
-unsigned
-TMS320C64XInstrInfo::isLoadFromStack(const MachineInstr *MI,int &frame_idx)const
-{
-	unsigned opcode;
-
-	opcode = MI->getDesc().getOpcode();
-
-	if (opcode == TMS320C64X::word_addr_load_p ||
-			opcode == TMS320C64X::hword_addr_load_p ||
-			opcode == TMS320C64X::uhword_addr_load_p ||
-			opcode == TMS320C64X::byte_addr_load_p ||
-			opcode == TMS320C64X::ubyte_addr_load_p) {
-		if (MI->getOperand(0).getReg() == TMS320C64X::B15) {
-			MachineOperand op = MI->getOperand(1);
-			if (op.isFI()) {
-				frame_idx = op.getIndex();
-				return true;
-			} else {
-				// XXX - are there any circumstances where
-				// we'll be handed an insn after frame index
-				// elimination? I find this unlikely, but just
-				// in case
-				llvm_unreachable("Found load-from-stack sans "
-						"frame index operand");
-			}
-		}
-	}
-
-	return false;
-}
-
-unsigned
-TMS320C64XInstrInfo::isStoreToStack(const MachineInstr *MI, int &frame_idx)const
-{
-	unsigned opcode;
-
-	opcode = MI->getDesc().getOpcode();
-
-	if (opcode == TMS320C64X::word_addr_store_p ||
-			opcode == TMS320C64X::hword_addr_store_p ||
-			opcode == TMS320C64X::byte_addr_store_p) {
-		if (MI->getOperand(1).getReg() == TMS320C64X::B15) {
-			MachineOperand op = MI->getOperand(2);
-			if (op.isFI()) {
-				frame_idx = op.getIndex();
-				return true;
-			} else {
-				llvm_unreachable("Found store-to-stack sans "
-						"frame index operand");
-			}
-		}
-	}
-
-	return false;
-}
-
-bool
-TMS320C64XInstrInfo::isPredicated(const MachineInstr *MI) const
-{
-	int pred_idx, pred_val;
-
-	pred_idx = MI->findFirstPredOperandIdx();
-	if (pred_idx == -1)
-		return false;
-
-	pred_val = MI->getOperand(pred_idx).getImm();
-	if (pred_val == -1)
-		return false;
-
-	return true;
 }

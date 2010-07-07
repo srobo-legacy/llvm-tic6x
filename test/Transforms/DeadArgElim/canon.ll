@@ -1,5 +1,5 @@
 ; This test shows a few canonicalizations made by deadargelim
-; RUN: llvm-as < %s | opt -deadargelim | llvm-dis > %t
+; RUN: opt < %s -deadargelim -S > %t
 ; This test should remove {} and replace it with void
 ; RUN: cat %t | grep {define internal void @test}
 ; This test shouls replace the {i32} return value with just i32
@@ -10,12 +10,12 @@ define internal {} @test() {
 }
 
 define internal {i32} @test2() {
-  ret {i32} undef;
+  ret {i32} undef
 }
 
 define void @caller() {
   call {} @test()
-  %X = call {i32} @test2();
+  %X = call {i32} @test2()
   %Y = extractvalue {i32} %X, 0
   call void @user(i32 %Y, {i32} %X)
   ret void

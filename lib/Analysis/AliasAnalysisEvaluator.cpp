@@ -26,12 +26,11 @@
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Assembly/Writer.h"
 #include "llvm/Target/TargetData.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/InstIterator.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
-#include <set>
-#include <sstream>
+#include "llvm/ADT/SetVector.h"
 using namespace llvm;
 
 static cl::opt<bool> PrintAll("print-all-alias-modref-info", cl::ReallyHidden);
@@ -46,7 +45,7 @@ static cl::opt<bool> PrintRef("print-ref", cl::ReallyHidden);
 static cl::opt<bool> PrintModRef("print-modref", cl::ReallyHidden);
 
 namespace {
-  class VISIBILITY_HIDDEN AAEval : public FunctionPass {
+  class AAEval : public FunctionPass {
     unsigned NoAlias, MayAlias, MustAlias;
     unsigned NoModRef, Mod, Ref, ModRef;
 
@@ -81,13 +80,16 @@ X("aa-eval", "Exhaustive Alias Analysis Precision Evaluator", false, true);
 
 FunctionPass *llvm::createAAEvalPass() { return new AAEval(); }
 
-static void PrintResults(const char *Msg, bool P, const Value *V1, const Value *V2,
-                         const Module *M) {
+static void PrintResults(const char *Msg, bool P, const Value *V1,
+                         const Value *V2, const Module *M) {
   if (P) {
-    std::stringstream s1, s2;
-    WriteAsOperand(s1, V1, true, M);
-    WriteAsOperand(s2, V2, true, M);
-    std::string o1(s1.str()), o2(s2.str());
+    std::string o1, o2;
+    {
+      raw_string_ostream os1(o1), os2(o2);
+      WriteAsOperand(os1, V1, true, M);
+      WriteAsOperand(os2, V2, true, M);
+    }
+    
     if (o2 < o1)
       std::swap(o1, o2);
     errs() << "  " << Msg << ":\t"
@@ -102,22 +104,22 @@ PrintModRefResults(const char *Msg, bool P, Instruction *I, Value *Ptr,
   if (P) {
     errs() << "  " << Msg << ":  Ptr: ";
     WriteAsOperand(errs(), Ptr, true, M);
-    errs() << "\t<->" << *I;
+    errs() << "\t<->" << *I << '\n';
   }
 }
 
 bool AAEval::runOnFunction(Function &F) {
   AliasAnalysis &AA = getAnalysis<AliasAnalysis>();
 
-  std::set<Value *> Pointers;
-  std::set<CallSite> CallSites;
+  SetVector<Value *> Pointers;
+  SetVector<CallSite> CallSites;
 
   for (Function::arg_iterator I = F.arg_begin(), E = F.arg_end(); I != E; ++I)
-    if (isa<PointerType>(I->getType()))    // Add all pointer arguments
+    if (I->getType()->isPointerTy())    // Add all pointer arguments
       Pointers.insert(I);
 
   for (inst_iterator I = inst_begin(F), E = inst_end(F); I != E; ++I) {
-    if (isa<PointerType>(I->getType())) // Add all pointer instructions
+    if (I->getType()->isPointerTy()) // Add all pointer instructions
       Pointers.insert(&*I);
     Instruction &Inst = *I;
     User::op_iterator OI = Inst.op_begin();
@@ -126,7 +128,7 @@ bool AAEval::runOnFunction(Function &F) {
         isa<Function>(CS.getCalledValue()))
       ++OI;  // Skip actual functions for direct function calls.
     for (; OI != Inst.op_end(); ++OI)
-      if (isa<PointerType>((*OI)->getType()) && !isa<ConstantPointerNull>(*OI))
+      if ((*OI)->getType()->isPointerTy() && !isa<ConstantPointerNull>(*OI))
         Pointers.insert(*OI);
 
     if (CS.getInstruction()) CallSites.insert(CS);
@@ -138,13 +140,13 @@ bool AAEval::runOnFunction(Function &F) {
            << " pointers, " << CallSites.size() << " call sites\n";
 
   // iterate over the worklist, and run the full (n^2)/2 disambiguations
-  for (std::set<Value *>::iterator I1 = Pointers.begin(), E = Pointers.end();
+  for (SetVector<Value *>::iterator I1 = Pointers.begin(), E = Pointers.end();
        I1 != E; ++I1) {
     unsigned I1Size = ~0u;
     const Type *I1ElTy = cast<PointerType>((*I1)->getType())->getElementType();
     if (I1ElTy->isSized()) I1Size = AA.getTypeStoreSize(I1ElTy);
 
-    for (std::set<Value *>::iterator I2 = Pointers.begin(); I2 != I1; ++I2) {
+    for (SetVector<Value *>::iterator I2 = Pointers.begin(); I2 != I1; ++I2) {
       unsigned I2Size = ~0u;
       const Type *I2ElTy =cast<PointerType>((*I2)->getType())->getElementType();
       if (I2ElTy->isSized()) I2Size = AA.getTypeStoreSize(I2ElTy);
@@ -166,11 +168,11 @@ bool AAEval::runOnFunction(Function &F) {
   }
 
   // Mod/ref alias analysis: compare all pairs of calls and values
-  for (std::set<CallSite>::iterator C = CallSites.begin(),
+  for (SetVector<CallSite>::iterator C = CallSites.begin(),
          Ce = CallSites.end(); C != Ce; ++C) {
     Instruction *I = C->getInstruction();
 
-    for (std::set<Value *>::iterator V = Pointers.begin(), Ve = Pointers.end();
+    for (SetVector<Value *>::iterator V = Pointers.begin(), Ve = Pointers.end();
          V != Ve; ++V) {
       unsigned Size = ~0u;
       const Type *ElTy = cast<PointerType>((*V)->getType())->getElementType();

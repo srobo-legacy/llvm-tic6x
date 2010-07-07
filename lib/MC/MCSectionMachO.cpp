@@ -40,8 +40,8 @@ static const struct {
 
 /// SectionAttrDescriptors - This is an array of descriptors for section
 /// attributes.  Unlike the SectionTypeDescriptors, this is not directly indexed
-/// by attribute, instead it is searched.  The last entry has a zero AttrFlag
-/// value.
+/// by attribute, instead it is searched.  The last entry has an AttrFlagEnd
+/// AttrFlag value.
 static const struct {
   unsigned AttrFlag;
   const char *AssemblerName, *EnumName;
@@ -59,12 +59,14 @@ ENTRY(0 /*FIXME*/,           S_ATTR_SOME_INSTRUCTIONS)
 ENTRY(0 /*FIXME*/,           S_ATTR_EXT_RELOC)
 ENTRY(0 /*FIXME*/,           S_ATTR_LOC_RELOC)
 #undef ENTRY
-  { 0, "none", 0 }
+  { 0, "none", 0 }, // used if section has no attributes but has a stub size
+#define AttrFlagEnd 0xffffffff // non legal value, multiple attribute bits set
+  { AttrFlagEnd, 0, 0 }
 };
 
 
 MCSectionMachO *MCSectionMachO::
-Create(const StringRef &Segment, const StringRef &Section,
+Create(StringRef Segment, StringRef Section,
        unsigned TypeAndAttributes, unsigned Reserved2,
        SectionKind K, MCContext &Ctx) {
   // S_SYMBOL_STUBS must be set for Reserved2 to be non-zero.
@@ -72,7 +74,7 @@ Create(const StringRef &Segment, const StringRef &Section,
                                   Reserved2, K);
 }
 
-void MCSectionMachO::PrintSwitchToSection(const TargetAsmInfo &TAI,
+void MCSectionMachO::PrintSwitchToSection(const MCAsmInfo &MAI,
                                           raw_ostream &OS) const {
   OS << "\t.section\t" << getSegmentName() << ',' << getSectionName();
   
@@ -228,7 +230,7 @@ std::string MCSectionMachO::ParseSectionSpecifier(StringRef Spec,        // In.
 
     // Look up the attribute.
     for (unsigned i = 0; ; ++i) {
-      if (SectionAttrDescriptors[i].AttrFlag == 0)
+      if (SectionAttrDescriptors[i].AttrFlag == AttrFlagEnd)
         return "mach-o section specifier has invalid attribute";
       
       if (SectionAttrDescriptors[i].AssemblerName &&
@@ -260,18 +262,8 @@ std::string MCSectionMachO::ParseSectionSpecifier(StringRef Spec,        // In.
   StringRef StubSizeStr = Comma.second;
   StripSpaces(StubSizeStr);
   
-  // Convert the a null terminated buffer for strtoul.
-  char TmpBuffer[32];
-  if (StubSizeStr.size() >= 32)
-    return"mach-o section specifier has a stub size specifier that is too long";
-  
-  memcpy(TmpBuffer, StubSizeStr.data(), StubSizeStr.size());
-  TmpBuffer[StubSizeStr.size()] = 0;
-  
-  char *EndPtr;
-  StubSize = strtoul(TmpBuffer, &EndPtr, 0);
-
-  if (EndPtr[0] != 0)
+  // Convert the stub size from a string to an integer.
+  if (StubSizeStr.getAsInteger(0, StubSize))
     return "mach-o section specifier has a malformed stub size";
   
   return "";

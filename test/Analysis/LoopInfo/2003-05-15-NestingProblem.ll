@@ -1,8 +1,8 @@
 ; This testcase was incorrectly computing that the loopentry.7 loop was
 ; not a child of the loopentry.6 loop.
 ;
-; RUN: llvm-as < %s | opt -analyze -loops | \
-; RUN:   grep {^            Loop at depth 4 containing: %loopentry.7<header><latch><exit>}
+; RUN: opt < %s -analyze -loops | \
+; RUN:   grep {^            Loop at depth 4 containing: %loopentry.7<header><latch><exiting>}
 
 define void @getAndMoveToFrontDecode() {
 	br label %endif.2

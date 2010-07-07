@@ -1,4 +1,4 @@
-//===---------------- ----LeaksContext.h - Implementation ------*- C++ -*--===//
+//===- LeaksContext.h - LeadDetector Implementation ------------*- C++ -*--===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -13,19 +13,17 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Value.h"
-#include "llvm/Support/Streams.h"
 #include "llvm/ADT/SmallPtrSet.h"
-
 using namespace llvm;
 
 template <class T>
 struct PrinterTrait {
-  static void print(const T* P) { cerr << P; }
+  static void print(const T* P) { errs() << P; }
 };
 
 template<>
 struct PrinterTrait<Value> {
-  static void print(const Value* P) { cerr << *P; }
+  static void print(const Value* P) { errs() << *P; }
 };
 
 template <typename T>
@@ -48,8 +46,9 @@ struct LeakDetectorImpl {
   // immediately, it is added to the CachedValue Value.  If it is
   // immediately removed, no set search need be performed.
   void addGarbage(const T* o) {
+    assert(Ts.count(o) == 0 && "Object already in set!");
     if (Cache) {
-      assert(Ts.count(Cache) == 0 && "Object already in set!");
+      assert(Cache != o && "Object already in set!");
       Ts.insert(Cache);
     }
     Cache = o;
@@ -68,14 +67,14 @@ struct LeakDetectorImpl {
     assert(Cache == 0 && "No value should be cached anymore!");
 
     if (!Ts.empty()) {
-      cerr << "Leaked " << Name << " objects found: " << Message << ":\n";
+      errs() << "Leaked " << Name << " objects found: " << Message << ":\n";
       for (typename SmallPtrSet<const T*, 8>::iterator I = Ts.begin(),
            E = Ts.end(); I != E; ++I) {
-        cerr << "\t";
+        errs() << '\t';
         PrinterTrait<T>::print(*I);
-        cerr << "\n";
+        errs() << '\n';
       }
-      cerr << '\n';
+      errs() << '\n';
 
       return true;
     }

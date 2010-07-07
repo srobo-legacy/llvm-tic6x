@@ -48,8 +48,6 @@ namespace llvm {
     iterator begin() { return S2IMap.begin(); }
     iterator end() { return S2IMap.end(); }
 
-    void scaleNumbering(int factor);
-
     unsigned getNumIntervals() const { return (unsigned)S2IMap.size(); }
 
     LiveInterval &getOrCreateInterval(int Slot, const TargetRegisterClass *RC) {
@@ -102,10 +100,7 @@ namespace llvm {
     virtual bool runOnMachineFunction(MachineFunction&);
 
     /// print - Implement the dump method.
-    virtual void print(std::ostream &O, const Module* = 0) const;
-    void print(std::ostream *O, const Module* M = 0) const {
-      if (O) print(*O, M);
-    }
+    virtual void print(raw_ostream &O, const Module* = 0) const;
   };
 }
 

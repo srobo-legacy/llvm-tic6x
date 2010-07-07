@@ -21,19 +21,17 @@
 #include "llvm/IntrinsicInst.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CFG.h"
-#include "llvm/Support/Compiler.h"
 #include "llvm/Support/InstIterator.h"
 #include "llvm/ADT/DepthFirstIterator.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
-
 using namespace llvm;
 
 STATISTIC(NumRemoved, "Number of instructions removed");
 
 namespace {
-  struct VISIBILITY_HIDDEN ADCE : public FunctionPass {
+  struct ADCE : public FunctionPass {
     static char ID; // Pass identification, replacement for typeid
     ADCE() : FunctionPass(&ID) {}
     
@@ -64,8 +62,7 @@ bool ADCE::runOnFunction(Function& F) {
   
   // Propagate liveness backwards to operands.
   while (!worklist.empty()) {
-    Instruction* curr = worklist.back();
-    worklist.pop_back();
+    Instruction* curr = worklist.pop_back_val();
     
     for (Instruction::op_iterator OI = curr->op_begin(), OE = curr->op_end();
          OI != OE; ++OI)

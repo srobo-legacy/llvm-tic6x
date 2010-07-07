@@ -20,29 +20,27 @@
 #define LLVM_SUPPORT_TARGETFOLDER_H
 
 #include "llvm/Constants.h"
+#include "llvm/InstrTypes.h"
 #include "llvm/Analysis/ConstantFolding.h"
 
 namespace llvm {
 
 class TargetData;
-class LLVMContext;
 
 /// TargetFolder - Create constants with target dependent folding.
 class TargetFolder {
   const TargetData *TD;
-  LLVMContext &Context;
 
   /// Fold - Fold the constant using target specific information.
   Constant *Fold(Constant *C) const {
     if (ConstantExpr *CE = dyn_cast<ConstantExpr>(C))
-      if (Constant *CF = ConstantFoldConstantExpression(CE, Context, TD))
+      if (Constant *CF = ConstantFoldConstantExpression(CE, TD))
         return CF;
     return C;
   }
 
 public:
-  explicit TargetFolder(const TargetData *TheTD, LLVMContext &C) :
-    TD(TheTD), Context(C) {}
+  explicit TargetFolder(const TargetData *TheTD) : TD(TheTD) {}
 
   //===--------------------------------------------------------------------===//
   // Binary Operators
@@ -54,17 +52,32 @@ public:
   Constant *CreateNSWAdd(Constant *LHS, Constant *RHS) const {
     return Fold(ConstantExpr::getNSWAdd(LHS, RHS));
   }
+  Constant *CreateNUWAdd(Constant *LHS, Constant *RHS) const {
+    return Fold(ConstantExpr::getNUWAdd(LHS, RHS));
+  }
   Constant *CreateFAdd(Constant *LHS, Constant *RHS) const {
     return Fold(ConstantExpr::getFAdd(LHS, RHS));
   }
   Constant *CreateSub(Constant *LHS, Constant *RHS) const {
     return Fold(ConstantExpr::getSub(LHS, RHS));
   }
+  Constant *CreateNSWSub(Constant *LHS, Constant *RHS) const {
+    return Fold(ConstantExpr::getNSWSub(LHS, RHS));
+  }
+  Constant *CreateNUWSub(Constant *LHS, Constant *RHS) const {
+    return Fold(ConstantExpr::getNUWSub(LHS, RHS));
+  }
   Constant *CreateFSub(Constant *LHS, Constant *RHS) const {
     return Fold(ConstantExpr::getFSub(LHS, RHS));
   }
   Constant *CreateMul(Constant *LHS, Constant *RHS) const {
     return Fold(ConstantExpr::getMul(LHS, RHS));
+  }
+  Constant *CreateNSWMul(Constant *LHS, Constant *RHS) const {
+    return Fold(ConstantExpr::getNSWMul(LHS, RHS));
+  }
+  Constant *CreateNUWMul(Constant *LHS, Constant *RHS) const {
+    return Fold(ConstantExpr::getNUWMul(LHS, RHS));
   }
   Constant *CreateFMul(Constant *LHS, Constant *RHS) const {
     return Fold(ConstantExpr::getFMul(LHS, RHS));
@@ -121,6 +134,12 @@ public:
   Constant *CreateNeg(Constant *C) const {
     return Fold(ConstantExpr::getNeg(C));
   }
+  Constant *CreateNSWNeg(Constant *C) const {
+    return Fold(ConstantExpr::getNSWNeg(C));
+  }
+  Constant *CreateNUWNeg(Constant *C) const {
+    return Fold(ConstantExpr::getNUWNeg(C));
+  }
   Constant *CreateFNeg(Constant *C) const {
     return Fold(ConstantExpr::getFNeg(C));
   }
@@ -166,7 +185,9 @@ public:
       return C; // avoid calling Fold
     return Fold(ConstantExpr::getIntegerCast(C, DestTy, isSigned));
   }
-
+  Constant *CreatePointerCast(Constant *C, const Type *DestTy) const {
+    return ConstantExpr::getPointerCast(C, DestTy);
+  }
   Constant *CreateBitCast(Constant *C, const Type *DestTy) const {
     return CreateCast(Instruction::BitCast, C, DestTy);
   }
@@ -175,6 +196,16 @@ public:
   }
   Constant *CreatePtrToInt(Constant *C, const Type *DestTy) const {
     return CreateCast(Instruction::PtrToInt, C, DestTy);
+  }
+  Constant *CreateZExtOrBitCast(Constant *C, const Type *DestTy) const {
+    if (C->getType() == DestTy)
+      return C; // avoid calling Fold
+    return Fold(ConstantExpr::getZExtOrBitCast(C, DestTy));
+  }
+  Constant *CreateSExtOrBitCast(Constant *C, const Type *DestTy) const {
+    if (C->getType() == DestTy)
+      return C; // avoid calling Fold
+    return Fold(ConstantExpr::getSExtOrBitCast(C, DestTy));
   }
   Constant *CreateTruncOrBitCast(Constant *C, const Type *DestTy) const {
     if (C->getType() == DestTy)

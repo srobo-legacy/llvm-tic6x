@@ -1,10 +1,9 @@
-; RUN: llvm-as < %s | \
-; RUN:   llc -mtriple=x86_64-pc-linux -relocation-model=pic -o %t1 -f
-; RUN: grep {call	g@PLT} %t1
+; RUN: llc < %s -mtriple=x86_64-pc-linux -relocation-model=pic -o %t1
+; RUN: grep {callq	g@PLT} %t1
 
 @g = alias weak i32 ()* @f
 
-define void @g() {
+define void @h() {
 entry:
 	%tmp31 = call i32 @g()
         ret void

@@ -17,9 +17,7 @@
 #include "llvm/AbstractTypeUser.h"
 #include "llvm/Use.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/Twine.h"
 #include "llvm/Support/Casting.h"
-#include <iosfwd>
 #include <string>
 
 namespace llvm {
@@ -43,6 +41,8 @@ class raw_ostream;
 class AssemblyAnnotationWriter;
 class ValueHandleBase;
 class LLVMContext;
+class Twine;
+class MDNode;
 
 //===----------------------------------------------------------------------===//
 //                                 Value Class
@@ -57,7 +57,7 @@ class LLVMContext;
 ///
 /// Every value has a "use list" that keeps track of which other Values are
 /// using this Value.  A Value can also have an arbitrary number of ValueHandle
-/// objects that watch it and listen to RAUW and Destroy events see
+/// objects that watch it and listen to RAUW and Destroy events.  See
 /// llvm/Support/ValueHandle.h for details.
 ///
 /// @brief LLVM Value Representation
@@ -71,21 +71,27 @@ protected:
   /// interpretation.
   unsigned char SubclassOptionalData : 7;
 
+private:
   /// SubclassData - This member is defined by this class, but is not used for
   /// anything.  Subclasses can use it to hold whatever state they find useful.
   /// This field is initialized to zero by the ctor.
   unsigned short SubclassData;
-private:
+
   PATypeHolder VTy;
   Use *UseList;
 
   friend class ValueSymbolTable; // Allow ValueSymbolTable to directly mod Name.
-  friend class SymbolTable;      // Allow SymbolTable to directly poke Name.
   friend class ValueHandleBase;
+  friend class AbstractTypeUser;
   ValueName *Name;
 
   void operator=(const Value &);     // Do not implement
   Value(const Value &);              // Do not implement
+
+protected:
+  /// printCustom - Value subclasses can override this to implement custom
+  /// printing behavior.
+  virtual void printCustom(raw_ostream &O) const;
 
 public:
   Value(const Type *Ty, unsigned scid);
@@ -93,11 +99,10 @@ public:
 
   /// dump - Support for debugging, callable in GDB: V->dump()
   //
-  virtual void dump() const;
+  void dump() const;
 
   /// print - Implement operator<< on Value.
   ///
-  void print(std::ostream &O, AssemblyAnnotationWriter *AAW = 0) const;
   void print(raw_ostream &O, AssemblyAnnotationWriter *AAW = 0) const;
 
   /// All values are typed, get the type of this value.
@@ -147,12 +152,6 @@ public:
   // uncheckedReplaceAllUsesWith - Just like replaceAllUsesWith but dangerous.
   // Only use when in type resolution situations!
   void uncheckedReplaceAllUsesWith(Value *V);
-
-  /// clearOptionalData - Clear any optional optimization data from this Value.
-  /// Transformation passes must call this method whenever changing the IR
-  /// in a way that would affect the values produced by this Value, unless
-  /// it takes special care to ensure correctness in some other way.
-  void clearOptionalData() { SubclassOptionalData = 0; }
 
   //----------------------------------------------------------------------
   // Methods for handling the chain of uses of this Value.
@@ -209,12 +208,14 @@ public:
     GlobalAliasVal,           // This is an instance of GlobalAlias
     GlobalVariableVal,        // This is an instance of GlobalVariable
     UndefValueVal,            // This is an instance of UndefValue
+    BlockAddressVal,          // This is an instance of BlockAddress
     ConstantExprVal,          // This is an instance of ConstantExpr
     ConstantAggregateZeroVal, // This is an instance of ConstantAggregateNull
     ConstantIntVal,           // This is an instance of ConstantInt
     ConstantFPVal,            // This is an instance of ConstantFP
     ConstantArrayVal,         // This is an instance of ConstantArray
     ConstantStructVal,        // This is an instance of ConstantStruct
+    ConstantUnionVal,         // This is an instance of ConstantUnion
     ConstantVectorVal,        // This is an instance of ConstantVector
     ConstantPointerNullVal,   // This is an instance of ConstantPointerNull
     MDNodeVal,                // This is an instance of MDNode
@@ -222,8 +223,12 @@ public:
     NamedMDNodeVal,           // This is an instance of NamedMDNode
     InlineAsmVal,             // This is an instance of InlineAsm
     PseudoSourceValueVal,     // This is an instance of PseudoSourceValue
+    FixedStackPseudoSourceValueVal, // This is an instance of 
+                                    // FixedStackPseudoSourceValue
     InstructionVal,           // This is an instance of Instruction
-    
+    // Enum values starting at InstructionVal are used for Instructions;
+    // don't add new values here!
+
     // Markers:
     ConstantFirstVal = FunctionVal,
     ConstantLastVal  = ConstantPointerNullVal
@@ -240,6 +245,13 @@ public:
   ///   the ValueTy enum.
   unsigned getValueID() const {
     return SubclassID;
+  }
+
+  /// getRawSubclassOptionalData - Return the raw optional flags value
+  /// contained in this value. This should only be used when testing two
+  /// Values for equivalence.
+  unsigned getRawSubclassOptionalData() const {
+    return SubclassOptionalData;
   }
 
   /// hasSameSubclassOptionalData - Test whether the optional flags contained
@@ -274,10 +286,11 @@ public:
   /// getUnderlyingObject - This method strips off any GEP address adjustments
   /// and pointer casts from the specified value, returning the original object
   /// being addressed.  Note that the returned value has pointer type if the
-  /// specified value does.
-  Value *getUnderlyingObject();
-  const Value *getUnderlyingObject() const {
-    return const_cast<Value*>(this)->getUnderlyingObject();
+  /// specified value does.  If the MaxLookup value is non-zero, it limits the
+  /// number of instructions to be stripped off.
+  Value *getUnderlyingObject(unsigned MaxLookup = 6);
+  const Value *getUnderlyingObject(unsigned MaxLookup = 6) const {
+    return const_cast<Value*>(this)->getUnderlyingObject(MaxLookup);
   }
   
   /// DoPHITranslation - If this value is a PHI node with CurBB as its parent,
@@ -290,12 +303,12 @@ public:
                                 const BasicBlock *PredBB) const{
     return const_cast<Value*>(this)->DoPHITranslation(CurBB, PredBB);
   }
+  
+protected:
+  unsigned short getSubclassDataFromValue() const { return SubclassData; }
+  void setValueSubclassData(unsigned short D) { SubclassData = D; }
 };
 
-inline std::ostream &operator<<(std::ostream &OS, const Value &V) {
-  V.print(OS);
-  return OS;
-}
 inline raw_ostream &operator<<(raw_ostream &OS, const Value &V) {
   V.print(OS);
   return OS;
@@ -339,6 +352,9 @@ template <> inline bool isa_impl<GlobalAlias, Value>(const Value &Val) {
 template <> inline bool isa_impl<GlobalValue, Value>(const Value &Val) {
   return isa<GlobalVariable>(Val) || isa<Function>(Val) ||
          isa<GlobalAlias>(Val);
+}
+template <> inline bool isa_impl<MDNode, Value>(const Value &Val) {
+  return Val.getValueID() == Value::MDNodeVal;
 }
   
   

@@ -1,4 +1,4 @@
-; RUN: llvm-as < %s | opt -gvn -disable-output
+; RUN: opt < %s -gvn -disable-output
 ; PR1774
 
 target datalayout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:128:128-a0:0:64-s0:64:64-f80:128:128"
@@ -23,9 +23,9 @@ entry:
 cond_true34:            ; preds = %entry
         %tmp631 = getelementptr %struct.usb_hcd* %hcd, i32 0, i32 2, i64
 2305843009213693950            ; <i64*> [#uses=1]
-        %tmp70 = bitcast i64* %tmp631 to %struct.device**               ;
+        %tmp70 = bitcast i64* %tmp631 to %struct.device**
 
-        %tmp71 = load %struct.device** %tmp70, align 8          ;
+        %tmp71 = load %struct.device** %tmp70, align 8
 
         ret i32 undef
 

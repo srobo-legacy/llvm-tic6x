@@ -22,7 +22,7 @@
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/PseudoSourceValue.h"
-
+#include "llvm/Support/ErrorHandling.h"
 using namespace llvm;
 
 SystemZInstrInfo::SystemZInstrInfo(SystemZTargetMachine &tm)
@@ -266,30 +266,6 @@ unsigned SystemZInstrInfo::isStoreToStackSlot(const MachineInstr *MI,
   return 0;
 }
 
-bool SystemZInstrInfo::isInvariantLoad(const MachineInstr *MI) const {
-  for (unsigned i = 0, e = MI->getNumOperands(); i != e; ++i) {
-    const MachineOperand &MO = MI->getOperand(i);
-    // Loads from constant pools are trivially invariant.
-    if (MO.isCPI())
-      return true;
-
-    if (MO.isGlobal())
-      return isGVStub(MO.getGlobal(), TM);
-
-    // If this is a load from an invariant stack slot, the load is a constant.
-    if (MO.isFI()) {
-      const MachineFrameInfo &MFI =
-        *MI->getParent()->getParent()->getFrameInfo();
-      int Idx = MO.getIndex();
-      return MFI.isFixedObjectIndex(Idx) && MFI.isImmutableObjectIndex(Idx);
-    }
-  }
-
-  // All other instances of these instructions are presumed to have other
-  // issues.
-  return false;
-}
-
 bool
 SystemZInstrInfo::spillCalleeSavedRegisters(MachineBasicBlock &MBB,
                                            MachineBasicBlock::iterator MI,
@@ -426,18 +402,6 @@ ReverseBranchCondition(SmallVectorImpl<MachineOperand> &Cond) const {
   return false;
 }
 
-bool SystemZInstrInfo::BlockHasNoFallThrough(const MachineBasicBlock &MBB)const{
-  if (MBB.empty()) return false;
-
-  switch (MBB.back().getOpcode()) {
-  case SystemZ::RET:   // Return.
-  case SystemZ::JMP:   // Uncond branch.
-  case SystemZ::JMPr:  // Indirect branch.
-    return true;
-  default: return false;
-  }
-}
-
 bool SystemZInstrInfo::isUnpredicatedTerminator(const MachineInstr *MI) const {
   const TargetInstrDesc &TID = MI->getDesc();
   if (!TID.isTerminator()) return false;
@@ -478,8 +442,8 @@ bool SystemZInstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
       }
 
       // If the block has any instructions after a JMP, delete them.
-      while (next(I) != MBB.end())
-        next(I)->eraseFromParent();
+      while (llvm::next(I) != MBB.end())
+        llvm::next(I)->eraseFromParent();
       Cond.clear();
       FBB = 0;
 

@@ -72,10 +72,10 @@ ReducePassList::doTest(std::vector<const PassInfo*> &Prefix,
     PrefixOutput.set(PfxOutput);
     OrigProgram = BD.Program;
 
-    BD.Program = ParseInputFile(PrefixOutput.toString(), BD.getContext());
+    BD.Program = ParseInputFile(PrefixOutput.str(), BD.getContext());
     if (BD.Program == 0) {
       errs() << BD.getToolName() << ": Error reading bitcode file '"
-             << PrefixOutput << "'!\n";
+             << PrefixOutput.str() << "'!\n";
       exit(1);
     }
     PrefixOutput.eraseFromDisk();
@@ -295,7 +295,7 @@ bool ReduceCrashingBlocks::TestBlocks(std::vector<const BasicBlock*> &BBs) {
 
         TerminatorInst *BBTerm = BB->getTerminator();
         
-        if (isa<StructType>(BBTerm->getType()))
+        if (BBTerm->getType()->isStructTy())
            BBTerm->replaceAllUsesWith(UndefValue::get(BBTerm->getType()));
         else if (BB->getTerminator()->getType() != 
                     Type::getVoidTy(BB->getContext()))

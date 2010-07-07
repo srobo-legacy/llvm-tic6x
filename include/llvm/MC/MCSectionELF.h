@@ -31,24 +31,23 @@ class MCSectionELF : public MCSection {
   unsigned Flags;
 
   /// IsExplicit - Indicates that this section comes from globals with an
-  /// explicit section specfied.
+  /// explicit section specified.
   bool IsExplicit;
   
 protected:
-  MCSectionELF(const StringRef &Section, unsigned type, unsigned flags,
+  MCSectionELF(StringRef Section, unsigned type, unsigned flags,
                SectionKind K, bool isExplicit)
     : MCSection(K), SectionName(Section.str()), Type(type), Flags(flags), 
       IsExplicit(isExplicit) {}
 public:
   
-  static MCSectionELF *Create(const StringRef &Section, unsigned Type, 
+  static MCSectionELF *Create(StringRef Section, unsigned Type, 
                               unsigned Flags, SectionKind K, bool isExplicit,
                               MCContext &Ctx);
 
   /// ShouldOmitSectionDirective - Decides whether a '.section' directive
   /// should be printed before the section name
-  bool ShouldOmitSectionDirective(const char *Name, 
-                                  const TargetAsmInfo &TAI) const;
+  bool ShouldOmitSectionDirective(StringRef Name, const MCAsmInfo &MAI) const;
 
   /// ShouldPrintSectionType - Only prints the section type if supported
   bool ShouldPrintSectionType(unsigned Ty) const;
@@ -171,7 +170,7 @@ public:
   unsigned getType() const { return Type; }
   unsigned getFlags() const { return Flags; }
   
-  virtual void PrintSwitchToSection(const TargetAsmInfo &TAI,
+  virtual void PrintSwitchToSection(const MCAsmInfo &MAI,
                                     raw_ostream &OS) const;
   
   
@@ -179,7 +178,7 @@ public:
   /// MCSectionELF subclasses with target specific section flags should
   /// implement this method if they end up adding letters to the attributes
   /// list.
-  virtual void PrintTargetSpecificSectionFlags(const TargetAsmInfo &TAI,
+  virtual void PrintTargetSpecificSectionFlags(const MCAsmInfo &MAI,
                                                raw_ostream &OS) const {
   }
                                                

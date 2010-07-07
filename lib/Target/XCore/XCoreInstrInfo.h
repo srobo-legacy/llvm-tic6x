@@ -52,8 +52,6 @@ public:
   virtual unsigned isStoreToStackSlot(const MachineInstr *MI,
                                       int &FrameIndex) const;
   
-  virtual bool isInvariantLoad(const MachineInstr *MI) const;
-  
   virtual bool AnalyzeBranch(MachineBasicBlock &MBB, MachineBasicBlock *&TBB,
                              MachineBasicBlock *&FBB,
                              SmallVectorImpl<MachineOperand> &Cond,
@@ -88,8 +86,6 @@ public:
   virtual bool restoreCalleeSavedRegisters(MachineBasicBlock &MBB,
                                          MachineBasicBlock::iterator MI,
                                const std::vector<CalleeSavedInfo> &CSI) const;
-
-  virtual bool BlockHasNoFallThrough(const MachineBasicBlock &MBB) const;
 
   virtual bool ReverseBranchCondition(
                             SmallVectorImpl<MachineOperand> &Cond) const;

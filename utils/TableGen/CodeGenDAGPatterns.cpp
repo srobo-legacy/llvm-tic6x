@@ -78,24 +78,24 @@ static bool LHSIsSubsetOfRHS(const std::vector<unsigned char> &LHS,
 namespace llvm {
 namespace EEVT {
 /// isExtIntegerInVTs - Return true if the specified extended value type vector
-/// contains isInt or an integer value type.
+/// contains iAny or an integer value type.
 bool isExtIntegerInVTs(const std::vector<unsigned char> &EVTs) {
   assert(!EVTs.empty() && "Cannot check for integer in empty ExtVT list!");
-  return EVTs[0] == isInt || !(FilterEVTs(EVTs, isInteger).empty());
+  return EVTs[0] == MVT::iAny || !(FilterEVTs(EVTs, isInteger).empty());
 }
 
 /// isExtFloatingPointInVTs - Return true if the specified extended value type
-/// vector contains isFP or a FP value type.
+/// vector contains fAny or a FP value type.
 bool isExtFloatingPointInVTs(const std::vector<unsigned char> &EVTs) {
   assert(!EVTs.empty() && "Cannot check for FP in empty ExtVT list!");
-  return EVTs[0] == isFP || !(FilterEVTs(EVTs, isFloatingPoint).empty());
+  return EVTs[0] == MVT::fAny || !(FilterEVTs(EVTs, isFloatingPoint).empty());
 }
 
 /// isExtVectorInVTs - Return true if the specified extended value type
-/// vector contains a vector value type.
+/// vector contains vAny or a vector value type.
 bool isExtVectorInVTs(const std::vector<unsigned char> &EVTs) {
   assert(!EVTs.empty() && "Cannot check for vector in empty ExtVT list!");
-  return EVTs[0] == isVec || !(FilterEVTs(EVTs, isVector).empty());
+  return EVTs[0] == MVT::vAny || !(FilterEVTs(EVTs, isVector).empty());
 }
 } // end namespace EEVT.
 } // end namespace llvm.
@@ -138,14 +138,14 @@ void FindDepVars(TreePatternNode *N, MultipleUseVarSet &DepVars) {
 //! Dump the dependent variable set:
 void DumpDepVars(MultipleUseVarSet &DepVars) {
   if (DepVars.empty()) {
-    DOUT << "<empty set>";
+    DEBUG(errs() << "<empty set>");
   } else {
-    DOUT << "[ ";
+    DEBUG(errs() << "[ ");
     for (MultipleUseVarSet::const_iterator i = DepVars.begin(), e = DepVars.end();
          i != e; ++i) {
-      DOUT << (*i) << " ";
+      DEBUG(errs() << (*i) << " ");
     }
-    DOUT << "]";
+    DEBUG(errs() << "]");
   }
 }
 }
@@ -276,7 +276,7 @@ bool SDTypeConstraint::ApplyTypeConstraint(TreePatternNode *N,
     // If we found exactly one supported integer type, apply it.
     if (IntVTs.size() == 1)
       return NodeToApply->UpdateNodeType(IntVTs[0], TP);
-    return NodeToApply->UpdateNodeType(EEVT::isInt, TP);
+    return NodeToApply->UpdateNodeType(MVT::iAny, TP);
   }
   case SDTCisFP: {
     // If there is only one FP type supported, this must be it.
@@ -286,7 +286,7 @@ bool SDTypeConstraint::ApplyTypeConstraint(TreePatternNode *N,
     // If we found exactly one supported FP type, apply it.
     if (FPVTs.size() == 1)
       return NodeToApply->UpdateNodeType(FPVTs[0], TP);
-    return NodeToApply->UpdateNodeType(EEVT::isFP, TP);
+    return NodeToApply->UpdateNodeType(MVT::fAny, TP);
   }
   case SDTCisVec: {
     // If there is only one vector type supported, this must be it.
@@ -296,7 +296,7 @@ bool SDTypeConstraint::ApplyTypeConstraint(TreePatternNode *N,
     // If we found exactly one supported vector type, apply it.
     if (VecVTs.size() == 1)
       return NodeToApply->UpdateNodeType(VecVTs[0], TP);
-    return NodeToApply->UpdateNodeType(EEVT::isVec, TP);
+    return NodeToApply->UpdateNodeType(MVT::vAny, TP);
   }
   case SDTCisSameAs: {
     TreePatternNode *OtherNode =
@@ -321,8 +321,7 @@ bool SDTypeConstraint::ApplyTypeConstraint(TreePatternNode *N,
       getOperandNum(x.SDTCisVTSmallerThanOp_Info.OtherOperandNum, N,NumResults);
     
     // It must be integer.
-    bool MadeChange = false;
-    MadeChange |= OtherNode->UpdateNodeType(EEVT::isInt, TP);
+    bool MadeChange = OtherNode->UpdateNodeType(MVT::iAny, TP);
     
     // This code only handles nodes that have one type set.  Assert here so
     // that we can change this if we ever need to deal with multiple value
@@ -330,7 +329,7 @@ bool SDTypeConstraint::ApplyTypeConstraint(TreePatternNode *N,
     assert(OtherNode->getExtTypes().size() == 1 && "Node has too many types!");
     if (OtherNode->hasTypeSet() && OtherNode->getTypeNum(0) <= VT)
       OtherNode->UpdateNodeType(MVT::Other, TP);  // Throw an error.
-    return false;
+    return MadeChange;
   }
   case SDTCisOpSmallerThanOp: {
     TreePatternNode *BigOperand =
@@ -348,13 +347,13 @@ bool SDTypeConstraint::ApplyTypeConstraint(TreePatternNode *N,
              EEVT::isExtFloatingPointInVTs(BigOperand->getExtTypes())) &&
            "SDTCisOpSmallerThanOp does not handle mixed int/fp types!");
     if (EEVT::isExtIntegerInVTs(NodeToApply->getExtTypes()))
-      MadeChange |= BigOperand->UpdateNodeType(EEVT::isInt, TP);
+      MadeChange |= BigOperand->UpdateNodeType(MVT::iAny, TP);
     else if (EEVT::isExtFloatingPointInVTs(NodeToApply->getExtTypes()))
-      MadeChange |= BigOperand->UpdateNodeType(EEVT::isFP, TP);
+      MadeChange |= BigOperand->UpdateNodeType(MVT::fAny, TP);
     if (EEVT::isExtIntegerInVTs(BigOperand->getExtTypes()))
-      MadeChange |= NodeToApply->UpdateNodeType(EEVT::isInt, TP);
+      MadeChange |= NodeToApply->UpdateNodeType(MVT::iAny, TP);
     else if (EEVT::isExtFloatingPointInVTs(BigOperand->getExtTypes()))
-      MadeChange |= NodeToApply->UpdateNodeType(EEVT::isFP, TP);
+      MadeChange |= NodeToApply->UpdateNodeType(MVT::fAny, TP);
 
     std::vector<MVT::SimpleValueType> VTs = CGT.getLegalValueTypes();
 
@@ -448,6 +447,30 @@ SDNodeInfo::SDNodeInfo(Record *R) : Def(R) {
   TypeConstraints.assign(ConstraintList.begin(), ConstraintList.end());
 }
 
+/// getKnownType - If the type constraints on this node imply a fixed type
+/// (e.g. all stores return void, etc), then return it as an
+/// MVT::SimpleValueType.  Otherwise, return EEVT::isUnknown.
+unsigned SDNodeInfo::getKnownType() const {
+  unsigned NumResults = getNumResults();
+  assert(NumResults <= 1 &&
+         "We only work with nodes with zero or one result so far!");
+  
+  for (unsigned i = 0, e = TypeConstraints.size(); i != e; ++i) {
+    // Make sure that this applies to the correct node result.
+    if (TypeConstraints[i].OperandNo >= NumResults)  // FIXME: need value #
+      continue;
+    
+    switch (TypeConstraints[i].ConstraintType) {
+    default: break;
+    case SDTypeConstraint::SDTCisVT:
+      return TypeConstraints[i].x.SDTCisVT_Info.VT;
+    case SDTypeConstraint::SDTCisPtrTy:
+      return MVT::iPTR;
+    }
+  }
+  return EEVT::isUnknown;
+}
+
 //===----------------------------------------------------------------------===//
 // TreePatternNode implementation
 //
@@ -476,7 +499,7 @@ bool TreePatternNode::UpdateNodeType(const std::vector<unsigned char> &ExtVTs,
 
   if (getExtTypeNum(0) == MVT::iPTR || getExtTypeNum(0) == MVT::iPTRAny) {
     if (ExtVTs[0] == MVT::iPTR || ExtVTs[0] == MVT::iPTRAny ||
-        ExtVTs[0] == EEVT::isInt)
+        ExtVTs[0] == MVT::iAny)
       return false;
     if (EEVT::isExtIntegerInVTs(ExtVTs)) {
       std::vector<unsigned char> FVTs = FilterEVTs(ExtVTs, isInteger);
@@ -487,7 +510,18 @@ bool TreePatternNode::UpdateNodeType(const std::vector<unsigned char> &ExtVTs,
     }
   }
 
-  if ((ExtVTs[0] == EEVT::isInt || ExtVTs[0] == MVT::iAny) &&
+  // Merge vAny with iAny/fAny.  The latter include vector types so keep them
+  // as the more specific information.
+  if (ExtVTs[0] == MVT::vAny && 
+      (getExtTypeNum(0) == MVT::iAny || getExtTypeNum(0) == MVT::fAny))
+    return false;
+  if (getExtTypeNum(0) == MVT::vAny &&
+      (ExtVTs[0] == MVT::iAny || ExtVTs[0] == MVT::fAny)) {
+    setTypes(ExtVTs);
+    return true;
+  }
+
+  if (ExtVTs[0] == MVT::iAny &&
       EEVT::isExtIntegerInVTs(getExtTypes())) {
     assert(hasTypeSet() && "should be handled above!");
     std::vector<unsigned char> FVTs = FilterEVTs(getExtTypes(), isInteger);
@@ -507,7 +541,7 @@ bool TreePatternNode::UpdateNodeType(const std::vector<unsigned char> &ExtVTs,
       return true;
     }
   }      
-  if ((ExtVTs[0] == EEVT::isFP || ExtVTs[0] == MVT::fAny) &&
+  if (ExtVTs[0] == MVT::fAny &&
       EEVT::isExtFloatingPointInVTs(getExtTypes())) {
     assert(hasTypeSet() && "should be handled above!");
     std::vector<unsigned char> FVTs =
@@ -517,7 +551,7 @@ bool TreePatternNode::UpdateNodeType(const std::vector<unsigned char> &ExtVTs,
     setTypes(FVTs);
     return true;
   }
-  if ((ExtVTs[0] == EEVT::isVec || ExtVTs[0] == MVT::vAny) &&
+  if (ExtVTs[0] == MVT::vAny &&
       EEVT::isExtVectorInVTs(getExtTypes())) {
     assert(hasTypeSet() && "should be handled above!");
     std::vector<unsigned char> FVTs = FilterEVTs(getExtTypes(), isVector);
@@ -526,22 +560,22 @@ bool TreePatternNode::UpdateNodeType(const std::vector<unsigned char> &ExtVTs,
     setTypes(FVTs);
     return true;
   }
-      
+
   // If we know this is an int, FP, or vector type, and we are told it is a
   // specific one, take the advice.
   //
   // Similarly, we should probably set the type here to the intersection of
-  // {isInt|isFP|isVec} and ExtVTs
-  if (((getExtTypeNum(0) == EEVT::isInt || getExtTypeNum(0) == MVT::iAny) &&
+  // {iAny|fAny|vAny} and ExtVTs
+  if ((getExtTypeNum(0) == MVT::iAny &&
        EEVT::isExtIntegerInVTs(ExtVTs)) ||
-      ((getExtTypeNum(0) == EEVT::isFP || getExtTypeNum(0) == MVT::fAny) &&
+      (getExtTypeNum(0) == MVT::fAny &&
        EEVT::isExtFloatingPointInVTs(ExtVTs)) ||
-      ((getExtTypeNum(0) == EEVT::isVec || getExtTypeNum(0) == MVT::vAny) &&
+      (getExtTypeNum(0) == MVT::vAny &&
        EEVT::isExtVectorInVTs(ExtVTs))) {
     setTypes(ExtVTs);
     return true;
   }
-  if (getExtTypeNum(0) == EEVT::isInt &&
+  if (getExtTypeNum(0) == MVT::iAny &&
       (ExtVTs[0] == MVT::iPTR || ExtVTs[0] == MVT::iPTRAny)) {
     setTypes(ExtVTs);
     return true;
@@ -558,33 +592,36 @@ bool TreePatternNode::UpdateNodeType(const std::vector<unsigned char> &ExtVTs,
   return true; // unreachable
 }
 
+static std::string GetTypeName(unsigned char TypeID) {
+  switch (TypeID) {
+  case MVT::Other:      return "Other";
+  case MVT::iAny:       return "iAny";
+  case MVT::fAny:       return "fAny";
+  case MVT::vAny:       return "vAny";
+  case EEVT::isUnknown: return "isUnknown";
+  case MVT::iPTR:       return "iPTR";
+  case MVT::iPTRAny:    return "iPTRAny";
+  default:
+    std::string VTName = llvm::getName((MVT::SimpleValueType)TypeID);
+    // Strip off EVT:: prefix if present.
+    if (VTName.substr(0,5) == "MVT::")
+      VTName = VTName.substr(5);
+    return VTName;
+  }
+}
+
 
 void TreePatternNode::print(raw_ostream &OS) const {
   if (isLeaf()) {
     OS << *getLeafValue();
   } else {
-    OS << "(" << getOperator()->getName();
+    OS << '(' << getOperator()->getName();
   }
   
   // FIXME: At some point we should handle printing all the value types for 
   // nodes that are multiply typed.
-  switch (getExtTypeNum(0)) {
-  case MVT::Other: OS << ":Other"; break;
-  case EEVT::isInt: OS << ":isInt"; break;
-  case EEVT::isFP : OS << ":isFP"; break;
-  case EEVT::isVec: OS << ":isVec"; break;
-  case EEVT::isUnknown: ; /*OS << ":?";*/ break;
-  case MVT::iPTR:  OS << ":iPTR"; break;
-  case MVT::iPTRAny:  OS << ":iPTRAny"; break;
-  default: {
-    std::string VTName = llvm::getName(getTypeNum(0));
-    // Strip off EVT:: prefix if present.
-    if (VTName.substr(0,5) == "MVT::")
-      VTName = VTName.substr(5);
-    OS << ":" << VTName;
-    break;
-  }
-  }
+  if (getExtTypeNum(0) != EEVT::isUnknown)
+    OS << ':' << GetTypeName(getExtTypeNum(0));
 
   if (!isLeaf()) {
     if (getNumChildren() != 0) {
@@ -663,6 +700,15 @@ TreePatternNode *TreePatternNode::clone() const {
   New->setTransformFn(getTransformFn());
   return New;
 }
+
+/// RemoveAllTypes - Recursively strip all the types of this tree.
+void TreePatternNode::RemoveAllTypes() {
+  removeTypes();
+  if (isLeaf()) return;
+  for (unsigned i = 0, e = getNumChildren(); i != e; ++i)
+    getChild(i)->RemoveAllTypes();
+}
+
 
 /// SubstituteFormalArguments - Replace the formal arguments in this tree
 /// with actual values specified by ArgMap.
@@ -758,7 +804,7 @@ TreePatternNode *TreePatternNode::InlinePatternFragments(TreePattern &TP) {
 /// references from the register file information, for example.
 ///
 static std::vector<unsigned char> getImplicitType(Record *R, bool NotRegisters,
-                                      TreePattern &TP) {
+                                                  TreePattern &TP) {
   // Some common return values
   std::vector<unsigned char> Unknown(1, EEVT::isUnknown);
   std::vector<unsigned char> Other(1, MVT::Other);
@@ -815,6 +861,48 @@ getIntrinsicInfo(const CodeGenDAGPatterns &CDP) const {
   return &CDP.getIntrinsicInfo(IID);
 }
 
+/// getComplexPatternInfo - If this node corresponds to a ComplexPattern,
+/// return the ComplexPattern information, otherwise return null.
+const ComplexPattern *
+TreePatternNode::getComplexPatternInfo(const CodeGenDAGPatterns &CGP) const {
+  if (!isLeaf()) return 0;
+  
+  DefInit *DI = dynamic_cast<DefInit*>(getLeafValue());
+  if (DI && DI->getDef()->isSubClassOf("ComplexPattern"))
+    return &CGP.getComplexPattern(DI->getDef());
+  return 0;
+}
+
+/// NodeHasProperty - Return true if this node has the specified property.
+bool TreePatternNode::NodeHasProperty(SDNP Property,
+                                      const CodeGenDAGPatterns &CGP) const {
+  if (isLeaf()) {
+    if (const ComplexPattern *CP = getComplexPatternInfo(CGP))
+      return CP->hasProperty(Property);
+    return false;
+  }
+  
+  Record *Operator = getOperator();
+  if (!Operator->isSubClassOf("SDNode")) return false;
+  
+  return CGP.getSDNodeInfo(Operator).hasProperty(Property);
+}
+
+
+
+
+/// TreeHasProperty - Return true if any node in this tree has the specified
+/// property.
+bool TreePatternNode::TreeHasProperty(SDNP Property,
+                                      const CodeGenDAGPatterns &CGP) const {
+  if (NodeHasProperty(Property, CGP))
+    return true;
+  for (unsigned i = 0, e = getNumChildren(); i != e; ++i)
+    if (getChild(i)->TreeHasProperty(Property, CGP))
+      return true;
+  return false;
+}  
+
 /// isCommutativeIntrinsic - Return true if the node corresponds to a
 /// commutative intrinsic.
 bool
@@ -835,9 +923,11 @@ bool TreePatternNode::ApplyTypeConstraints(TreePattern &TP, bool NotRegisters) {
     if (DefInit *DI = dynamic_cast<DefInit*>(getLeafValue())) {
       // If it's a regclass or something else known, include the type.
       return UpdateNodeType(getImplicitType(DI->getDef(), NotRegisters, TP),TP);
-    } else if (IntInit *II = dynamic_cast<IntInit*>(getLeafValue())) {
+    }
+    
+    if (IntInit *II = dynamic_cast<IntInit*>(getLeafValue())) {
       // Int inits are always integers. :)
-      bool MadeChange = UpdateNodeType(EEVT::isInt, TP);
+      bool MadeChange = UpdateNodeType(MVT::iAny, TP);
       
       if (hasTypeSet()) {
         // At some point, it may make sense for this tree pattern to have
@@ -893,20 +983,25 @@ bool TreePatternNode::ApplyTypeConstraints(TreePattern &TP, bool NotRegisters) {
       MadeChange |= UpdateNodeType(MVT::isVoid, TP);
     }
     return MadeChange;
-  } else if (getOperator()->getName() == "implicit" ||
-             getOperator()->getName() == "parallel") {
+  }
+  
+  if (getOperator()->getName() == "implicit" ||
+      getOperator()->getName() == "parallel") {
     bool MadeChange = false;
     for (unsigned i = 0; i < getNumChildren(); ++i)
       MadeChange = getChild(i)->ApplyTypeConstraints(TP, NotRegisters);
     MadeChange |= UpdateNodeType(MVT::isVoid, TP);
     return MadeChange;
-  } else if (getOperator()->getName() == "COPY_TO_REGCLASS") {
+  }
+  
+  if (getOperator()->getName() == "COPY_TO_REGCLASS") {
     bool MadeChange = false;
     MadeChange |= getChild(0)->ApplyTypeConstraints(TP, NotRegisters);
     MadeChange |= getChild(1)->ApplyTypeConstraints(TP, NotRegisters);
-    MadeChange |= UpdateNodeType(getChild(1)->getTypeNum(0), TP);
     return MadeChange;
-  } else if (const CodeGenIntrinsic *Int = getIntrinsicInfo(CDP)) {
+  }
+  
+  if (const CodeGenIntrinsic *Int = getIntrinsicInfo(CDP)) {
     bool MadeChange = false;
 
     // Apply the result type to the node.
@@ -930,7 +1025,9 @@ bool TreePatternNode::ApplyTypeConstraints(TreePattern &TP, bool NotRegisters) {
       MadeChange |= getChild(i)->ApplyTypeConstraints(TP, NotRegisters);
     }
     return MadeChange;
-  } else if (getOperator()->isSubClassOf("SDNode")) {
+  }
+  
+  if (getOperator()->isSubClassOf("SDNode")) {
     const SDNodeInfo &NI = CDP.getSDNodeInfo(getOperator());
     
     bool MadeChange = NI.ApplyTypeConstraints(this, TP);
@@ -942,7 +1039,9 @@ bool TreePatternNode::ApplyTypeConstraints(TreePattern &TP, bool NotRegisters) {
       MadeChange |= UpdateNodeType(MVT::isVoid, TP);
     
     return MadeChange;  
-  } else if (getOperator()->isSubClassOf("Instruction")) {
+  }
+  
+  if (getOperator()->isSubClassOf("Instruction")) {
     const DAGInstruction &Inst = CDP.getInstruction(getOperator());
     bool MadeChange = false;
     unsigned NumResults = Inst.getNumResults();
@@ -1018,24 +1117,24 @@ bool TreePatternNode::ApplyTypeConstraints(TreePattern &TP, bool NotRegisters) {
                "' was provided too many operands!");
     
     return MadeChange;
-  } else {
-    assert(getOperator()->isSubClassOf("SDNodeXForm") && "Unknown node type!");
-    
-    // Node transforms always take one operand.
-    if (getNumChildren() != 1)
-      TP.error("Node transform '" + getOperator()->getName() +
-               "' requires one operand!");
-
-    // If either the output or input of the xform does not have exact
-    // type info. We assume they must be the same. Otherwise, it is perfectly
-    // legal to transform from one type to a completely different type.
-    if (!hasTypeSet() || !getChild(0)->hasTypeSet()) {
-      bool MadeChange = UpdateNodeType(getChild(0)->getExtTypes(), TP);
-      MadeChange |= getChild(0)->UpdateNodeType(getExtTypes(), TP);
-      return MadeChange;
-    }
-    return false;
   }
+  
+  assert(getOperator()->isSubClassOf("SDNodeXForm") && "Unknown node type!");
+  
+  // Node transforms always take one operand.
+  if (getNumChildren() != 1)
+    TP.error("Node transform '" + getOperator()->getName() +
+             "' requires one operand!");
+
+  // If either the output or input of the xform does not have exact
+  // type info. We assume they must be the same. Otherwise, it is perfectly
+  // legal to transform from one type to a completely different type.
+  if (!hasTypeSet() || !getChild(0)->hasTypeSet()) {
+    bool MadeChange = UpdateNodeType(getChild(0)->getExtTypes(), TP);
+    MadeChange |= getChild(0)->UpdateNodeType(getExtTypes(), TP);
+    return MadeChange;
+  }
+  return false;
 }
 
 /// OnlyOnRHSOfCommutative - Return true if this value is only allowed on the
@@ -1308,7 +1407,6 @@ void TreePattern::dump() const { print(errs()); }
 // CodeGenDAGPatterns implementation
 //
 
-// FIXME: REMOVE OSTREAM ARGUMENT
 CodeGenDAGPatterns::CodeGenDAGPatterns(RecordKeeper &R) : Records(R) {
   Intrinsics = LoadIntrinsics(Records, false);
   TgtIntrinsics = LoadIntrinsics(Records, true);
@@ -1507,10 +1605,10 @@ void CodeGenDAGPatterns::ParseDefaultOperands() {
         if (TPN->ContainsUnresolvedType()) {
           if (iter == 0)
             throw "Value #" + utostr(i) + " of PredicateOperand '" +
-              DefaultOps[iter][i]->getName() + "' doesn't have a concrete type!";
+              DefaultOps[iter][i]->getName() +"' doesn't have a concrete type!";
           else
             throw "Value #" + utostr(i) + " of OptionalDefOperand '" +
-              DefaultOps[iter][i]->getName() + "' doesn't have a concrete type!";
+              DefaultOps[iter][i]->getName() +"' doesn't have a concrete type!";
         }
         DefaultOpInfo.DefaultOps.push_back(TPN);
       }
@@ -1554,21 +1652,21 @@ static bool HandleUse(TreePattern *I, TreePatternNode *Pat,
   TreePatternNode *&Slot = InstInputs[Pat->getName()];
   if (!Slot) {
     Slot = Pat;
-  } else {
-    Record *SlotRec;
-    if (Slot->isLeaf()) {
-      SlotRec = dynamic_cast<DefInit*>(Slot->getLeafValue())->getDef();
-    } else {
-      assert(Slot->getNumChildren() == 0 && "can't be a use with children!");
-      SlotRec = Slot->getOperator();
-    }
-    
-    // Ensure that the inputs agree if we've already seen this input.
-    if (Rec != SlotRec)
-      I->error("All $" + Pat->getName() + " inputs must agree with each other");
-    if (Slot->getExtTypes() != Pat->getExtTypes())
-      I->error("All $" + Pat->getName() + " inputs must agree with each other");
+    return true;
   }
+  Record *SlotRec;
+  if (Slot->isLeaf()) {
+    SlotRec = dynamic_cast<DefInit*>(Slot->getLeafValue())->getDef();
+  } else {
+    assert(Slot->getNumChildren() == 0 && "can't be a use with children!");
+    SlotRec = Slot->getOperator();
+  }
+  
+  // Ensure that the inputs agree if we've already seen this input.
+  if (Rec != SlotRec)
+    I->error("All $" + Pat->getName() + " inputs must agree with each other");
+  if (Slot->getExtTypes() != Pat->getExtTypes())
+    I->error("All $" + Pat->getName() + " inputs must agree with each other");
   return true;
 }
 
@@ -1586,7 +1684,9 @@ FindPatternInputsAndOutputs(TreePattern *I, TreePatternNode *Pat,
     if (!isUse && Pat->getTransformFn())
       I->error("Cannot specify a transform function for a non-input value!");
     return;
-  } else if (Pat->getOperator()->getName() == "implicit") {
+  }
+  
+  if (Pat->getOperator()->getName() == "implicit") {
     for (unsigned i = 0, e = Pat->getNumChildren(); i != e; ++i) {
       TreePatternNode *Dest = Pat->getChild(i);
       if (!Dest->isLeaf())
@@ -1598,7 +1698,9 @@ FindPatternInputsAndOutputs(TreePattern *I, TreePatternNode *Pat,
       InstImpResults.push_back(Val->getDef());
     }
     return;
-  } else if (Pat->getOperator()->getName() != "set") {
+  }
+  
+  if (Pat->getOperator()->getName() != "set") {
     // If this is not a set, verify that the children nodes are not void typed,
     // and recurse.
     for (unsigned i = 0, e = Pat->getNumChildren(); i != e; ++i) {
@@ -1615,7 +1717,7 @@ FindPatternInputsAndOutputs(TreePattern *I, TreePatternNode *Pat,
     if (!isUse && Pat->getTransformFn())
       I->error("Cannot specify a transform function for a non-input value!");
     return;
-  } 
+  }
   
   // Otherwise, this is a set, validate and collect instruction results.
   if (Pat->getNumChildren() == 0)
@@ -2001,18 +2103,98 @@ void CodeGenDAGPatterns::ParseInstructions() {
       SrcPattern = Pattern;
     }
     
-    std::string Reason;
-    if (!SrcPattern->canPatternMatch(Reason, *this))
-      I->error("Instruction can never match: " + Reason);
-    
     Record *Instr = II->first;
-    TreePatternNode *DstPattern = TheInst.getResultPattern();
-    PatternsToMatch.
-      push_back(PatternToMatch(Instr->getValueAsListInit("Predicates"),
-                               SrcPattern, DstPattern, TheInst.getImpResults(),
-                               Instr->getValueAsInt("AddedComplexity")));
+    AddPatternToMatch(I,
+                      PatternToMatch(Instr->getValueAsListInit("Predicates"),
+                                     SrcPattern,
+                                     TheInst.getResultPattern(),
+                                     TheInst.getImpResults(),
+                                     Instr->getValueAsInt("AddedComplexity"),
+                                     Instr->getID()));
   }
 }
+
+
+typedef std::pair<const TreePatternNode*, unsigned> NameRecord;
+
+static void FindNames(const TreePatternNode *P, 
+                      std::map<std::string, NameRecord> &Names,
+                      const TreePattern *PatternTop) {
+  if (!P->getName().empty()) {
+    NameRecord &Rec = Names[P->getName()];
+    // If this is the first instance of the name, remember the node.
+    if (Rec.second++ == 0)
+      Rec.first = P;
+    else if (Rec.first->getExtTypes() != P->getExtTypes())
+      PatternTop->error("repetition of value: $" + P->getName() +
+                        " where different uses have different types!");
+  }
+  
+  if (!P->isLeaf()) {
+    for (unsigned i = 0, e = P->getNumChildren(); i != e; ++i)
+      FindNames(P->getChild(i), Names, PatternTop);
+  }
+}
+
+void CodeGenDAGPatterns::AddPatternToMatch(const TreePattern *Pattern,
+                                           const PatternToMatch &PTM) {
+  // Do some sanity checking on the pattern we're about to match.
+  std::string Reason;
+  if (!PTM.getSrcPattern()->canPatternMatch(Reason, *this))
+    Pattern->error("Pattern can never match: " + Reason);
+  
+  // If the source pattern's root is a complex pattern, that complex pattern
+  // must specify the nodes it can potentially match.
+  if (const ComplexPattern *CP =
+        PTM.getSrcPattern()->getComplexPatternInfo(*this))
+    if (CP->getRootNodes().empty())
+      Pattern->error("ComplexPattern at root must specify list of opcodes it"
+                     " could match");
+  
+  
+  // Find all of the named values in the input and output, ensure they have the
+  // same type.
+  std::map<std::string, NameRecord> SrcNames, DstNames;
+  FindNames(PTM.getSrcPattern(), SrcNames, Pattern);
+  FindNames(PTM.getDstPattern(), DstNames, Pattern);
+
+  // Scan all of the named values in the destination pattern, rejecting them if
+  // they don't exist in the input pattern.
+  for (std::map<std::string, NameRecord>::iterator
+       I = DstNames.begin(), E = DstNames.end(); I != E; ++I) {
+    if (SrcNames[I->first].first == 0)
+      Pattern->error("Pattern has input without matching name in output: $" +
+                     I->first);
+    
+#if 0
+    const std::vector<unsigned char> &SrcTypeVec =
+      SrcNames[I->first].first->getExtTypes();
+    const std::vector<unsigned char> &DstTypeVec =
+      I->second.first->getExtTypes();
+    if (SrcTypeVec == DstTypeVec) continue;
+    
+    std::string SrcType, DstType;
+    for (unsigned i = 0, e = SrcTypeVec.size(); i != e; ++i)
+      SrcType += ":" + GetTypeName(SrcTypeVec[i]);
+    for (unsigned i = 0, e = DstTypeVec.size(); i != e; ++i)
+      DstType += ":" + GetTypeName(DstTypeVec[i]);
+    
+    Pattern->error("Variable $" + I->first +
+                   " has different types in source (" + SrcType +
+                   ") and dest (" + DstType + ") pattern!");
+#endif
+  }
+  
+  // Scan all of the named values in the source pattern, rejecting them if the
+  // name isn't used in the dest, and isn't used to tie two values together.
+  for (std::map<std::string, NameRecord>::iterator
+       I = SrcNames.begin(), E = SrcNames.end(); I != E; ++I)
+    if (DstNames[I->first].first == 0 && SrcNames[I->first].second == 1)
+      Pattern->error("Pattern has dead named input: $" + I->first);
+  
+  PatternsToMatch.push_back(PTM);
+}
+
 
 
 void CodeGenDAGPatterns::InferInstructionFlags() {
@@ -2142,15 +2324,13 @@ void CodeGenDAGPatterns::ParsePatterns() {
     TreePattern Temp(Result->getRecord(), DstPattern, false, *this);
     Temp.InferAllTypes();
 
-    std::string Reason;
-    if (!Pattern->getTree(0)->canPatternMatch(Reason, *this))
-      Pattern->error("Pattern can never match: " + Reason);
     
-    PatternsToMatch.
-      push_back(PatternToMatch(Patterns[i]->getValueAsListInit("Predicates"),
-                               Pattern->getTree(0),
-                               Temp.getOnlyTree(), InstImpResults,
-                               Patterns[i]->getValueAsInt("AddedComplexity")));
+    AddPatternToMatch(Pattern,
+                 PatternToMatch(Patterns[i]->getValueAsListInit("Predicates"),
+                                Pattern->getTree(0),
+                                Temp.getOnlyTree(), InstImpResults,
+                                Patterns[i]->getValueAsInt("AddedComplexity"),
+                                Patterns[i]->getID()));
   }
 }
 
@@ -2172,13 +2352,13 @@ static void CombineChildVariants(TreePatternNode *Orig,
   bool NotDone;
   do {
 #ifndef NDEBUG
-    if (DebugFlag && !Idxs.empty()) {
-      errs() << Orig->getOperator()->getName() << ": Idxs = [ ";
-        for (unsigned i = 0; i < Idxs.size(); ++i) {
-          errs() << Idxs[i] << " ";
-      }
-      errs() << "]\n";
-    }
+    DEBUG(if (!Idxs.empty()) {
+            errs() << Orig->getOperator()->getName() << ": Idxs = [ ";
+              for (unsigned i = 0; i < Idxs.size(); ++i) {
+                errs() << Idxs[i] << " ";
+            }
+            errs() << "]\n";
+          });
 #endif
     // Create the variant and add it to the output list.
     std::vector<TreePatternNode*> NewChildren;
@@ -2385,7 +2565,7 @@ static void GenerateVariantsOf(TreePatternNode *N,
 // GenerateVariants - Generate variants.  For example, commutative patterns can
 // match multiple ways.  Add them to PatternsToMatch as well.
 void CodeGenDAGPatterns::GenerateVariants() {
-  DOUT << "Generating instruction variants.\n";
+  DEBUG(errs() << "Generating instruction variants.\n");
   
   // Loop over all of the patterns we've collected, checking to see if we can
   // generate variants of the instruction, through the exploitation of
@@ -2400,9 +2580,9 @@ void CodeGenDAGPatterns::GenerateVariants() {
     MultipleUseVarSet             DepVars;
     std::vector<TreePatternNode*> Variants;
     FindDepVars(PatternsToMatch[i].getSrcPattern(), DepVars);
-    DOUT << "Dependent/multiply used variables: ";
+    DEBUG(errs() << "Dependent/multiply used variables: ");
     DEBUG(DumpDepVars(DepVars));
-    DOUT << "\n";
+    DEBUG(errs() << "\n");
     GenerateVariantsOf(PatternsToMatch[i].getSrcPattern(), Variants, *this, DepVars);
 
     assert(!Variants.empty() && "Must create at least original variant!");
@@ -2411,16 +2591,16 @@ void CodeGenDAGPatterns::GenerateVariants() {
     if (Variants.empty())  // No variants for this pattern.
       continue;
 
-    DOUT << "FOUND VARIANTS OF: ";
-    DEBUG(PatternsToMatch[i].getSrcPattern()->dump());
-    DOUT << "\n";
+    DEBUG(errs() << "FOUND VARIANTS OF: ";
+          PatternsToMatch[i].getSrcPattern()->dump();
+          errs() << "\n");
 
     for (unsigned v = 0, e = Variants.size(); v != e; ++v) {
       TreePatternNode *Variant = Variants[v];
 
-      DOUT << "  VAR#" << v <<  ": ";
-      DEBUG(Variant->dump());
-      DOUT << "\n";
+      DEBUG(errs() << "  VAR#" << v <<  ": ";
+            Variant->dump();
+            errs() << "\n");
       
       // Scan to see if an instruction or explicit pattern already matches this.
       bool AlreadyExists = false;
@@ -2431,7 +2611,7 @@ void CodeGenDAGPatterns::GenerateVariants() {
           continue;
         // Check to see if this variant already exists.
         if (Variant->isIsomorphicTo(PatternsToMatch[p].getSrcPattern(), DepVars)) {
-          DOUT << "  *** ALREADY EXISTS, ignoring variant.\n";
+          DEBUG(errs() << "  *** ALREADY EXISTS, ignoring variant.\n");
           AlreadyExists = true;
           break;
         }
@@ -2444,10 +2624,11 @@ void CodeGenDAGPatterns::GenerateVariants() {
         push_back(PatternToMatch(PatternsToMatch[i].getPredicates(),
                                  Variant, PatternsToMatch[i].getDstPattern(),
                                  PatternsToMatch[i].getDstRegs(),
-                                 PatternsToMatch[i].getAddedComplexity()));
+                                 PatternsToMatch[i].getAddedComplexity(),
+                                 Record::getNewUID()));
     }
 
-    DOUT << "\n";
+    DEBUG(errs() << "\n");
   }
 }
 

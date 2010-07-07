@@ -11,19 +11,20 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ManagedStatic.h"
-#include "llvm/Support/Streams.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/Format.h"
 #include "llvm/System/Process.h"
 #include <algorithm>
-#include <fstream>
 #include <functional>
 #include <map>
 using namespace llvm;
 
 // GetLibSupportInfoOutputFile - Return a file stream to print our output on.
-namespace llvm { extern std::ostream *GetLibSupportInfoOutputFile(); }
+namespace llvm { extern raw_ostream *GetLibSupportInfoOutputFile(); }
 
 // getLibSupportInfoOutputFilename - This ugly hack is brought to you courtesy
 // of constructor/destructor ordering being unspecified by C++.  Basically the
@@ -66,7 +67,7 @@ static TimerGroup *getDefaultTimerGroup() {
     }
     llvm_release_global_lock();
   }
-  
+
   return tmp;
 }
 
@@ -145,7 +146,7 @@ static TimeRecord getTimeRecord(bool Start) {
 static ManagedStatic<std::vector<Timer*> > ActiveTimers;
 
 void Timer::startTimer() {
-  sys::SmartScopedLock<true> L(Lock);
+  sys::SmartScopedLock<true> L(*TimerLock);
   Started = true;
   ActiveTimers->push_back(this);
   TimeRecord TR = getTimeRecord(true);
@@ -157,7 +158,7 @@ void Timer::startTimer() {
 }
 
 void Timer::stopTimer() {
-  sys::SmartScopedLock<true> L(Lock);
+  sys::SmartScopedLock<true> L(*TimerLock);
   TimeRecord TR = getTimeRecord(false);
   Elapsed    += TR.Elapsed;
   UserTime   += TR.UserTime;
@@ -175,27 +176,11 @@ void Timer::stopTimer() {
 }
 
 void Timer::sum(const Timer &T) {
-  if (&T < this) {
-    T.Lock.acquire();
-    Lock.acquire();
-  } else {
-    Lock.acquire();
-    T.Lock.acquire();
-  }
-  
   Elapsed    += T.Elapsed;
   UserTime   += T.UserTime;
   SystemTime += T.SystemTime;
   MemUsed    += T.MemUsed;
   PeakMem    += T.PeakMem;
-  
-  if (&T < this) {
-    T.Lock.release();
-    Lock.release();
-  } else {
-    Lock.release();
-    T.Lock.release();
-  }
 }
 
 /// addPeakMemoryMeasurement - This method should be called whenever memory
@@ -203,14 +188,12 @@ void Timer::sum(const Timer &T) {
 /// currently active timers, which will be printed when the timer group prints
 ///
 void Timer::addPeakMemoryMeasurement() {
+  sys::SmartScopedLock<true> L(*TimerLock);
   size_t MemUsed = getMemUsage();
 
   for (std::vector<Timer*>::iterator I = ActiveTimers->begin(),
-         E = ActiveTimers->end(); I != E; ++I) {
-    (*I)->Lock.acquire();
+         E = ActiveTimers->end(); I != E; ++I)
     (*I)->PeakMem = std::max((*I)->PeakMem, MemUsed-(*I)->PeakMemBase);
-    (*I)->Lock.release();
-  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -269,46 +252,18 @@ NamedRegionTimer::NamedRegionTimer(const std::string &Name,
 //   TimerGroup Implementation
 //===----------------------------------------------------------------------===//
 
-// printAlignedFP - Simulate the printf "%A.Bf" format, where A is the
-// TotalWidth size, and B is the AfterDec size.
-//
-static void printAlignedFP(double Val, unsigned AfterDec, unsigned TotalWidth,
-                           std::ostream &OS) {
-  assert(TotalWidth >= AfterDec+1 && "Bad FP Format!");
-  OS.width(TotalWidth-AfterDec-1);
-  char OldFill = OS.fill();
-  OS.fill(' ');
-  OS << (int)Val;  // Integer part;
-  OS << ".";
-  OS.width(AfterDec);
-  OS.fill('0');
-  unsigned ResultFieldSize = 1;
-  while (AfterDec--) ResultFieldSize *= 10;
-  OS << (int)(Val*ResultFieldSize) % ResultFieldSize;
-  OS.fill(OldFill);
-}
 
-static void printVal(double Val, double Total, std::ostream &OS) {
+static void printVal(double Val, double Total, raw_ostream &OS) {
   if (Total < 1e-7)   // Avoid dividing by zero...
     OS << "        -----     ";
   else {
-    OS << "  ";
-    printAlignedFP(Val, 4, 7, OS);
-    OS << " (";
-    printAlignedFP(Val*100/Total, 1, 5, OS);
-    OS << "%)";
+    OS << "  " << format("%7.4f", Val) << " (";
+    OS << format("%5.1f", Val*100/Total) << "%)";
   }
 }
 
-void Timer::print(const Timer &Total, std::ostream &OS) {
-  if (&Total < this) {
-    Total.Lock.acquire();
-    Lock.acquire();
-  } else {
-    Lock.acquire();
-    Total.Lock.acquire();
-  }
-  
+void Timer::print(const Timer &Total, raw_ostream &OS) {
+  sys::SmartScopedLock<true> L(*TimerLock);
   if (Total.UserTime)
     printVal(UserTime, Total.UserTime, OS);
   if (Total.SystemTime)
@@ -320,47 +275,39 @@ void Timer::print(const Timer &Total, std::ostream &OS) {
   OS << "  ";
 
   if (Total.MemUsed) {
-    OS.width(9);
-    OS << MemUsed << "  ";
+    OS << format("%9lld", (long long)MemUsed) << "  ";
   }
   if (Total.PeakMem) {
     if (PeakMem) {
-      OS.width(9);
-      OS << PeakMem << "  ";
+      OS << format("%9lld", (long long)PeakMem) << "  ";
     } else
       OS << "           ";
   }
   OS << Name << "\n";
 
   Started = false;  // Once printed, don't print again
-  
-  if (&Total < this) {
-    Total.Lock.release();
-    Lock.release();
-  } else {
-    Lock.release();
-    Total.Lock.release();
-  }
 }
 
 // GetLibSupportInfoOutputFile - Return a file stream to print our output on...
-std::ostream *
+raw_ostream *
 llvm::GetLibSupportInfoOutputFile() {
   std::string &LibSupportInfoOutputFilename = getLibSupportInfoOutputFilename();
   if (LibSupportInfoOutputFilename.empty())
-    return cerr.stream();
+    return &errs();
   if (LibSupportInfoOutputFilename == "-")
-    return cout.stream();
+    return &outs();
 
-  std::ostream *Result = new std::ofstream(LibSupportInfoOutputFilename.c_str(),
-                                           std::ios::app);
-  if (!Result->good()) {
-    cerr << "Error opening info-output-file '"
+
+  std::string Error;
+  raw_ostream *Result = new raw_fd_ostream(LibSupportInfoOutputFilename.c_str(),
+                                           Error, raw_fd_ostream::F_Append);
+  if (Error.empty())
+    return Result;
+
+  errs() << "Error opening info-output-file '"
          << LibSupportInfoOutputFilename << " for appending!\n";
-    delete Result;
-    return cerr.stream();
-  }
-  return Result;
+  delete Result;
+  return &errs();
 }
 
 
@@ -375,7 +322,7 @@ void TimerGroup::removeTimer() {
     unsigned Padding = (80-Name.length())/2;
     if (Padding > 80) Padding = 0;         // Don't allow "negative" numbers
 
-    std::ostream *OutStream = GetLibSupportInfoOutputFile();
+    raw_ostream *OutStream = GetLibSupportInfoOutputFile();
 
     ++NumTimers;
     {  // Scope to contain Total timer... don't allow total timer to drop us to
@@ -397,10 +344,8 @@ void TimerGroup::removeTimer() {
       if (this != DefaultTimerGroup) {
         *OutStream << "  Total Execution Time: ";
 
-        printAlignedFP(Total.getProcessTime(), 4, 5, *OutStream);
-        *OutStream << " seconds (";
-        printAlignedFP(Total.getWallTime(), 4, 5, *OutStream);
-        *OutStream << " wall clock)\n";
+        *OutStream << format("%5.4f", Total.getProcessTime()) << " seconds (";
+        *OutStream << format("%5.4f", Total.getWallTime()) << " wall clock)\n";
       }
       *OutStream << "\n";
 
@@ -422,13 +367,14 @@ void TimerGroup::removeTimer() {
         TimersToPrint[i].print(Total, *OutStream);
 
       Total.print(Total, *OutStream);
-      *OutStream << std::endl;  // Flush output
+      *OutStream << '\n';
+      OutStream->flush();
     }
     --NumTimers;
 
     TimersToPrint.clear();
 
-    if (OutStream != cerr.stream() && OutStream != cout.stream())
+    if (OutStream != &errs() && OutStream != &outs() && OutStream != &dbgs())
       delete OutStream;   // Close the file...
   }
 }

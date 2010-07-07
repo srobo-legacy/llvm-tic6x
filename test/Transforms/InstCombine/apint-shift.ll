@@ -1,6 +1,6 @@
 ; This test makes sure that shit instructions are properly eliminated
 ; even with arbitrary precision integers.
-; RUN: llvm-as < %s | opt -instcombine | llvm-dis | not grep sh
+; RUN: opt < %s -instcombine -S | not grep sh
 ; END.
 
 define i47 @test1(i47 %A) {
@@ -166,13 +166,6 @@ define i11 @test23(i44 %A) {
 	%C = ashr i44 %B, 33		; <i44> [#uses=1]
 	%D = trunc i44 %C to i11	; <i8> [#uses=1]
 	ret i11 %D
-}
-
-define i17 @test24(i17 %X) {
-	%Y = and i17 %X, -5		; <i17> [#uses=1]
-	%Z = shl i17 %Y, 9		; <i17> [#uses=1]
-	%Q = ashr i17 %Z, 9		; <i17> [#uses=1]
-	ret i17 %Q
 }
 
 define i37 @test25(i37 %tmp.2, i37 %AA) {

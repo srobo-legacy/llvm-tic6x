@@ -29,6 +29,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileUtilities.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/System/Path.h"
 #include "llvm/System/Signals.h"
 #include <set>
@@ -36,6 +37,7 @@ using namespace llvm;
 
 namespace llvm {
   bool DisableSimplifyCFG = false;
+  extern cl::opt<std::string> OutputPrefix;
 } // End llvm namespace
 
 namespace {
@@ -71,7 +73,7 @@ Module *BugDriver::deleteInstructionFromProgram(const Instruction *I,
   Instruction *TheInst = RI;              // Got the corresponding instruction!
 
   // If this instruction produces a value, replace any users with null values
-  if (isa<StructType>(TheInst->getType()))
+  if (TheInst->getType()->isStructTy())
     TheInst->replaceAllUsesWith(UndefValue::get(TheInst->getType()));
   else if (TheInst->getType() != Type::getVoidTy(I->getContext()))
     TheInst->replaceAllUsesWith(Constant::getNullValue(TheInst->getType()));
@@ -187,8 +189,8 @@ static Constant *GetTorInit(std::vector<std::pair<Function*, int> > &TorList) {
     Elts.push_back(ConstantInt::get(
           Type::getInt32Ty(TorList[i].first->getContext()), TorList[i].second));
     Elts.push_back(TorList[i].first);
-    ArrayElts.push_back(ConstantStruct::get(
-                                        TorList[i].first->getContext(), Elts));
+    ArrayElts.push_back(ConstantStruct::get(TorList[i].first->getContext(),
+                                            Elts, false));
   }
   return ConstantArray::get(ArrayType::get(ArrayElts[0]->getType(), 
                                            ArrayElts.size()),
@@ -321,9 +323,7 @@ llvm::SplitFunctionsOutOfModule(Module *M,
 Module *BugDriver::ExtractMappedBlocksFromModule(const
                                                  std::vector<BasicBlock*> &BBs,
                                                  Module *M) {
-  char *ExtraArg = NULL;
-
-  sys::Path uniqueFilename("bugpoint-extractblocks");
+  sys::Path uniqueFilename(OutputPrefix + "-extractblocks");
   std::string ErrMsg;
   if (uniqueFilename.createTemporaryFileOnDisk(true, &ErrMsg)) {
     outs() << "*** Basic Block extraction failed!\n";
@@ -336,9 +336,7 @@ Module *BugDriver::ExtractMappedBlocksFromModule(const
   sys::RemoveFileOnSignal(uniqueFilename);
 
   std::string ErrorInfo;
-  raw_fd_ostream BlocksToNotExtractFile(uniqueFilename.c_str(),
-                                        /*Binary=*/false, /*Force=*/true,
-                                        ErrorInfo);
+  raw_fd_ostream BlocksToNotExtractFile(uniqueFilename.c_str(), ErrorInfo);
   if (!ErrorInfo.empty()) {
     outs() << "*** Basic Block extraction failed!\n";
     errs() << "Error writing list of blocks to not extract: " << ErrorInfo
@@ -359,9 +357,8 @@ Module *BugDriver::ExtractMappedBlocksFromModule(const
   }
   BlocksToNotExtractFile.close();
 
-  const char *uniqueFN = uniqueFilename.c_str();
-  ExtraArg = (char*)malloc(23 + strlen(uniqueFN));
-  strcat(strcpy(ExtraArg, "--extract-blocks-file="), uniqueFN);
+  std::string uniqueFN = "--extract-blocks-file=" + uniqueFilename.str();
+  const char *ExtraArg = uniqueFN.c_str();
 
   std::vector<const PassInfo*> PI;
   std::vector<BasicBlock *> EmptyBBs; // This parameter is ignored.
@@ -370,7 +367,6 @@ Module *BugDriver::ExtractMappedBlocksFromModule(const
 
   if (uniqueFilename.exists())
     uniqueFilename.eraseFromDisk(); // Free disk space
-  free(ExtraArg);
 
   if (Ret == 0) {
     outs() << "*** Basic Block extraction failed, please report a bug!\n";

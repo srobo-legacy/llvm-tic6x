@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/CodeGen/CallingConvLower.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetRegisterInfo.h"
@@ -20,7 +21,7 @@
 #include "llvm/Target/TargetMachine.h"
 using namespace llvm;
 
-CCState::CCState(unsigned CC, bool isVarArg, const TargetMachine &tm,
+CCState::CCState(CallingConv::ID CC, bool isVarArg, const TargetMachine &tm,
                  SmallVector<CCValAssign, 16> &locs, LLVMContext &C)
   : CallingConv(CC), IsVarArg(isVarArg), TM(tm),
     TRI(*TM.getRegisterInfo()), Locs(locs), Context(C) {
@@ -69,12 +70,27 @@ CCState::AnalyzeFormalArguments(const SmallVectorImpl<ISD::InputArg> &Ins,
     ISD::ArgFlagsTy ArgFlags = Ins[i].Flags;
     if (Fn(i, ArgVT, ArgVT, CCValAssign::Full, ArgFlags, *this)) {
 #ifndef NDEBUG
-      cerr << "Formal argument #" << i << " has unhandled type "
-           << ArgVT.getEVTString();
+      dbgs() << "Formal argument #" << i << " has unhandled type "
+             << ArgVT.getEVTString();
 #endif
       llvm_unreachable(0);
     }
   }
+}
+
+/// CheckReturn - Analyze the return values of a function, returning true if
+/// the return can be performed without sret-demotion, and false otherwise.
+bool CCState::CheckReturn(const SmallVectorImpl<EVT> &OutTys,
+                          const SmallVectorImpl<ISD::ArgFlagsTy> &ArgsFlags,
+                          CCAssignFn Fn) {
+  // Determine which register each value should be copied into.
+  for (unsigned i = 0, e = OutTys.size(); i != e; ++i) {
+    EVT VT = OutTys[i];
+    ISD::ArgFlagsTy ArgFlags = ArgsFlags[i];
+    if (Fn(i, VT, VT, CCValAssign::Full, ArgFlags, *this))
+      return false;
+  }
+  return true;
 }
 
 /// AnalyzeReturn - Analyze the returned values of a return,
@@ -87,8 +103,8 @@ void CCState::AnalyzeReturn(const SmallVectorImpl<ISD::OutputArg> &Outs,
     ISD::ArgFlagsTy ArgFlags = Outs[i].Flags;
     if (Fn(i, VT, VT, CCValAssign::Full, ArgFlags, *this)) {
 #ifndef NDEBUG
-      cerr << "Return operand #" << i << " has unhandled type "
-           << VT.getEVTString();
+      dbgs() << "Return operand #" << i << " has unhandled type "
+             << VT.getEVTString();
 #endif
       llvm_unreachable(0);
     }
@@ -106,8 +122,8 @@ void CCState::AnalyzeCallOperands(const SmallVectorImpl<ISD::OutputArg> &Outs,
     ISD::ArgFlagsTy ArgFlags = Outs[i].Flags;
     if (Fn(i, ArgVT, ArgVT, CCValAssign::Full, ArgFlags, *this)) {
 #ifndef NDEBUG
-      cerr << "Call operand #" << i << " has unhandled type "
-           << ArgVT.getEVTString();
+      dbgs() << "Call operand #" << i << " has unhandled type "
+             << ArgVT.getEVTString();
 #endif
       llvm_unreachable(0);
     }
@@ -125,8 +141,8 @@ void CCState::AnalyzeCallOperands(SmallVectorImpl<EVT> &ArgVTs,
     ISD::ArgFlagsTy ArgFlags = Flags[i];
     if (Fn(i, ArgVT, ArgVT, CCValAssign::Full, ArgFlags, *this)) {
 #ifndef NDEBUG
-      cerr << "Call operand #" << i << " has unhandled type "
-           << ArgVT.getEVTString();
+      dbgs() << "Call operand #" << i << " has unhandled type "
+             << ArgVT.getEVTString();
 #endif
       llvm_unreachable(0);
     }
@@ -142,8 +158,8 @@ void CCState::AnalyzeCallResult(const SmallVectorImpl<ISD::InputArg> &Ins,
     ISD::ArgFlagsTy Flags = Ins[i].Flags;
     if (Fn(i, VT, VT, CCValAssign::Full, Flags, *this)) {
 #ifndef NDEBUG
-      cerr << "Call result #" << i << " has unhandled type "
-           << VT.getEVTString();
+      dbgs() << "Call result #" << i << " has unhandled type "
+             << VT.getEVTString();
 #endif
       llvm_unreachable(0);
     }
@@ -155,8 +171,8 @@ void CCState::AnalyzeCallResult(const SmallVectorImpl<ISD::InputArg> &Ins,
 void CCState::AnalyzeCallResult(EVT VT, CCAssignFn Fn) {
   if (Fn(0, VT, VT, CCValAssign::Full, ISD::ArgFlagsTy(), *this)) {
 #ifndef NDEBUG
-    cerr << "Call result has unhandled type "
-         << VT.getEVTString();
+    dbgs() << "Call result has unhandled type "
+           << VT.getEVTString();
 #endif
     llvm_unreachable(0);
   }

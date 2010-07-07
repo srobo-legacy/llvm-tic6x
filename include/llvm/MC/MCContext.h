@@ -15,10 +15,11 @@
 #include "llvm/Support/Allocator.h"
 
 namespace llvm {
-  class MCValue;
+  class MCExpr;
   class MCSection;
   class MCSymbol;
   class StringRef;
+  class Twine;
 
   /// MCContext - Context object for machine code objects.  This class owns all
   /// of the sections that it creates.
@@ -33,11 +34,6 @@ namespace llvm {
     /// Symbols - Bindings of names to symbols.
     StringMap<MCSymbol*> Symbols;
 
-    /// SymbolValues - Bindings of symbols to values.
-    //
-    // FIXME: Is there a good reason to not just put this in the MCSymbol?
-    DenseMap<MCSymbol*, MCValue> SymbolValues;
-
     /// Allocator - Allocator object used for creating machine code objects.
     ///
     /// We use a bump pointer allocator to avoid the need to track all allocated
@@ -46,46 +42,40 @@ namespace llvm {
   public:
     MCContext();
     ~MCContext();
-    
-    /// CreateSymbol - Create a new symbol with the specified @param Name.
+
+    /// @name Symbol Managment
+    /// @{
+
+    /// CreateSymbol - Create a new symbol with the specified @p Name.
     ///
     /// @param Name - The symbol name, which must be unique across all symbols.
-    MCSymbol *CreateSymbol(const StringRef &Name);
+    MCSymbol *CreateSymbol(StringRef Name);
 
     /// GetOrCreateSymbol - Lookup the symbol inside with the specified
-    /// @param Name.  If it exists, return it.  If not, create a forward
+    /// @p Name.  If it exists, return it.  If not, create a forward
     /// reference and return it.
     ///
     /// @param Name - The symbol name, which must be unique across all symbols.
-    MCSymbol *GetOrCreateSymbol(const StringRef &Name);
-    
+    MCSymbol *GetOrCreateSymbol(StringRef Name);
+    MCSymbol *GetOrCreateSymbol(const Twine &Name);
+
     /// CreateTemporarySymbol - Create a new temporary symbol with the specified
-    /// @param Name.
+    /// @p Name.
     ///
     /// @param Name - The symbol name, for debugging purposes only, temporary
     /// symbols do not surive assembly. If non-empty the name must be unique
     /// across all symbols.
-    MCSymbol *CreateTemporarySymbol(const StringRef &Name = "");
+    MCSymbol *CreateTemporarySymbol(StringRef Name = "");
 
-    /// LookupSymbol - Get the symbol for @param Name, or null.
-    MCSymbol *LookupSymbol(const StringRef &Name) const;
+    /// LookupSymbol - Get the symbol for \p Name, or null.
+    MCSymbol *LookupSymbol(StringRef Name) const;
 
-    /// ClearSymbolValue - Erase a value binding for @param Symbol, if one
-    /// exists.
-    void ClearSymbolValue(MCSymbol *Symbol);
-
-    /// SetSymbolValue - Set the value binding for @param Symbol to @param
-    /// Value.
-    void SetSymbolValue(MCSymbol *Symbol, const MCValue &Value);
-
-    /// GetSymbolValue - Return the current value for @param Symbol, or null if
-    /// none exists.
-    const MCValue *GetSymbolValue(MCSymbol *Symbol) const;
+    /// @}
 
     void *Allocate(unsigned Size, unsigned Align = 8) {
       return Allocator.Allocate(Size, Align);
     }
-    void Deallocate(void *Ptr) { 
+    void Deallocate(void *Ptr) {
     }
   };
 

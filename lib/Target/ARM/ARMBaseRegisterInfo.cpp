@@ -29,6 +29,7 @@
 #include "llvm/CodeGen/MachineLocation.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/RegisterScavenging.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetFrameInfo.h"
@@ -36,7 +37,12 @@
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/CommandLine.h"
 using namespace llvm;
+
+static cl::opt<bool>
+ReuseFrameIndexVals("arm-reuse-frame-index-vals", cl::Hidden, cl::init(true),
+          cl::desc("Reuse repeated frame index values"));
 
 unsigned ARMBaseRegisterInfo::getRegisterNumbering(unsigned RegEnum,
                                                    bool *isSPVFP) {
@@ -74,7 +80,7 @@ unsigned ARMBaseRegisterInfo::getRegisterNumbering(unsigned RegEnum,
   case D23: return 23;
   case D24: return 24;
   case D25: return 25;
-  case D26: return 27;
+  case D26: return 26;
   case D27: return 27;
   case D28: return 28;
   case D29: return 29;
@@ -211,7 +217,8 @@ ARMBaseRegisterInfo::getCalleeSavedRegClasses(const MachineFunction *MF) const {
     ? DarwinCalleeSavedRegClasses : CalleeSavedRegClasses;
 }
 
-BitVector ARMBaseRegisterInfo::getReservedRegs(const MachineFunction &MF) const {
+BitVector ARMBaseRegisterInfo::
+getReservedRegs(const MachineFunction &MF) const {
   // FIXME: avoid re-calculating this everytime.
   BitVector Reserved(getNumRegs());
   Reserved.set(ARM::SP);
@@ -244,8 +251,44 @@ bool ARMBaseRegisterInfo::isReservedReg(const MachineFunction &MF,
 }
 
 const TargetRegisterClass *
+ARMBaseRegisterInfo::getMatchingSuperRegClass(const TargetRegisterClass *A,
+                                              const TargetRegisterClass *B,
+                                              unsigned SubIdx) const {
+  switch (SubIdx) {
+  default: return 0;
+  case 1:
+  case 2:
+  case 3:
+  case 4:
+    // S sub-registers.
+    if (A->getSize() == 8) {
+      if (B == &ARM::SPR_8RegClass)
+        return &ARM::DPR_8RegClass;
+      assert(B == &ARM::SPRRegClass && "Expecting SPR register class!");
+      if (A == &ARM::DPR_8RegClass)
+        return A;
+      return &ARM::DPR_VFP2RegClass;
+    }
+
+    assert(A->getSize() == 16 && "Expecting a Q register class!");
+    if (B == &ARM::SPR_8RegClass)
+      return &ARM::QPR_8RegClass;
+    return &ARM::QPR_VFP2RegClass;
+  case 5:
+  case 6:
+    // D sub-registers.
+    if (B == &ARM::DPR_VFP2RegClass)
+      return &ARM::QPR_VFP2RegClass;
+    if (B == &ARM::DPR_8RegClass)
+      return &ARM::QPR_8RegClass;
+    return A;
+  }
+  return 0;
+}
+
+const TargetRegisterClass *
 ARMBaseRegisterInfo::getPointerRegClass(unsigned Kind) const {
-  return &ARM::GPRRegClass;
+  return ARM::GPRRegisterClass;
 }
 
 /// getAllocationOrder - Returns the register allocation order for a specified
@@ -435,20 +478,42 @@ ARMBaseRegisterInfo::UpdateRegAllocHint(unsigned Reg, unsigned NewReg,
 ///
 bool ARMBaseRegisterInfo::hasFP(const MachineFunction &MF) const {
   const MachineFrameInfo *MFI = MF.getFrameInfo();
-  return (NoFramePointerElim ||
+  return ((NoFramePointerElim && MFI->hasCalls())||
+          needsStackRealignment(MF) ||
           MFI->hasVarSizedObjects() ||
           MFI->isFrameAddressTaken());
 }
 
-bool ARMBaseRegisterInfo::cannotEliminateFrame(const MachineFunction &MF) const {
+bool ARMBaseRegisterInfo::canRealignStack(const MachineFunction &MF) const {
+  const MachineFrameInfo *MFI = MF.getFrameInfo();
+  const ARMFunctionInfo *AFI = MF.getInfo<ARMFunctionInfo>();
+  return (RealignStack &&
+          !AFI->isThumb1OnlyFunction() &&
+          !MFI->hasVarSizedObjects());
+}
+
+bool ARMBaseRegisterInfo::
+needsStackRealignment(const MachineFunction &MF) const {
+  const MachineFrameInfo *MFI = MF.getFrameInfo();
+  const ARMFunctionInfo *AFI = MF.getInfo<ARMFunctionInfo>();
+  unsigned StackAlign = MF.getTarget().getFrameInfo()->getStackAlignment();
+  return (RealignStack &&
+          !AFI->isThumb1OnlyFunction() &&
+          (MFI->getMaxAlignment() > StackAlign) &&
+          !MFI->hasVarSizedObjects());
+}
+
+bool ARMBaseRegisterInfo::
+cannotEliminateFrame(const MachineFunction &MF) const {
   const MachineFrameInfo *MFI = MF.getFrameInfo();
   if (NoFramePointerElim && MFI->hasCalls())
     return true;
-  return MFI->hasVarSizedObjects() || MFI->isFrameAddressTaken();
+  return MFI->hasVarSizedObjects() || MFI->isFrameAddressTaken()
+    || needsStackRealignment(MF);
 }
 
 /// estimateStackSize - Estimate and return the size of the frame.
-static unsigned estimateStackSize(MachineFunction &MF, MachineFrameInfo *MFI) {
+static unsigned estimateStackSize(MachineFunction &MF) {
   const MachineFrameInfo *FFI = MF.getFrameInfo();
   int Offset = 0;
   for (int i = FFI->getObjectIndexBegin(); i != 0; ++i) {
@@ -468,7 +533,7 @@ static unsigned estimateStackSize(MachineFunction &MF, MachineFrameInfo *MFI) {
 
 /// estimateRSStackSizeLimit - Look at each instruction that references stack
 /// frames and return the stack size limit beyond which some of these
-/// instructions will require scratch register during their expansion later.
+/// instructions will require a scratch register during their expansion later.
 unsigned
 ARMBaseRegisterInfo::estimateRSStackSizeLimit(MachineFunction &MF) const {
   unsigned Limit = (1 << 12) - 1;
@@ -492,6 +557,9 @@ ARMBaseRegisterInfo::estimateRSStackSizeLimit(MachineFunction &MF) const {
           // When the stack offset is negative, we will end up using
           // the i8 instructions instead.
           return (1 << 8) - 1;
+
+        if (AddrMode == ARMII::AddrMode6)
+          return 0;
         break; // At most one FI per instruction
       }
     }
@@ -502,7 +570,7 @@ ARMBaseRegisterInfo::estimateRSStackSizeLimit(MachineFunction &MF) const {
 
 void
 ARMBaseRegisterInfo::processFunctionBeforeCalleeSavedScan(MachineFunction &MF,
-                                                          RegScavenger *RS) const {
+                                                       RegScavenger *RS) const {
   // This tells PEI to spill the FP as if it is any other callee-save register
   // to take advantage the eliminateFrameIndex machinery. This also ensures it
   // is spilled in the order specified by getCalleeSavedRegs() to make it easier
@@ -514,6 +582,13 @@ ARMBaseRegisterInfo::processFunctionBeforeCalleeSavedScan(MachineFunction &MF,
   SmallVector<unsigned, 4> UnspilledCS1GPRs;
   SmallVector<unsigned, 4> UnspilledCS2GPRs;
   ARMFunctionInfo *AFI = MF.getInfo<ARMFunctionInfo>();
+
+  // Spill R4 if Thumb2 function requires stack realignment - it will be used as
+  // scratch register.
+  // FIXME: It will be better just to find spare register here.
+  if (needsStackRealignment(MF) &&
+      AFI->isThumb2Function())
+    MF.getRegInfo().setPhysRegUsed(ARM::R4);
 
   // Don't spill FP if the frame can be eliminated. This is determined
   // by scanning the callee-save registers to see if any is used.
@@ -536,7 +611,8 @@ ARMBaseRegisterInfo::processFunctionBeforeCalleeSavedScan(MachineFunction &MF,
       }
     }
 
-    if (CSRegClasses[i] == &ARM::GPRRegClass) {
+    if (CSRegClasses[i] == ARM::GPRRegisterClass ||
+        CSRegClasses[i] == ARM::tGPRRegisterClass) {
       if (Spilled) {
         NumGPRSpills++;
 
@@ -595,8 +671,16 @@ ARMBaseRegisterInfo::processFunctionBeforeCalleeSavedScan(MachineFunction &MF,
     }
   }
 
+  // If any of the stack slot references may be out of range of an immediate
+  // offset, make sure a register (or a spill slot) is available for the
+  // register scavenger. Note that if we're indexing off the frame pointer, the
+  // effective stack size is 4 bytes larger since the FP points to the stack
+  // slot of the previous FP.
+  bool BigStack = RS &&
+    estimateStackSize(MF) + (hasFP(MF) ? 4 : 0) >= estimateRSStackSizeLimit(MF);
+
   bool ExtraCSSpill = false;
-  if (!CanEliminateFrame || cannotEliminateFrame(MF)) {
+  if (BigStack || !CanEliminateFrame || cannotEliminateFrame(MF)) {
     AFI->setHasStackFrame(true);
 
     // If LR is not spilled, but at least one of R4, R5, R6, and R7 is spilled.
@@ -649,22 +733,23 @@ ARMBaseRegisterInfo::processFunctionBeforeCalleeSavedScan(MachineFunction &MF,
     // Estimate if we might need to scavenge a register at some point in order
     // to materialize a stack offset. If so, either spill one additional
     // callee-saved register or reserve a special spill slot to facilitate
-    // register scavenging.
-    if (RS && !ExtraCSSpill && !AFI->isThumb1OnlyFunction()) {
-      MachineFrameInfo  *MFI = MF.getFrameInfo();
-      if (estimateStackSize(MF, MFI) >= estimateRSStackSizeLimit(MF)) {
-        // If any non-reserved CS register isn't spilled, just spill one or two
-        // extra. That should take care of it!
-        unsigned NumExtras = TargetAlign / 4;
-        SmallVector<unsigned, 2> Extras;
-        while (NumExtras && !UnspilledCS1GPRs.empty()) {
-          unsigned Reg = UnspilledCS1GPRs.back();
-          UnspilledCS1GPRs.pop_back();
-          if (!isReservedReg(MF, Reg)) {
-            Extras.push_back(Reg);
-            NumExtras--;
-          }
+    // register scavenging. Thumb1 needs a spill slot for stack pointer
+    // adjustments also, even when the frame itself is small.
+    if (BigStack && !ExtraCSSpill) {
+      // If any non-reserved CS register isn't spilled, just spill one or two
+      // extra. That should take care of it!
+      unsigned NumExtras = TargetAlign / 4;
+      SmallVector<unsigned, 2> Extras;
+      while (NumExtras && !UnspilledCS1GPRs.empty()) {
+        unsigned Reg = UnspilledCS1GPRs.back();
+        UnspilledCS1GPRs.pop_back();
+        if (!isReservedReg(MF, Reg)) {
+          Extras.push_back(Reg);
+          NumExtras--;
         }
+      }
+      // For non-Thumb1 functions, also check for hi-reg CS registers
+      if (!AFI->isThumb1OnlyFunction()) {
         while (NumExtras && !UnspilledCS2GPRs.empty()) {
           unsigned Reg = UnspilledCS2GPRs.back();
           UnspilledCS2GPRs.pop_back();
@@ -673,17 +758,20 @@ ARMBaseRegisterInfo::processFunctionBeforeCalleeSavedScan(MachineFunction &MF,
             NumExtras--;
           }
         }
-        if (Extras.size() && NumExtras == 0) {
-          for (unsigned i = 0, e = Extras.size(); i != e; ++i) {
-            MF.getRegInfo().setPhysRegUsed(Extras[i]);
-            AFI->setCSRegisterIsSpilled(Extras[i]);
-          }
-        } else {
-          // Reserve a slot closest to SP or frame pointer.
-          const TargetRegisterClass *RC = &ARM::GPRRegClass;
-          RS->setScavengingFrameIndex(MFI->CreateStackObject(RC->getSize(),
-                                                           RC->getAlignment()));
+      }
+      if (Extras.size() && NumExtras == 0) {
+        for (unsigned i = 0, e = Extras.size(); i != e; ++i) {
+          MF.getRegInfo().setPhysRegUsed(Extras[i]);
+          AFI->setCSRegisterIsSpilled(Extras[i]);
         }
+      } else if (!AFI->isThumb1OnlyFunction()) {
+        // note: Thumb1 functions spill to R12, not the stack.  Reserve a slot
+        // closest to SP or frame pointer.
+        const TargetRegisterClass *RC = ARM::GPRRegisterClass;
+        MachineFrameInfo *MFI = MF.getFrameInfo();
+        RS->setScavengingFrameIndex(MFI->CreateStackObject(RC->getSize(),
+                                                           RC->getAlignment(),
+                                                           false));
       }
     }
   }
@@ -699,10 +787,60 @@ unsigned ARMBaseRegisterInfo::getRARegister() const {
   return ARM::LR;
 }
 
-unsigned ARMBaseRegisterInfo::getFrameRegister(MachineFunction &MF) const {
+unsigned 
+ARMBaseRegisterInfo::getFrameRegister(const MachineFunction &MF) const {
   if (STI.isTargetDarwin() || hasFP(MF))
     return FramePtr;
   return ARM::SP;
+}
+
+int
+ARMBaseRegisterInfo::getFrameIndexReference(const MachineFunction &MF, int FI,
+                                            unsigned &FrameReg) const {
+  const MachineFrameInfo *MFI = MF.getFrameInfo();
+  const ARMFunctionInfo *AFI = MF.getInfo<ARMFunctionInfo>();
+  int Offset = MFI->getObjectOffset(FI) + MFI->getStackSize();
+  bool isFixed = MFI->isFixedObjectIndex(FI);
+
+  FrameReg = ARM::SP;
+  if (AFI->isGPRCalleeSavedArea1Frame(FI))
+    Offset -= AFI->getGPRCalleeSavedArea1Offset();
+  else if (AFI->isGPRCalleeSavedArea2Frame(FI))
+    Offset -= AFI->getGPRCalleeSavedArea2Offset();
+  else if (AFI->isDPRCalleeSavedAreaFrame(FI))
+    Offset -= AFI->getDPRCalleeSavedAreaOffset();
+  else if (needsStackRealignment(MF)) {
+    // When dynamically realigning the stack, use the frame pointer for
+    // parameters, and the stack pointer for locals.
+    assert (hasFP(MF) && "dynamic stack realignment without a FP!");
+    if (isFixed) {
+      FrameReg = getFrameRegister(MF);
+      Offset -= AFI->getFramePtrSpillOffset();
+    }
+  } else if (hasFP(MF) && AFI->hasStackFrame()) {
+    if (isFixed || MFI->hasVarSizedObjects()) {
+      // Use frame pointer to reference fixed objects unless this is a
+      // frameless function.
+      FrameReg = getFrameRegister(MF);
+      Offset -= AFI->getFramePtrSpillOffset();
+    } else if (AFI->isThumb2Function()) {
+      // In Thumb2 mode, the negative offset is very limited.
+      int FPOffset = Offset - AFI->getFramePtrSpillOffset();
+      if (FPOffset >= -255 && FPOffset < 0) {
+        FrameReg = getFrameRegister(MF);
+        Offset = FPOffset;
+      }
+    }
+  }
+  return Offset;
+}
+
+
+int
+ARMBaseRegisterInfo::getFrameIndexOffset(const MachineFunction &MF,
+                                         int FI) const {
+  unsigned FrameReg;
+  return getFrameIndexReference(MF, FI, FrameReg);
 }
 
 unsigned ARMBaseRegisterInfo::getEHExceptionRegister() const {
@@ -720,7 +858,7 @@ int ARMBaseRegisterInfo::getDwarfRegNum(unsigned RegNum, bool isEH) const {
 }
 
 unsigned ARMBaseRegisterInfo::getRegisterPairEven(unsigned Reg,
-                                               const MachineFunction &MF) const {
+                                              const MachineFunction &MF) const {
   switch (Reg) {
   default: break;
   // Return 0 if either register of the pair is a special register.
@@ -728,8 +866,7 @@ unsigned ARMBaseRegisterInfo::getRegisterPairEven(unsigned Reg,
   case ARM::R1:
     return ARM::R0;
   case ARM::R3:
-    // FIXME!
-    return STI.isThumb1Only() ? 0 : ARM::R2;
+    return ARM::R2;
   case ARM::R5:
     return ARM::R4;
   case ARM::R7:
@@ -818,8 +955,7 @@ unsigned ARMBaseRegisterInfo::getRegisterPairOdd(unsigned Reg,
   case ARM::R0:
     return ARM::R1;
   case ARM::R2:
-    // FIXME!
-    return STI.isThumb1Only() ? 0 : ARM::R3;
+    return ARM::R3;
   case ARM::R4:
     return ARM::R5;
   case ARM::R6:
@@ -925,6 +1061,11 @@ requiresRegisterScavenging(const MachineFunction &MF) const {
   return true;
 }
 
+bool ARMBaseRegisterInfo::
+requiresFrameIndexScavenging(const MachineFunction &MF) const {
+  return true;
+}
+
 // hasReservedCallFrame - Under normal circumstances, when a frame pointer is
 // not required, we reserve argument space for call sites in the function
 // immediately on entry to the current function. This eliminates the need for
@@ -942,6 +1083,15 @@ hasReservedCallFrame(MachineFunction &MF) const {
     return false;
 
   return !MF.getFrameInfo()->hasVarSizedObjects();
+}
+
+// canSimplifyCallFramePseudos - If there is a reserved call frame, the
+// call frame pseudos can be simplified. Unlike most targets, having a FP
+// is not sufficient here since we still may reference some objects via SP
+// even when FP is available in Thumb2 mode.
+bool ARMBaseRegisterInfo::
+canSimplifyCallFramePseudos(MachineFunction &MF) const {
+  return hasReservedCallFrame(MF) || MF.getFrameInfo()->hasVarSizedObjects();
 }
 
 static void
@@ -978,13 +1128,14 @@ eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
 
       ARMFunctionInfo *AFI = MF.getInfo<ARMFunctionInfo>();
       assert(!AFI->isThumb1OnlyFunction() &&
-             "This eliminateCallFramePseudoInstr does not suppor Thumb1!");
+             "This eliminateCallFramePseudoInstr does not support Thumb1!");
       bool isARM = !AFI->isThumbFunction();
 
       // Replace the pseudo instruction with a new instruction...
       unsigned Opc = Old->getOpcode();
-      ARMCC::CondCodes Pred = (ARMCC::CondCodes)Old->getOperand(1).getImm();
-      // FIXME: Thumb2 version of ADJCALLSTACKUP and ADJCALLSTACKDOWN?
+      int PIdx = Old->findFirstPredOperandIdx();
+      ARMCC::CondCodes Pred = (PIdx == -1)
+        ? ARMCC::AL : (ARMCC::CondCodes)Old->getOperand(PIdx).getImm();
       if (Opc == ARM::ADJCALLSTACKDOWN || Opc == ARM::tADJCALLSTACKDOWN) {
         // Note: PredReg is operand 2 for ADJCALLSTACKDOWN.
         unsigned PredReg = Old->getOperand(2).getReg();
@@ -1000,91 +1151,77 @@ eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
   MBB.erase(I);
 }
 
-/// findScratchRegister - Find a 'free' ARM register. If register scavenger
-/// is not being used, R12 is available. Otherwise, try for a call-clobbered
-/// register first and then a spilled callee-saved register if that fails.
-static
-unsigned findScratchRegister(RegScavenger *RS, const TargetRegisterClass *RC,
-                             ARMFunctionInfo *AFI) {
-  unsigned Reg = RS ? RS->FindUnusedReg(RC) : (unsigned) ARM::R12;
-  assert(!AFI->isThumb1OnlyFunction());
-  return Reg;
-}
-
-void
+unsigned
 ARMBaseRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
-                                         int SPAdj, RegScavenger *RS) const {
+                                         int SPAdj, int *Value,
+                                         RegScavenger *RS) const {
   unsigned i = 0;
   MachineInstr &MI = *II;
   MachineBasicBlock &MBB = *MI.getParent();
   MachineFunction &MF = *MBB.getParent();
-  const MachineFrameInfo *MFI = MF.getFrameInfo();
   ARMFunctionInfo *AFI = MF.getInfo<ARMFunctionInfo>();
   assert(!AFI->isThumb1OnlyFunction() &&
-         "This eliminateFrameIndex does not suppor Thumb1!");
+         "This eliminateFrameIndex does not support Thumb1!");
 
   while (!MI.getOperand(i).isFI()) {
     ++i;
     assert(i < MI.getNumOperands() && "Instr doesn't have FrameIndex operand!");
   }
 
-  unsigned FrameReg = ARM::SP;
   int FrameIndex = MI.getOperand(i).getIndex();
-  int Offset = MFI->getObjectOffset(FrameIndex) + MFI->getStackSize() + SPAdj;
+  unsigned FrameReg;
 
-  if (AFI->isGPRCalleeSavedArea1Frame(FrameIndex))
-    Offset -= AFI->getGPRCalleeSavedArea1Offset();
-  else if (AFI->isGPRCalleeSavedArea2Frame(FrameIndex))
-    Offset -= AFI->getGPRCalleeSavedArea2Offset();
-  else if (AFI->isDPRCalleeSavedAreaFrame(FrameIndex))
-    Offset -= AFI->getDPRCalleeSavedAreaOffset();
-  else if (hasFP(MF) && AFI->hasStackFrame()) {
-    assert(SPAdj == 0 && "Unexpected stack offset!");
-    // Use frame pointer to reference fixed objects unless this is a
-    // frameless function,
-    FrameReg = getFrameRegister(MF);
-    Offset -= AFI->getFramePtrSpillOffset();
-  }
+  int Offset = getFrameIndexReference(MF, FrameIndex, FrameReg);
+  if (FrameReg != ARM::SP)
+    SPAdj = 0;
+  Offset += SPAdj;
 
-  // modify MI as necessary to handle as much of 'Offset' as possible
+  // Modify MI as necessary to handle as much of 'Offset' as possible
+  bool Done = false;
   if (!AFI->isThumbFunction())
-    Offset = rewriteARMFrameIndex(MI, i, FrameReg, Offset, TII);
+    Done = rewriteARMFrameIndex(MI, i, FrameReg, Offset, TII);
   else {
     assert(AFI->isThumb2Function());
-    Offset = rewriteT2FrameIndex(MI, i, FrameReg, Offset, TII);
+    Done = rewriteT2FrameIndex(MI, i, FrameReg, Offset, TII);
   }
-  if (Offset == 0)
-    return;
+  if (Done)
+    return 0;
 
   // If we get here, the immediate doesn't fit into the instruction.  We folded
   // as much as possible above, handle the rest, providing a register that is
   // SP+LargeImm.
-  assert(Offset && "This code isn't needed if offset already handled!");
+  assert((Offset ||
+          (MI.getDesc().TSFlags & ARMII::AddrModeMask) == ARMII::AddrMode4 ||
+          (MI.getDesc().TSFlags & ARMII::AddrModeMask) == ARMII::AddrMode6) &&
+         "This code isn't needed if offset already handled!");
 
-  // Insert a set of r12 with the full address: r12 = sp + offset
-  // If the offset we have is too large to fit into the instruction, we need
-  // to form it with a series of ADDri's.  Do this by taking 8-bit chunks
-  // out of 'Offset'.
-  unsigned ScratchReg = findScratchRegister(RS, &ARM::GPRRegClass, AFI);
-  if (ScratchReg == 0)
-    // No register is "free". Scavenge a register.
-    ScratchReg = RS->scavengeRegister(&ARM::GPRRegClass, II, SPAdj);
+  unsigned ScratchReg = 0;
   int PIdx = MI.findFirstPredOperandIdx();
   ARMCC::CondCodes Pred = (PIdx == -1)
     ? ARMCC::AL : (ARMCC::CondCodes)MI.getOperand(PIdx).getImm();
   unsigned PredReg = (PIdx == -1) ? 0 : MI.getOperand(PIdx+1).getReg();
-  if (!AFI->isThumbFunction())
-    emitARMRegPlusImmediate(MBB, II, MI.getDebugLoc(), ScratchReg, FrameReg,
-                            Offset, Pred, PredReg, TII);
+  if (Offset == 0)
+    // Must be addrmode4/6.
+    MI.getOperand(i).ChangeToRegister(FrameReg, false, false, false);
   else {
-    assert(AFI->isThumb2Function());
-    emitT2RegPlusImmediate(MBB, II, MI.getDebugLoc(), ScratchReg, FrameReg,
-                           Offset, Pred, PredReg, TII);
+    ScratchReg = MF.getRegInfo().createVirtualRegister(ARM::GPRRegisterClass);
+    if (Value) *Value = Offset;
+    if (!AFI->isThumbFunction())
+      emitARMRegPlusImmediate(MBB, II, MI.getDebugLoc(), ScratchReg, FrameReg,
+                              Offset, Pred, PredReg, TII);
+    else {
+      assert(AFI->isThumb2Function());
+      emitT2RegPlusImmediate(MBB, II, MI.getDebugLoc(), ScratchReg, FrameReg,
+                             Offset, Pred, PredReg, TII);
+    }
+    MI.getOperand(i).ChangeToRegister(ScratchReg, false, false, true);
+    if (!ReuseFrameIndexVals)
+      ScratchReg = 0;
   }
-  MI.getOperand(i).ChangeToRegister(ScratchReg, false, false, true);
+  return ScratchReg;
 }
 
-/// Move iterator pass the next bunch of callee save load / store ops for
+/// Move iterator past the next bunch of callee save load / store ops for
 /// the particular spill area (1: integer area 1, 2: integer area 2,
 /// 3: fp area, 0: don't care).
 static void movePastCSLoadStoreOps(MachineBasicBlock &MBB,
@@ -1128,7 +1265,7 @@ emitPrologue(MachineFunction &MF) const {
   MachineFrameInfo  *MFI = MF.getFrameInfo();
   ARMFunctionInfo *AFI = MF.getInfo<ARMFunctionInfo>();
   assert(!AFI->isThumb1OnlyFunction() &&
-         "This emitPrologue does not suppor Thumb1!");
+         "This emitPrologue does not support Thumb1!");
   bool isARM = !AFI->isThumbFunction();
   unsigned VARegSaveSize = AFI->getVarArgsRegSaveSize();
   unsigned NumBytes = MFI->getStackSize();
@@ -1141,6 +1278,7 @@ emitPrologue(MachineFunction &MF) const {
   unsigned GPRCS1Size = 0, GPRCS2Size = 0, DPRCSSize = 0;
   int FramePtrSpillFI = 0;
 
+  // Allocate the vararg register save area. This is not counted in NumBytes.
   if (VARegSaveSize)
     emitSPUpdate(isARM, MBB, MBBI, dl, TII, -VARegSaveSize);
 
@@ -1188,8 +1326,11 @@ emitPrologue(MachineFunction &MF) const {
   emitSPUpdate(isARM, MBB, MBBI, dl, TII, -GPRCS1Size);
   movePastCSLoadStoreOps(MBB, MBBI, ARM::STR, ARM::t2STRi12, 1, STI);
 
-  // Darwin ABI requires FP to point to the stack slot that contains the
-  // previous FP.
+  // Set FP to point to the stack slot that contains the previous FP.
+  // For Darwin, FP is R7, which has now been stored in spill area 1.
+  // Otherwise, if this is not Darwin, all the callee-saved registers go
+  // into spill area 1, including the FP in R11.  In either case, it is
+  // now safe to emit this assignment.
   if (STI.isTargetDarwin() || hasFP(MF)) {
     unsigned ADDriOpc = !AFI->isThumbFunction() ? ARM::ADDri : ARM::t2ADDri;
     MachineInstrBuilder MIB =
@@ -1209,15 +1350,17 @@ emitPrologue(MachineFunction &MF) const {
   unsigned DPRCSOffset  = NumBytes - (GPRCS1Size + GPRCS2Size + DPRCSSize);
   unsigned GPRCS2Offset = DPRCSOffset + DPRCSSize;
   unsigned GPRCS1Offset = GPRCS2Offset + GPRCS2Size;
-  AFI->setFramePtrSpillOffset(MFI->getObjectOffset(FramePtrSpillFI) + NumBytes);
+  if (STI.isTargetDarwin() || hasFP(MF))
+    AFI->setFramePtrSpillOffset(MFI->getObjectOffset(FramePtrSpillFI) +
+                                NumBytes);
   AFI->setGPRCalleeSavedArea1Offset(GPRCS1Offset);
   AFI->setGPRCalleeSavedArea2Offset(GPRCS2Offset);
   AFI->setDPRCalleeSavedAreaOffset(DPRCSOffset);
 
+  movePastCSLoadStoreOps(MBB, MBBI, ARM::VSTRD, 0, 3, STI);
   NumBytes = DPRCSOffset;
   if (NumBytes) {
-    // Insert it after all the callee-save spills.
-    movePastCSLoadStoreOps(MBB, MBBI, ARM::FSTD, 0, 3, STI);
+    // Adjust SP after all the callee-save spills.
     emitSPUpdate(isARM, MBB, MBBI, dl, TII, -NumBytes);
   }
 
@@ -1229,6 +1372,34 @@ emitPrologue(MachineFunction &MF) const {
   AFI->setGPRCalleeSavedArea1Size(GPRCS1Size);
   AFI->setGPRCalleeSavedArea2Size(GPRCS2Size);
   AFI->setDPRCalleeSavedAreaSize(DPRCSSize);
+
+  // If we need dynamic stack realignment, do it here.
+  if (needsStackRealignment(MF)) {
+    unsigned MaxAlign = MFI->getMaxAlignment();
+    assert (!AFI->isThumb1OnlyFunction());
+    if (!AFI->isThumbFunction()) {
+      // Emit bic sp, sp, MaxAlign
+      AddDefaultCC(AddDefaultPred(BuildMI(MBB, MBBI, dl,
+                                          TII.get(ARM::BICri), ARM::SP)
+                                  .addReg(ARM::SP, RegState::Kill)
+                                  .addImm(MaxAlign-1)));
+    } else {
+      // We cannot use sp as source/dest register here, thus we're emitting the
+      // following sequence:
+      // mov r4, sp
+      // bic r4, r4, MaxAlign
+      // mov sp, r4
+      // FIXME: It will be better just to find spare register here.
+      BuildMI(MBB, MBBI, dl, TII.get(ARM::tMOVgpr2tgpr), ARM::R4)
+        .addReg(ARM::SP, RegState::Kill);
+      AddDefaultCC(AddDefaultPred(BuildMI(MBB, MBBI, dl,
+                                          TII.get(ARM::t2BICri), ARM::R4)
+                                  .addReg(ARM::R4, RegState::Kill)
+                                  .addImm(MaxAlign-1)));
+      BuildMI(MBB, MBBI, dl, TII.get(ARM::tMOVtgpr2gpr), ARM::SP)
+        .addReg(ARM::R4, RegState::Kill);
+    }
+  }
 }
 
 static bool isCalleeSavedRegister(unsigned Reg, const unsigned *CSRegs) {
@@ -1241,7 +1412,7 @@ static bool isCalleeSavedRegister(unsigned Reg, const unsigned *CSRegs) {
 static bool isCSRestore(MachineInstr *MI,
                         const ARMBaseInstrInfo &TII,
                         const unsigned *CSRegs) {
-  return ((MI->getOpcode() == (int)ARM::FLDD ||
+  return ((MI->getOpcode() == (int)ARM::VLDRD ||
            MI->getOpcode() == (int)ARM::LDR ||
            MI->getOpcode() == (int)ARM::t2LDRi12) &&
           MI->getOperand(1).isFI() &&
@@ -1257,7 +1428,7 @@ emitEpilogue(MachineFunction &MF, MachineBasicBlock &MBB) const {
   MachineFrameInfo *MFI = MF.getFrameInfo();
   ARMFunctionInfo *AFI = MF.getInfo<ARMFunctionInfo>();
   assert(!AFI->isThumb1OnlyFunction() &&
-         "This emitEpilogue does not suppor Thumb1!");
+         "This emitEpilogue does not support Thumb1!");
   bool isARM = !AFI->isThumbFunction();
 
   unsigned VARegSaveSize = AFI->getVarArgsRegSaveSize();
@@ -1267,7 +1438,7 @@ emitEpilogue(MachineFunction &MF, MachineBasicBlock &MBB) const {
     if (NumBytes != 0)
       emitSPUpdate(isARM, MBB, MBBI, dl, TII, NumBytes);
   } else {
-    // Unwind MBBI to point to first LDR / FLDD.
+    // Unwind MBBI to point to first LDR / VLDRD.
     const unsigned *CSRegs = getCalleeSavedRegs();
     if (MBBI != MBB.begin()) {
       do
@@ -1315,7 +1486,7 @@ emitEpilogue(MachineFunction &MF, MachineBasicBlock &MBB) const {
       emitSPUpdate(isARM, MBB, MBBI, dl, TII, NumBytes);
 
     // Move SP to start of integer callee save spill area 2.
-    movePastCSLoadStoreOps(MBB, MBBI, ARM::FLDD, 0, 3, STI);
+    movePastCSLoadStoreOps(MBB, MBBI, ARM::VLDRD, 0, 3, STI);
     emitSPUpdate(isARM, MBB, MBBI, dl, TII, AFI->getDPRCalleeSavedAreaSize());
 
     // Move SP to start of integer callee save spill area 1.

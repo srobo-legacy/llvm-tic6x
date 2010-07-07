@@ -19,6 +19,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/System/Path.h"
 
+#include <sstream>
 #include <stdexcept>
 #include <string>
 
@@ -27,6 +28,8 @@ namespace sys = llvm::sys;
 using namespace llvmc;
 
 namespace {
+
+  std::stringstream* GlobalTimeLog;
 
   sys::Path getTempDir() {
     sys::Path tempDir;
@@ -81,6 +84,11 @@ namespace {
 
 namespace llvmc {
 
+// Used to implement -time option. External linkage is intentional.
+void AppendToGlobalTimeLog(const std::string& cmd, double time) {
+  *GlobalTimeLog << "# " << cmd << ' ' << time << '\n';
+}
+
 // Sometimes plugins want to condition on the value in argv[0].
 const char* ProgramName;
 
@@ -92,11 +100,11 @@ int Main(int argc, char** argv) {
     ProgramName = argv[0];
 
     cl::ParseCommandLineOptions
-      (argc, argv, "LLVM Compiler Driver (Work In Progress)", true);
+      (argc, argv, "LLVM Compiler Driver (Work In Progress)",
+       /* ReadResponseFiles = */ false);
 
     PluginLoader Plugins;
-    Plugins.PopulateLanguageMap(langMap);
-    Plugins.PopulateCompilationGraph(graph);
+    Plugins.RunInitialization(langMap, graph);
 
     if (CheckGraph) {
       int ret = graph.Check();
@@ -119,11 +127,19 @@ int Main(int argc, char** argv) {
       return 0;
     }
 
-    if (InputFilenames.empty()) {
-      throw std::runtime_error("no input files");
+    if (Time) {
+      GlobalTimeLog = new std::stringstream;
+      GlobalTimeLog->precision(2);
     }
 
-    return BuildTargets(graph, langMap);
+    int ret = BuildTargets(graph, langMap);
+
+    if (Time) {
+      llvm::errs() << GlobalTimeLog->str();
+      delete GlobalTimeLog;
+    }
+
+    return ret;
   }
   catch(llvmc::error_code& ec) {
     return ec.code();

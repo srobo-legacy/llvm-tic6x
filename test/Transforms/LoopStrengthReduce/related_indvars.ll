@@ -1,4 +1,4 @@
-; RUN: llvm-as < %s | opt -loop-reduce | llvm-dis | grep phi | count 1
+; RUN: opt < %s -loop-reduce -S | grep phi | count 1
 
 ; This should only result in one PHI node!
 
@@ -7,7 +7,7 @@
 ;     *D++ = F;
 ; }
 
-define void @foo(double* %D, double* %E, double %F) {
+define void @foo(double* %D, double* %E, double %F) nounwind {
 entry:
 	%tmp.24 = icmp eq double* %D, %E		; <i1> [#uses=1]
 	br i1 %tmp.24, label %return, label %no_exit

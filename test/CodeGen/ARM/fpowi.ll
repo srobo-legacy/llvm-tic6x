@@ -1,4 +1,4 @@
-; RUN: llvm-as < %s | llc -mtriple=arm-linux-gnueabi | grep powidf2
+; RUN: llc < %s -mtriple=arm-linux-gnueabi | grep powidf2
 ; PR1287
 
 ; ModuleID = '<stdin>'
@@ -7,9 +7,8 @@ target triple = "arm-linux-gnueabi"
 
 define double @_ZSt3powdi(double %__x, i32 %__i) {
 entry:
-	%tmp3 = call double @llvm.powi.f64( double 0.000000e+00, i32 0 )		; <double> [#uses=1]
-	store double %tmp3, double* null, align 8
-	unreachable
+	%tmp3 = call double @llvm.powi.f64( double %__x, i32 %__i )
+        ret double %tmp3
 }
 
 declare double @llvm.powi.f64(double, i32)

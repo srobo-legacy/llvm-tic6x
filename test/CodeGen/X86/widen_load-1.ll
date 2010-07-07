@@ -1,11 +1,11 @@
-; RUN: llvm-as < %s | llc -o - -march=x86-64 -mtriple=x86_64-unknown-linux-gnu -disable-mmx | FileCheck %s
+; RUN: llc %s -o - -march=x86-64 -mtriple=x86_64-unknown-linux-gnu -disable-mmx | FileCheck %s
 ; PR4891
 
 ; This load should be before the call, not after.
 
-; CHECK: movq    compl+128(%rip), %xmm0
+; CHECK: movaps    compl+128(%rip), %xmm0
 ; CHECK: movaps  %xmm0, (%rsp)
-; CHECK: call    killcommon
+; CHECK: callq   killcommon
 
 @compl = linkonce global [20 x i64] zeroinitializer, align 64 ; <[20 x i64]*> [#uses=1]
 

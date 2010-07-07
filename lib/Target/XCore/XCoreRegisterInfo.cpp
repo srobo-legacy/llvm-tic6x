@@ -145,8 +145,8 @@ eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
       if (!isU6 && !isImmU16(Amount)) {
         // FIX could emit multiple instructions in this case.
 #ifndef NDEBUG
-        cerr << "eliminateCallFramePseudoInstr size too big: "
-             << Amount << "\n";
+        errs() << "eliminateCallFramePseudoInstr size too big: "
+               << Amount << "\n";
 #endif
         llvm_unreachable(0);
       }
@@ -171,8 +171,10 @@ eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
   MBB.erase(I);
 }
 
-void XCoreRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
-                                            int SPAdj, RegScavenger *RS) const {
+unsigned
+XCoreRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
+                                       int SPAdj, int *Value,
+                                       RegScavenger *RS) const {
   assert(SPAdj == 0 && "Unexpected");
   MachineInstr &MI = *II;
   DebugLoc dl = MI.getDebugLoc();
@@ -193,11 +195,11 @@ void XCoreRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   #ifndef NDEBUG
   DEBUG(errs() << "\nFunction         : " 
         << MF.getFunction()->getName() << "\n");
-  DOUT << "<--------->\n";
-  MI.print(DOUT);
-  DOUT << "FrameIndex         : " << FrameIndex << "\n";
-  DOUT << "FrameOffset        : " << Offset << "\n";
-  DOUT << "StackSize          : " << StackSize << "\n";
+  DEBUG(errs() << "<--------->\n");
+  DEBUG(MI.print(errs()));
+  DEBUG(errs() << "FrameIndex         : " << FrameIndex << "\n");
+  DEBUG(errs() << "FrameOffset        : " << Offset << "\n");
+  DEBUG(errs() << "StackSize          : " << StackSize << "\n");
   #endif
 
   Offset += StackSize;
@@ -208,10 +210,7 @@ void XCoreRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   
   assert(Offset%4 == 0 && "Misaligned stack offset");
 
-  #ifndef NDEBUG
-  DOUT << "Offset             : " << Offset << "\n";
-  DOUT << "<--------->\n";
-  #endif
+  DEBUG(errs() << "Offset             : " << Offset << "\n" << "<--------->\n");
   
   Offset/=4;
   
@@ -229,7 +228,6 @@ void XCoreRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
     bool isUs = isImmUs(Offset);
     unsigned FramePtr = XCore::R10;
     
-    MachineInstr *New = 0;
     if (!isUs) {
       if (!RS) {
         std::string msg;
@@ -242,18 +240,18 @@ void XCoreRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
       loadConstant(MBB, II, ScratchReg, Offset, dl);
       switch (MI.getOpcode()) {
       case XCore::LDWFI:
-        New = BuildMI(MBB, II, dl, TII.get(XCore::LDW_3r), Reg)
+        BuildMI(MBB, II, dl, TII.get(XCore::LDW_3r), Reg)
               .addReg(FramePtr)
               .addReg(ScratchReg, RegState::Kill);
         break;
       case XCore::STWFI:
-        New = BuildMI(MBB, II, dl, TII.get(XCore::STW_3r))
+        BuildMI(MBB, II, dl, TII.get(XCore::STW_3r))
               .addReg(Reg, getKillRegState(isKill))
               .addReg(FramePtr)
               .addReg(ScratchReg, RegState::Kill);
         break;
       case XCore::LDAWFI:
-        New = BuildMI(MBB, II, dl, TII.get(XCore::LDAWF_l3r), Reg)
+        BuildMI(MBB, II, dl, TII.get(XCore::LDAWF_l3r), Reg)
               .addReg(FramePtr)
               .addReg(ScratchReg, RegState::Kill);
         break;
@@ -263,18 +261,18 @@ void XCoreRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
     } else {
       switch (MI.getOpcode()) {
       case XCore::LDWFI:
-        New = BuildMI(MBB, II, dl, TII.get(XCore::LDW_2rus), Reg)
+        BuildMI(MBB, II, dl, TII.get(XCore::LDW_2rus), Reg)
               .addReg(FramePtr)
               .addImm(Offset);
         break;
       case XCore::STWFI:
-        New = BuildMI(MBB, II, dl, TII.get(XCore::STW_2rus))
+        BuildMI(MBB, II, dl, TII.get(XCore::STW_2rus))
               .addReg(Reg, getKillRegState(isKill))
               .addReg(FramePtr)
               .addImm(Offset);
         break;
       case XCore::LDAWFI:
-        New = BuildMI(MBB, II, dl, TII.get(XCore::LDAWF_l2rus), Reg)
+        BuildMI(MBB, II, dl, TII.get(XCore::LDAWF_l2rus), Reg)
               .addReg(FramePtr)
               .addImm(Offset);
         break;
@@ -315,6 +313,7 @@ void XCoreRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   }
   // Erase old instruction.
   MBB.erase(II);
+  return 0;
 }
 
 void
@@ -331,9 +330,10 @@ XCoreRegisterInfo::processFunctionBeforeCalleeSavedScan(MachineFunction &MF,
     int FrameIdx;
     if (! isVarArg) {
       // A fixed offset of 0 allows us to save / restore LR using entsp / retsp.
-      FrameIdx = MFI->CreateFixedObject(RC->getSize(), 0);
+      FrameIdx = MFI->CreateFixedObject(RC->getSize(), 0, true, false);
     } else {
-      FrameIdx = MFI->CreateStackObject(RC->getSize(), RC->getAlignment());
+      FrameIdx = MFI->CreateStackObject(RC->getSize(), RC->getAlignment(),
+                                        false);
     }
     XFI->setUsesLR(FrameIdx);
     XFI->setLRSpillSlot(FrameIdx);
@@ -341,13 +341,15 @@ XCoreRegisterInfo::processFunctionBeforeCalleeSavedScan(MachineFunction &MF,
   if (requiresRegisterScavenging(MF)) {
     // Reserve a slot close to SP or frame pointer.
     RS->setScavengingFrameIndex(MFI->CreateStackObject(RC->getSize(),
-                                                RC->getAlignment()));
+                                                       RC->getAlignment(),
+                                                       false));
   }
   if (hasFP(MF)) {
     // A callee save register is used to hold the FP.
     // This needs saving / restoring in the epilogue / prologue.
     XFI->setFPSpillSlot(MFI->CreateStackObject(RC->getSize(),
-                        RC->getAlignment()));
+                                               RC->getAlignment(),
+                                               false));
   }
 }
 
@@ -594,7 +596,7 @@ int XCoreRegisterInfo::getDwarfRegNum(unsigned RegNum, bool isEH) const {
   return XCoreGenRegisterInfo::getDwarfRegNumFull(RegNum, 0);
 }
 
-unsigned XCoreRegisterInfo::getFrameRegister(MachineFunction &MF) const {
+unsigned XCoreRegisterInfo::getFrameRegister(const MachineFunction &MF) const {
   bool FP = hasFP(MF);
   
   return FP ? XCore::R10 : XCore::SP;

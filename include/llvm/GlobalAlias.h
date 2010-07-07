@@ -18,6 +18,7 @@
 #include "llvm/GlobalValue.h"
 #include "llvm/OperandTraits.h"
 #include "llvm/ADT/ilist_node.h"
+#include "llvm/ADT/Twine.h"
 
 namespace llvm {
 
@@ -88,7 +89,7 @@ public:
 };
 
 template <>
-struct OperandTraits<GlobalAlias> : FixedNumOperandTraits<1> {
+struct OperandTraits<GlobalAlias> : public FixedNumOperandTraits<1> {
 };
 
 DEFINE_TRANSPARENT_OPERAND_ACCESSORS(GlobalAlias, Value)

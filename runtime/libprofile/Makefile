@@ -8,7 +8,9 @@
 ##===----------------------------------------------------------------------===##
 
 LEVEL = ../..
-ifneq ($(wildcard $(LLVMGCC)),)
+include $(LEVEL)/Makefile.config
+
+ifneq ($(strip $(LLVMCC)),)
 BYTECODE_LIBRARY = 1
 endif
 SHARED_LIBRARY = 1

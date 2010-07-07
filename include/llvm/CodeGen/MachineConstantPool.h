@@ -89,7 +89,7 @@ public:
   MachineConstantPoolEntry(MachineConstantPoolValue *V, unsigned A)
     : Alignment(A) {
     Val.MachineCPVal = V; 
-    Alignment |= 1 << (sizeof(unsigned)*CHAR_BIT-1);
+    Alignment |= 1U << (sizeof(unsigned)*CHAR_BIT-1);
   }
 
   bool isMachineConstantPoolEntry() const {
@@ -136,7 +136,7 @@ public:
     : TD(td), PoolAlignment(1) {}
   ~MachineConstantPool();
     
-  /// getConstantPoolAlignment - Return the the alignment required by
+  /// getConstantPoolAlignment - Return the alignment required by
   /// the whole constant pool, of which the first element must be aligned.
   unsigned getConstantPoolAlignment() const { return PoolAlignment; }
   

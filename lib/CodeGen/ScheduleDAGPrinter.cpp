@@ -18,7 +18,6 @@
 #include "llvm/CodeGen/MachineConstantPool.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineModuleInfo.h"
-#include "llvm/CodeGen/PseudoSourceValue.h"
 #include "llvm/Target/TargetRegisterInfo.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Support/Debug.h"
@@ -33,6 +32,9 @@ using namespace llvm;
 namespace llvm {
   template<>
   struct DOTGraphTraits<ScheduleDAG*> : public DefaultDOTGraphTraits {
+
+  DOTGraphTraits (bool isSimple=false) : DefaultDOTGraphTraits(isSimple) {}
+
     static std::string getGraphName(const ScheduleDAG *G) {
       return G->MF.getFunction()->getName();
     }
@@ -58,9 +60,7 @@ namespace llvm {
     }
     
 
-    static std::string getNodeLabel(const SUnit *Node,
-                                    const ScheduleDAG *Graph,
-                                    bool ShortNames);
+    std::string getNodeLabel(const SUnit *Node, const ScheduleDAG *Graph);
     static std::string getNodeAttributes(const SUnit *N,
                                          const ScheduleDAG *Graph) {
       return "shape=Mrecord";
@@ -74,8 +74,7 @@ namespace llvm {
 }
 
 std::string DOTGraphTraits<ScheduleDAG*>::getNodeLabel(const SUnit *SU,
-                                                       const ScheduleDAG *G,
-                                                       bool ShortNames) {
+                                                       const ScheduleDAG *G) {
   return G->getGraphNodeLabel(SU);
 }
 
@@ -93,7 +92,7 @@ void ScheduleDAG::viewGraph() {
     ViewGraph(this, "dag." + MF.getFunction()->getNameStr(), false,
               "Scheduling-Units Graph for " + MF.getFunction()->getNameStr());
 #else
-  cerr << "ScheduleDAG::viewGraph is only available in debug builds on "
-       << "systems with Graphviz or gv!\n";
+  errs() << "ScheduleDAG::viewGraph is only available in debug builds on "
+         << "systems with Graphviz or gv!\n";
 #endif  // NDEBUG
 }

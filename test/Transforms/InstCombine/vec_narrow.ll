@@ -1,5 +1,5 @@
-; RUN: llvm-as < %s | opt -instcombine | llvm-dis | \
-; RUN:   grep {add float}
+; RUN: opt < %s -instcombine -S | \
+; RUN:   grep {fadd float}
 
         %V = type <4 x float>
 

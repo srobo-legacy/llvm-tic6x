@@ -35,7 +35,8 @@ namespace X86 {
   /// these indices must be kept in sync with the class indices in the 
   /// X86RegisterInfo.td file.
   enum SubregIndex {
-    SUBREG_8BIT = 1, SUBREG_8BIT_HI = 2, SUBREG_16BIT = 3, SUBREG_32BIT = 4
+    SUBREG_8BIT = 1, SUBREG_8BIT_HI = 2, SUBREG_16BIT = 3, SUBREG_32BIT = 4,
+    SUBREG_SS = 1, SUBREG_SD = 2, SUBREG_XMM = 3
   };
 }
 
@@ -128,6 +129,8 @@ public:
 
   bool hasFP(const MachineFunction &MF) const;
 
+  bool canRealignStack(const MachineFunction &MF) const;
+
   bool needsStackRealignment(const MachineFunction &MF) const;
 
   bool hasReservedCallFrame(MachineFunction &MF) const;
@@ -139,8 +142,9 @@ public:
                                      MachineBasicBlock &MBB,
                                      MachineBasicBlock::iterator MI) const;
 
-  void eliminateFrameIndex(MachineBasicBlock::iterator MI,
-                           int SPAdj, RegScavenger *RS = NULL) const;
+  unsigned eliminateFrameIndex(MachineBasicBlock::iterator MI,
+                               int SPAdj, int *Value = NULL,
+                               RegScavenger *RS = NULL) const;
 
   void processFunctionBeforeCalleeSavedScan(MachineFunction &MF,
                                             RegScavenger *RS = NULL) const;
@@ -152,8 +156,8 @@ public:
 
   // Debug information queries.
   unsigned getRARegister() const;
-  unsigned getFrameRegister(MachineFunction &MF) const;
-  int getFrameIndexOffset(MachineFunction &MF, int FI) const;
+  unsigned getFrameRegister(const MachineFunction &MF) const;
+  int getFrameIndexOffset(const MachineFunction &MF, int FI) const;
   void getInitialFrameState(std::vector<MachineMove> &Moves) const;
 
   // Exception handling queries.

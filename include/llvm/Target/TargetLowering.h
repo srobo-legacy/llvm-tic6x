@@ -46,7 +46,10 @@ namespace llvm {
   class MachineFunction;
   class MachineFrameInfo;
   class MachineInstr;
+  class MachineJumpTableInfo;
   class MachineModuleInfo;
+  class MCContext;
+  class MCExpr;
   class DwarfWriter;
   class SDNode;
   class SDValue;
@@ -115,10 +118,6 @@ public:
   MVT getPointerTy() const { return PointerTy; }
   MVT getShiftAmountTy() const { return ShiftAmountTy; }
 
-  /// usesGlobalOffsetTable - Return true if this target uses a GOT for PIC
-  /// codegen.
-  bool usesGlobalOffsetTable() const { return UsesGlobalOffsetTable; }
-
   /// isSelectExpensive - Return true if the select operation is expensive for
   /// this target.
   bool isSelectExpensive() const { return SelectIsExpensive; }
@@ -138,6 +137,12 @@ public:
   /// operands to get a type hint from.
   virtual
   MVT::SimpleValueType getSetCCResultType(EVT VT) const;
+
+  /// getCmpLibcallReturnType - Return the ValueType for comparison 
+  /// libcalls. Comparions libcalls include floating point comparion calls,
+  /// and Ordered/Unordered check calls on floating point numbers.
+  virtual 
+  MVT::SimpleValueType getCmpLibcallReturnType() const;
 
   /// getBooleanContents - For targets without i1 registers, this gives the
   /// nature of the high-bits of boolean values held in types wider than i1.
@@ -325,12 +330,11 @@ public:
   /// scalarizing vs using the wider vector type.
   virtual EVT getWidenVectorType(EVT VT) const;
 
-  typedef std::vector<APFloat>::const_iterator legal_fpimm_iterator;
-  legal_fpimm_iterator legal_fpimm_begin() const {
-    return LegalFPImmediates.begin();
-  }
-  legal_fpimm_iterator legal_fpimm_end() const {
-    return LegalFPImmediates.end();
+  /// isFPImmLegal - Returns true if the target can instruction select the
+  /// specified FP immediate natively. If false, the legalizer will materialize
+  /// the FP immediate as a load from a constant pool.
+  virtual bool isFPImmLegal(const APFloat &Imm, EVT VT) const {
+    return false;
   }
   
   /// isShuffleMaskLegal - Targets can use this to indicate that they only
@@ -341,6 +345,11 @@ public:
                                   EVT VT) const {
     return true;
   }
+
+  /// canOpTrap - Returns true if the operation can trap for the value type.
+  /// VT must be a legal type. By default, we optimistically assume most
+  /// operations don't trap except for divide and remainder.
+  virtual bool canOpTrap(unsigned Op, EVT VT) const;
 
   /// isVectorClearMaskLegal - Similar to isShuffleMaskLegal. This is
   /// used by Targets can use this to indicate if there is a suitable
@@ -655,12 +664,12 @@ public:
 
   /// getOptimalMemOpType - Returns the target specific optimal type for load
   /// and store operations as a result of memset, memcpy, and memmove lowering.
-  /// It returns EVT::iAny if SelectionDAG should be responsible for
+  /// It returns EVT::Other if SelectionDAG should be responsible for
   /// determining it.
   virtual EVT getOptimalMemOpType(uint64_t Size, unsigned Align,
                                   bool isSrcConst, bool isSrcStr,
                                   SelectionDAG &DAG) const {
-    return MVT::iAny;
+    return MVT::Other;
   }
   
   /// usesUnderscoreSetJmp - Determine if we should use _setjmp or setjmp
@@ -747,11 +756,31 @@ public:
     return false;
   }
   
+  /// getJumpTableEncoding - Return the entry encoding for a jump table in the
+  /// current function.  The returned value is a member of the
+  /// MachineJumpTableInfo::JTEntryKind enum.
+  virtual unsigned getJumpTableEncoding() const;
+  
+  virtual const MCExpr *
+  LowerCustomJumpTableEntry(const MachineJumpTableInfo *MJTI,
+                            const MachineBasicBlock *MBB, unsigned uid,
+                            MCContext &Ctx) const {
+    assert(0 && "Need to implement this hook if target has custom JTIs");
+    return 0;
+  }
+  
   /// getPICJumpTableRelocaBase - Returns relocation base for the given PIC
   /// jumptable.
   virtual SDValue getPICJumpTableRelocBase(SDValue Table,
-                                             SelectionDAG &DAG) const;
+                                           SelectionDAG &DAG) const;
 
+  /// getPICJumpTableRelocBaseExpr - This returns the relocation base for the
+  /// given PIC jumptable, the same as getPICJumpTableRelocBase, but as an
+  /// MCExpr.
+  virtual const MCExpr *
+  getPICJumpTableRelocBaseExpr(const MachineFunction *MF,
+                               unsigned JTI, MCContext &Ctx) const;
+  
   /// isOffsetFoldingLegal - Return true if folding a constant offset
   /// with the given GlobalAddress is legal.  It is frequently not legal in
   /// PIC relocation models.
@@ -769,10 +798,12 @@ public:
   /// that want to combine 
   struct TargetLoweringOpt {
     SelectionDAG &DAG;
+    bool ShrinkOps;
     SDValue Old;
     SDValue New;
 
-    explicit TargetLoweringOpt(SelectionDAG &InDAG) : DAG(InDAG) {}
+    explicit TargetLoweringOpt(SelectionDAG &InDAG, bool Shrink = false) :
+      DAG(InDAG), ShrinkOps(Shrink) {}
     
     bool CombineTo(SDValue O, SDValue N) { 
       Old = O; 
@@ -858,12 +889,6 @@ public:
   virtual bool
   isGAPlusOffset(SDNode *N, GlobalValue* &GA, int64_t &Offset) const;
 
-  /// isConsecutiveLoad - Return true if LD is loading 'Bytes' bytes from a 
-  /// location that is 'Dist' units away from the location that the 'Base' load 
-  /// is loading from.
-  bool isConsecutiveLoad(LoadSDNode *LD, LoadSDNode *Base, unsigned Bytes,
-                         int Dist, const MachineFrameInfo *MFI) const;
-
   /// PerformDAGCombine - This method will be invoked for all target nodes and
   /// for any target-independent nodes that the target has registered with
   /// invoke it for.
@@ -885,10 +910,6 @@ public:
   //
 
 protected:
-  /// setUsesGlobalOffsetTable - Specify that this target does or doesn't use a
-  /// GOT for PC-relative code.
-  void setUsesGlobalOffsetTable(bool V) { UsesGlobalOffsetTable = V; }
-
   /// setShiftAmountType - Describe the type that should be used for shift
   /// amounts.  This type defaults to the pointer type.
   void setShiftAmountType(MVT VT) { ShiftAmountTy = VT; }
@@ -979,7 +1000,7 @@ protected:
   /// not work with the with specified type and indicate what to do about it.
   void setLoadExtAction(unsigned ExtType, MVT VT,
                       LegalizeAction Action) {
-    assert((unsigned)VT.SimpleTy < sizeof(LoadExtActions[0])*4 &&
+    assert((unsigned)VT.SimpleTy*2 < 63 &&
            ExtType < array_lengthof(LoadExtActions) &&
            "Table isn't big enough!");
     LoadExtActions[ExtType] &= ~(uint64_t(3UL) << VT.SimpleTy*2);
@@ -991,7 +1012,7 @@ protected:
   void setTruncStoreAction(MVT ValVT, MVT MemVT,
                            LegalizeAction Action) {
     assert((unsigned)ValVT.SimpleTy < array_lengthof(TruncStoreActions) &&
-           (unsigned)MemVT.SimpleTy < sizeof(TruncStoreActions[0])*4 &&
+           (unsigned)MemVT.SimpleTy*2 < 63 &&
            "Table isn't big enough!");
     TruncStoreActions[ValVT.SimpleTy] &= ~(uint64_t(3UL)  << MemVT.SimpleTy*2);
     TruncStoreActions[ValVT.SimpleTy] |= (uint64_t)Action << MemVT.SimpleTy*2;
@@ -1026,7 +1047,7 @@ protected:
   void setConvertAction(MVT FromVT, MVT ToVT,
                         LegalizeAction Action) {
     assert((unsigned)FromVT.SimpleTy < array_lengthof(ConvertActions) &&
-           (unsigned)ToVT.SimpleTy < sizeof(ConvertActions[0])*4 &&
+           (unsigned)ToVT.SimpleTy < MVT::LAST_VALUETYPE &&
            "Table isn't big enough!");
     ConvertActions[FromVT.SimpleTy] &= ~(uint64_t(3UL)  << ToVT.SimpleTy*2);
     ConvertActions[FromVT.SimpleTy] |= (uint64_t)Action << ToVT.SimpleTy*2;
@@ -1036,7 +1057,7 @@ protected:
   /// supported on the target and indicate what to do about it.
   void setCondCodeAction(ISD::CondCode CC, MVT VT,
                          LegalizeAction Action) {
-    assert((unsigned)VT.SimpleTy < sizeof(CondCodeActions[0])*4 &&
+    assert((unsigned)VT.SimpleTy < MVT::LAST_VALUETYPE &&
            (unsigned)CC < array_lengthof(CondCodeActions) &&
            "Table isn't big enough!");
     CondCodeActions[(unsigned)CC] &= ~(uint64_t(3UL)  << VT.SimpleTy*2);
@@ -1049,12 +1070,6 @@ protected:
   /// by the target to override the default.
   void AddPromotedToType(unsigned Opc, MVT OrigVT, MVT DestVT) {
     PromoteToType[std::make_pair(Opc, OrigVT.SimpleTy)] = DestVT.SimpleTy;
-  }
-
-  /// addLegalFPImmediate - Indicate that this target can instruction select
-  /// the specified FP immediate natively.
-  void addLegalFPImmediate(const APFloat& Imm) {
-    LegalFPImmediates.push_back(Imm);
   }
 
   /// setTargetDAGCombine - Targets should invoke this method for each target
@@ -1116,7 +1131,7 @@ public:
   ///
   virtual SDValue
     LowerFormalArguments(SDValue Chain,
-                         unsigned CallConv, bool isVarArg,
+                         CallingConv::ID CallConv, bool isVarArg,
                          const SmallVectorImpl<ISD::InputArg> &Ins,
                          DebugLoc dl, SelectionDAG &DAG,
                          SmallVectorImpl<SDValue> &InVals) {
@@ -1147,8 +1162,9 @@ public:
   std::pair<SDValue, SDValue>
   LowerCallTo(SDValue Chain, const Type *RetTy, bool RetSExt, bool RetZExt,
               bool isVarArg, bool isInreg, unsigned NumFixedArgs,
-              unsigned CallConv, bool isTailCall, bool isReturnValueUsed,
-              SDValue Callee, ArgListTy &Args, SelectionDAG &DAG, DebugLoc dl);
+              CallingConv::ID CallConv, bool isTailCall,
+              bool isReturnValueUsed, SDValue Callee, ArgListTy &Args,
+              SelectionDAG &DAG, DebugLoc dl);
 
   /// LowerCall - This hook must be implemented to lower calls into the
   /// the specified DAG. The outgoing arguments to the call are described
@@ -1156,15 +1172,9 @@ public:
   /// described by the Ins array. The implementation should fill in the
   /// InVals array with legal-type return values from the call, and return
   /// the resulting token chain value.
-  ///
-  /// The isTailCall flag here is normative. If it is true, the
-  /// implementation must emit a tail call. The
-  /// IsEligibleForTailCallOptimization hook should be used to catch
-  /// cases that cannot be handled.
-  ///
   virtual SDValue
     LowerCall(SDValue Chain, SDValue Callee,
-              unsigned CallConv, bool isVarArg, bool isTailCall,
+              CallingConv::ID CallConv, bool isVarArg, bool &isTailCall,
               const SmallVectorImpl<ISD::OutputArg> &Outs,
               const SmallVectorImpl<ISD::InputArg> &Ins,
               DebugLoc dl, SelectionDAG &DAG,
@@ -1173,13 +1183,25 @@ public:
     return SDValue();    // this is here to silence compiler errors
   }
 
+  /// CanLowerReturn - This hook should be implemented to check whether the
+  /// return values described by the Outs array can fit into the return
+  /// registers.  If false is returned, an sret-demotion is performed.
+  ///
+  virtual bool CanLowerReturn(CallingConv::ID CallConv, bool isVarArg,
+               const SmallVectorImpl<EVT> &OutTys,
+               const SmallVectorImpl<ISD::ArgFlagsTy> &ArgsFlags,
+               SelectionDAG &DAG)
+  {
+    // Return true by default to get preexisting behavior.
+    return true;
+  }
   /// LowerReturn - This hook must be implemented to lower outgoing
   /// return values, described by the Outs array, into the specified
   /// DAG. The implementation should return the resulting token chain
   /// value.
   ///
   virtual SDValue
-    LowerReturn(SDValue Chain, unsigned CallConv, bool isVarArg,
+    LowerReturn(SDValue Chain, CallingConv::ID CallConv, bool isVarArg,
                 const SmallVectorImpl<ISD::OutputArg> &Outs,
                 DebugLoc dl, SelectionDAG &DAG) {
     assert(0 && "Not Implemented");
@@ -1276,33 +1298,6 @@ public:
   virtual void ReplaceNodeResults(SDNode *N, SmallVectorImpl<SDValue> &Results,
                                   SelectionDAG &DAG) {
     assert(0 && "ReplaceNodeResults not implemented for this target!");
-  }
-
-  /// IsEligibleForTailCallOptimization - Check whether the call is eligible for
-  /// tail call optimization. Targets which want to do tail call optimization
-  /// should override this function.
-  virtual bool
-  IsEligibleForTailCallOptimization(SDValue Callee,
-                                    unsigned CalleeCC,
-                                    bool isVarArg,
-                                    const SmallVectorImpl<ISD::InputArg> &Ins,
-                                    SelectionDAG& DAG) const {
-    // Conservative default: no calls are eligible.
-    return false;
-  }
-
-  /// GetPossiblePreceedingTailCall - Get preceeding TailCallNodeOpCode node if
-  /// it exists. Skip a possible ISD::TokenFactor.
-  static SDValue GetPossiblePreceedingTailCall(SDValue Chain,
-                                                 unsigned TailCallNodeOpCode) {
-    if (Chain.getOpcode() == TailCallNodeOpCode) {
-      return Chain;
-    } else if (Chain.getOpcode() == ISD::TokenFactor) {
-      if (Chain.getNumOperands() &&
-          Chain.getOperand(0).getOpcode() == TailCallNodeOpCode)
-        return Chain.getOperand(0);
-    }
-    return Chain;
   }
 
   /// getTargetNodeName() - This method returns the name of a target specific
@@ -1431,16 +1426,21 @@ public:
                                             SelectionDAG &DAG) const;
   
   //===--------------------------------------------------------------------===//
-  // Scheduler hooks
+  // Instruction Emitting Hooks
   //
   
   // EmitInstrWithCustomInserter - This method should be implemented by targets
-  // that mark instructions with the 'usesCustomDAGSchedInserter' flag.  These
+  // that mark instructions with the 'usesCustomInserter' flag.  These
   // instructions are special in various ways, which require special support to
   // insert.  The specified MachineInstr is created but not inserted into any
-  // basic blocks, and the scheduler passes ownership of it to this method.
+  // basic blocks, and this method is called to expand it into a sequence of
+  // instructions, potentially also creating new basic blocks and control flow.
+  // When new basic blocks are inserted and the edges from MBB to its successors
+  // are modified, the method should insert pairs of <OldSucc, NewSucc> into the
+  // DenseMap.
   virtual MachineBasicBlock *EmitInstrWithCustomInserter(MachineInstr *MI,
-                                                  MachineBasicBlock *MBB) const;
+                                                         MachineBasicBlock *MBB,
+                    DenseMap<MachineBasicBlock*, MachineBasicBlock*> *EM) const;
 
   //===--------------------------------------------------------------------===//
   // Addressing mode description hooks (used by LSR etc).
@@ -1481,7 +1481,7 @@ public:
   }
 
   /// isZExtFree - Return true if any actual instruction that defines a
-  /// value of type Ty1 implicit zero-extends the value to Ty2 in the result
+  /// value of type Ty1 implicitly zero-extends the value to Ty2 in the result
   /// register. This does not necessarily include registers defined in
   /// unknown ways, such as incoming arguments, or copies from unknown
   /// virtual registers. Also, if isTruncateFree(Ty2, Ty1) is true, this
@@ -1501,6 +1501,14 @@ public:
   /// from i32 to i8 but not from i32 to i16.
   virtual bool isNarrowingProfitable(EVT VT1, EVT VT2) const {
     return false;
+  }
+
+  /// isLegalICmpImmediate - Return true if the specified immediate is legal
+  /// icmp immediate, that is the target has icmp instructions which can compare
+  /// a register against the immediate without having to materialize the
+  /// immediate into a register.
+  virtual bool isLegalICmpImmediate(int64_t Imm) const {
+    return true;
   }
 
   //===--------------------------------------------------------------------===//
@@ -1565,10 +1573,6 @@ private:
   ///
   bool IsLittleEndian;
 
-  /// UsesGlobalOffsetTable - True if this target uses a GOT for PIC codegen.
-  ///
-  bool UsesGlobalOffsetTable;
-  
   /// SelectIsExpensive - Tells the code generator not to expand operations
   /// into sequences that use the select operations if possible.
   bool SelectIsExpensive;
@@ -1690,8 +1694,6 @@ private:
   uint64_t CondCodeActions[ISD::SETCC_INVALID];
 
   ValueTypeActionImpl ValueTypeActions;
-
-  std::vector<APFloat> LegalFPImmediates;
 
   std::vector<std::pair<EVT, TargetRegisterClass*> > AvailableRegClasses;
 

@@ -30,7 +30,6 @@
 #include "llvm/Analysis/ConstantFolding.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/Statistic.h"
@@ -46,7 +45,7 @@ TailDupThreshold("taildup-threshold",
                  cl::init(1), cl::Hidden);
 
 namespace {
-  class VISIBILITY_HIDDEN TailDup : public FunctionPass {
+  class TailDup : public FunctionPass {
     bool runOnFunction(Function &F);
   public:
     static char ID; // Pass identification, replacement for typeid
@@ -129,8 +128,8 @@ bool TailDup::shouldEliminateUnconditionalBranch(TerminatorInst *TI,
     // other instructions.
     if (isa<CallInst>(I) || isa<InvokeInst>(I)) return false;
 
-    // Allso alloca and malloc.
-    if (isa<AllocationInst>(I)) return false;
+    // Also alloca and malloc.
+    if (isa<AllocaInst>(I)) return false;
 
     // Some vector instructions can expand into a number of instructions.
     if (isa<ShuffleVectorInst>(I) || isa<ExtractElementInst>(I) ||
@@ -244,13 +243,13 @@ void TailDup::eliminateUnconditionalBranch(BranchInst *Branch) {
   BasicBlock *DestBlock = Branch->getSuccessor(0);
   assert(SourceBlock != DestBlock && "Our predicate is broken!");
 
-  DEBUG(errs() << "TailDuplication[" << SourceBlock->getParent()->getName()
+  DEBUG(dbgs() << "TailDuplication[" << SourceBlock->getParent()->getName()
         << "]: Eliminating branch: " << *Branch);
 
   // See if we can avoid duplicating code by moving it up to a dominator of both
   // blocks.
   if (BasicBlock *DomBlock = FindObviousSharedDomOf(SourceBlock, DestBlock)) {
-    DEBUG(errs() << "Found shared dominator: " << DomBlock->getName() << "\n");
+    DEBUG(dbgs() << "Found shared dominator: " << DomBlock->getName() << "\n");
 
     // If there are non-phi instructions in DestBlock that have no operands
     // defined in DestBlock, and if the instruction has no side effects, we can
@@ -273,7 +272,7 @@ void TailDup::eliminateUnconditionalBranch(BranchInst *Branch) {
           // Remove from DestBlock, move right before the term in DomBlock.
           DestBlock->getInstList().remove(I);
           DomBlock->getInstList().insert(DomBlock->getTerminator(), I);
-          DOUT << "Hoisted: " << *I;
+          DEBUG(dbgs() << "Hoisted: " << *I);
         }
       }
     }
@@ -306,7 +305,7 @@ void TailDup::eliminateUnconditionalBranch(BranchInst *Branch) {
   // keeping track of the mapping...
   //
   for (; BI != DestBlock->end(); ++BI) {
-    Instruction *New = BI->clone(BI->getContext());
+    Instruction *New = BI->clone();
     New->setName(BI->getName());
     SourceBlock->getInstList().push_back(New);
     ValueMapping[BI] = New;
@@ -360,8 +359,7 @@ void TailDup::eliminateUnconditionalBranch(BranchInst *Branch) {
       Instruction *Inst = BI++;
       if (isInstructionTriviallyDead(Inst))
         Inst->eraseFromParent();
-      else if (Constant *C = ConstantFoldInstruction(Inst,
-                                                     Inst->getContext())) {
+      else if (Constant *C = ConstantFoldInstruction(Inst)) {
         Inst->replaceAllUsesWith(C);
         Inst->eraseFromParent();
       }

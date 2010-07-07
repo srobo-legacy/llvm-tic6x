@@ -22,6 +22,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Support/ConstantRange.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Instructions.h"
 using namespace llvm;
@@ -492,6 +493,30 @@ ConstantRange ConstantRange::truncate(uint32_t DstTySize) const {
   return ConstantRange(L, U);
 }
 
+/// zextOrTrunc - make this range have the bit width given by \p DstTySize. The
+/// value is zero extended, truncated, or left alone to make it that width.
+ConstantRange ConstantRange::zextOrTrunc(uint32_t DstTySize) const {
+  unsigned SrcTySize = getBitWidth();
+  if (SrcTySize > DstTySize)
+    return truncate(DstTySize);
+  else if (SrcTySize < DstTySize)
+    return zeroExtend(DstTySize);
+  else
+    return *this;
+}
+
+/// sextOrTrunc - make this range have the bit width given by \p DstTySize. The
+/// value is sign extended, truncated, or left alone to make it that width.
+ConstantRange ConstantRange::sextOrTrunc(uint32_t DstTySize) const {
+  unsigned SrcTySize = getBitWidth();
+  if (SrcTySize > DstTySize)
+    return truncate(DstTySize);
+  else if (SrcTySize < DstTySize)
+    return signExtend(DstTySize);
+  else
+    return *this;
+}
+
 ConstantRange
 ConstantRange::add(const ConstantRange &Other) const {
   if (isEmptySet() || Other.isEmptySet())
@@ -515,6 +540,11 @@ ConstantRange::add(const ConstantRange &Other) const {
 
 ConstantRange
 ConstantRange::multiply(const ConstantRange &Other) const {
+  // TODO: If either operand is a single element and the multiply is known to
+  // be non-wrapping, round the result min and max value to the appropriate
+  // multiple of that element. If wrapping is possible, at least adjust the
+  // range according to the greatest power-of-two factor of the single element.
+
   if (isEmptySet() || Other.isEmptySet())
     return ConstantRange(getBitWidth(), /*isFullSet=*/false);
   if (isFullSet() || Other.isFullSet())
@@ -585,21 +615,58 @@ ConstantRange::udiv(const ConstantRange &RHS) const {
   return ConstantRange(Lower, Upper);
 }
 
+ConstantRange
+ConstantRange::shl(const ConstantRange &Amount) const {
+  if (isEmptySet())
+    return *this;
+
+  APInt min = getUnsignedMin() << Amount.getUnsignedMin();
+  APInt max = getUnsignedMax() << Amount.getUnsignedMax();
+
+  // there's no overflow!
+  APInt Zeros(getBitWidth(), getUnsignedMax().countLeadingZeros());
+  if (Zeros.uge(Amount.getUnsignedMax()))
+    return ConstantRange(min, max);
+
+  // FIXME: implement the other tricky cases
+  return ConstantRange(getBitWidth());
+}
+
+ConstantRange
+ConstantRange::ashr(const ConstantRange &Amount) const {
+  if (isEmptySet())
+    return *this;
+
+  APInt min = getUnsignedMax().ashr(Amount.getUnsignedMin());
+  APInt max = getUnsignedMin().ashr(Amount.getUnsignedMax());
+  return ConstantRange(min, max);
+}
+
+ConstantRange
+ConstantRange::lshr(const ConstantRange &Amount) const {
+  if (isEmptySet())
+    return *this;
+  
+  APInt min = getUnsignedMax().lshr(Amount.getUnsignedMin());
+  APInt max = getUnsignedMin().lshr(Amount.getUnsignedMax());
+  return ConstantRange(min, max);
+}
+
 /// print - Print out the bounds to a stream...
 ///
 void ConstantRange::print(raw_ostream &OS) const {
-  OS << "[" << Lower << "," << Upper << ")";
+  if (isFullSet())
+    OS << "full-set";
+  else if (isEmptySet())
+    OS << "empty-set";
+  else
+    OS << "[" << Lower << "," << Upper << ")";
 }
 
 /// dump - Allow printing from a debugger easily...
 ///
 void ConstantRange::dump() const {
-  print(errs());
+  print(dbgs());
 }
 
-std::ostream &llvm::operator<<(std::ostream &o,
-                               const ConstantRange &CR) {
-  raw_os_ostream OS(o);
-  OS << CR;
-  return o;
-}
+

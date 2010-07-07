@@ -1,7 +1,7 @@
-; RUN: llvm-as < %s | llc -soft-float
+; RUN: llc < %s -soft-float
 ; PR3899
 
-@m = external global <2 x double>;
+@m = external global <2 x double>
 
 define double @vector_ex() nounwind {
        %v = load <2 x double>* @m

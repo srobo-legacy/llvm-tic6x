@@ -36,6 +36,7 @@
 #include "llvm/CodeGen/RegisterScavenging.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
+#include "llvm/Support/ErrorHandling.h"
 
 using namespace llvm;
 
@@ -70,11 +71,11 @@ const unsigned *
 TMS320C64XRegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const
 {
 	static const unsigned nonvolatileRegs[] = {
-		TMS320C64X::A10, TMS320C64X::B10,
-		TMS320C64X::A11, TMS320C64X::B11,
-		TMS320C64X::A12, TMS320C64X::B12,
-		TMS320C64X::A13, TMS320C64X::B13,
-		TMS320C64X::B14,
+		TMS320C64X::A10,
+		TMS320C64X::A11,
+		TMS320C64X::A12,
+		TMS320C64X::A13,
+		0
 	};
 
 	return nonvolatileRegs;
@@ -84,10 +85,6 @@ const TargetRegisterClass* const*
 TMS320C64XRegisterInfo::getCalleeSavedRegClasses(MachineFunction const*) const
 {
 	static const TargetRegisterClass *const calleeNonvolatileRegClasses[] ={
-		&TMS320C64X::GPRegsRegClass, &TMS320C64X::GPRegsRegClass,
-		&TMS320C64X::GPRegsRegClass, &TMS320C64X::GPRegsRegClass,
-		&TMS320C64X::GPRegsRegClass, &TMS320C64X::GPRegsRegClass,
-		&TMS320C64X::GPRegsRegClass, &TMS320C64X::GPRegsRegClass,
 		&TMS320C64X::GPRegsRegClass, &TMS320C64X::GPRegsRegClass,
 		&TMS320C64X::GPRegsRegClass, &TMS320C64X::GPRegsRegClass
 	};
@@ -99,7 +96,7 @@ unsigned int
 TMS320C64XRegisterInfo::getSubReg(unsigned int, unsigned int) const
 {
 
-	llvm_unreachable_internal("Unimplemented function getSubReg\n");
+	llvm_unreachable("Unimplemented function getSubReg\n");
 }
 
 bool
@@ -124,12 +121,15 @@ TMS320C64XRegisterInfo::requiresRegisterScavenging(const MachineFunction &MF) co
 	return true;
 }
 
-void
+unsigned
 TMS320C64XRegisterInfo::eliminateFrameIndex(
-	MachineBasicBlock::iterator MBBI, int SPAdj, RegScavenger *r) const
+	MachineBasicBlock::iterator MBBI, int SPAdj, int *Vaule,
+	RegScavenger *r) const
 {
 	unsigned i, frame_index, reg, access_alignment;
 	int offs;
+
+	/* XXX - Value turned up in 2.7, I don't know what it does. */
 
 	MachineInstr &MI = *MBBI;
 	MachineFunction &MF = *MI.getParent()->getParent();
@@ -155,7 +155,7 @@ TMS320C64XRegisterInfo::eliminateFrameIndex(
 		// need to scavenge a register
 		if (check_sconst_fits(offs, 5)) {
 			MI.getOperand(i).ChangeToImmediate(offs);
-			return;
+			return 0;
 		}
 		access_alignment = 0;
 	// So for memory, will this frame index actually fit inside the
@@ -165,7 +165,7 @@ TMS320C64XRegisterInfo::eliminateFrameIndex(
 		// it'll be scaled appropriately
 
 		MI.getOperand(i).ChangeToImmediate(offs);
-		return;
+		return 0;
 	}
 
 	// Otherwise, we need to do some juggling to load that constant into
@@ -199,6 +199,7 @@ TMS320C64XRegisterInfo::eliminateFrameIndex(
 		.addReg(reg, RegState::Define).addImm(offs));
 
 	MI.getOperand(i).ChangeToRegister(reg, false, false, true);
+	return 0;
 }
 
 void
@@ -221,18 +222,22 @@ TMS320C64XRegisterInfo::emitPrologue(MachineFunction &MF) const
 	frame_size = MFI->getStackSize();
 	frame_size += 8;
 
+	// Align the size of the stack - has to remain double word aligned.
+	frame_size += 7;
+	frame_size &= ~7;
+
 	// Emit setup instructions
 	// Store return pointer - we could use the correct addressing mode
 	// to decrement SP for us, but I don't know the infrastructure well
 	// enough to do that yet
 	addDefaultPred(BuildMI(MBB, MBBI, dl,
-		TII.get(TMS320C64X::word_idx_store2))
+		TII.get(TMS320C64X::word_store_p_addr))
 		.addReg(TMS320C64X::B15).addImm(0)
 		.addReg(TMS320C64X::B3, RegState::Kill));
 
 	// Store FP
 	addDefaultPred(BuildMI(MBB, MBBI, dl,
-		TII.get(TMS320C64X::word_idx_store2))
+		TII.get(TMS320C64X::word_store_p_addr))
 		.addReg(TMS320C64X::B15).addImm(-4).addReg(TMS320C64X::A15));
 
 	// Setup our own FP using the current SP
@@ -258,7 +263,7 @@ TMS320C64XRegisterInfo::emitPrologue(MachineFunction &MF) const
 			.addImm(frame_size).addReg(TMS320C64X::A0));
 	}
 
-	addDefaultPred(BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::sub_l_rx2),
+	addDefaultPred(BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::sub_l2x),
 		TMS320C64X::B15).addReg(TMS320C64X::B15)
 		.addReg(TMS320C64X::A0, RegState::Kill));
 }
@@ -283,12 +288,12 @@ TMS320C64XRegisterInfo::emitEpilogue(MachineFunction &MF,
 		TII.get(TMS320C64X::mv2))
 		.addReg(TMS320C64X::B15).addReg(TMS320C64X::A15));
 	addDefaultPred(BuildMI(MBB, MBBI, DL,
-		TII.get(TMS320C64X::word_idx_load2))
+		TII.get(TMS320C64X::word_load_p_addr))
 		.addReg(TMS320C64X::A15, RegState::Define)
 		.addReg(TMS320C64X::B15)
 		.addImm(-4));
 	addDefaultPred(BuildMI(MBB, MBBI, DL,
-		TII.get(TMS320C64X::word_idx_load2))
+		TII.get(TMS320C64X::word_load_p_addr))
 		.addReg(TMS320C64X::B3, RegState::Define)
 		.addReg(TMS320C64X::B15).addImm(0));
 
@@ -301,19 +306,19 @@ int
 TMS320C64XRegisterInfo::getDwarfRegNum(unsigned reg_num, bool isEH) const
 {
 
-	llvm_unreachable_internal("Unimplemented function getDwarfRegNum\n");
+	llvm_unreachable("Unimplemented function getDwarfRegNum\n");
 }
 
 unsigned int
 TMS320C64XRegisterInfo::getRARegister() const
 {
 
-	llvm_unreachable_internal("Unimplemented function getRARegister\n");
+	llvm_unreachable("Unimplemented function getRARegister\n");
 }
 
 unsigned int
-TMS320C64XRegisterInfo::getFrameRegister(MachineFunction &MF) const
+TMS320C64XRegisterInfo::getFrameRegister(const MachineFunction &MF) const
 {
 
-	llvm_unreachable_internal("Unimplemented function getFrameRegister\n");
+	llvm_unreachable("Unimplemented function getFrameRegister\n");
 }

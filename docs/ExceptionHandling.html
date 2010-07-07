@@ -4,7 +4,7 @@
 <head>
   <title>Exception Handling in LLVM</title>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <meta name="description" 
+  <meta name="description"
         content="Exception Handling in LLVM.">
   <link rel="stylesheet" href="llvm.css" type="text/css">
 </head>
@@ -39,6 +39,7 @@
   	<li><a href="#llvm_eh_sjlj_setjmp"><tt>llvm.eh.sjlj.setjmp</tt></a></li>
   	<li><a href="#llvm_eh_sjlj_longjmp"><tt>llvm.eh.sjlj.longjmp</tt></a></li>
   	<li><a href="#llvm_eh_sjlj_lsda"><tt>llvm.eh.sjlj.lsda</tt></a></li>
+  	<li><a href="#llvm_eh_sjlj_callsite"><tt>llvm.eh.sjlj.callsite</tt></a></li>
   </ol></li>
   <li><a href="#asm">Asm Table Formats</a>
   <ol>
@@ -56,7 +57,7 @@
 
 
 <!-- *********************************************************************** -->
-<div class="doc_section"><a name="introduction">Introduction</a></div> 
+<div class="doc_section"><a name="introduction">Introduction</a></div>
 <!-- *********************************************************************** -->
 
 <div class="doc_text">
@@ -295,10 +296,17 @@
   <li><tt>__cxa_begin_catch</tt> takes a exception structure reference as an
       argument and returns the value of the exception object.</li>
 
-  <li><tt>__cxa_end_catch</tt> takes a exception structure reference as an
-      argument. This function clears the exception from the exception space.
-      Note: a rethrow from within the catch may replace this call with
-      a <tt>__cxa_rethrow</tt>.</li>
+  <li><tt>__cxa_end_catch</tt> takes no arguments. This function:<br><br>
+    <ol>
+      <li>Locates the most recently caught exception and decrements its handler
+          count,</li>
+      <li>Removes the exception from the "caught" stack if the handler count
+          goes to zero, and</li>
+      <li>Destroys the exception if the handler count goes to zero, and the
+          exception was not re-thrown by throw.</li>
+    </ol>
+    <p>Note: a rethrow from within the catch may replace this call with
+       a <tt>__cxa_rethrow</tt>.</p></li>
 </ul>
 
 </div>
@@ -411,8 +419,7 @@
 <div class="doc_text">
 
 <pre>
-  i32 %<a href="#llvm_eh_selector">llvm.eh.selector.i32</a>(i8*, i8*, i8*, ...)
-  i64 %<a href="#llvm_eh_selector">llvm.eh.selector.i64</a>(i8*, i8*, i8*, ...)
+  i32 %<a href="#llvm_eh_selector">llvm.eh.selector</a>(i8*, i8*, i8*, ...)
 </pre>
 
 <p>This intrinsic is used to compare the exception with the given type infos,
@@ -444,8 +451,7 @@
 <div class="doc_text">
 
 <pre>
-  i32 %<a href="#llvm_eh_typeid_for">llvm.eh.typeid.for.i32</a>(i8*)
-  i64 %<a href="#llvm_eh_typeid_for">llvm.eh.typeid.for.i64</a>(i8*)
+  i32 %<a href="#llvm_eh_typeid_for">llvm.eh.typeid.for</a>(i8*)
 </pre>
 
 <p>This intrinsic returns the type info index in the exception table of the
@@ -500,6 +506,24 @@
    Specific Data Area (LSDA) for the current function. The SJLJ front-end code
    stores this address in the exception handling function context for use by the
    runtime.</p>
+
+</div>
+
+<!-- ======================================================================= -->
+<div class="doc_subsubsection">
+  <a name="llvm_eh_sjlj_callsite">llvm.eh.sjlj.callsite</a>
+</div>
+
+<div class="doc_text">
+
+<pre>
+  void %<a href="#llvm_eh_sjlj_callsite">llvm.eh.sjlj.callsite</a>(i32)
+</pre>
+
+<p>For SJLJ based exception handling, the <a href="#llvm_eh_sjlj_callsite">
+  <tt>llvm.eh.sjlj.callsite</tt></a> intrinsic identifies the callsite value
+  associated with the following invoke instruction. This is used to ensure
+  that landing pad entries in the LSDA are generated in the matching order.</p>
 
 </div>
 

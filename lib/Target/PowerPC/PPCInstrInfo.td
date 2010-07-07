@@ -35,11 +35,11 @@ def SDT_PPCcondbr : SDTypeProfile<0, 3, [
   SDTCisVT<0, i32>, SDTCisVT<2, OtherVT>
 ]>;
 
-def SDT_PPClbrx : SDTypeProfile<1, 3, [
-  SDTCisVT<0, i32>, SDTCisPtrTy<1>, SDTCisVT<2, OtherVT>, SDTCisVT<3, OtherVT>
+def SDT_PPClbrx : SDTypeProfile<1, 2, [
+  SDTCisVT<0, i32>, SDTCisPtrTy<1>, SDTCisVT<2, OtherVT>
 ]>;
-def SDT_PPCstbrx : SDTypeProfile<0, 4, [
-  SDTCisVT<0, i32>, SDTCisPtrTy<1>, SDTCisVT<2, OtherVT>, SDTCisVT<3, OtherVT>
+def SDT_PPCstbrx : SDTypeProfile<0, 3, [
+  SDTCisVT<0, i32>, SDTCisPtrTy<1>, SDTCisVT<2, OtherVT>
 ]>;
 
 def SDT_PPClarx : SDTypeProfile<1, 1, [
@@ -115,6 +115,12 @@ def PPCcall_Darwin : SDNode<"PPCISD::CALL_Darwin", SDT_PPCCall,
 def PPCcall_SVR4  : SDNode<"PPCISD::CALL_SVR4", SDT_PPCCall,
                            [SDNPHasChain, SDNPOptInFlag, SDNPOutFlag]>;
 def PPCnop : SDNode<"PPCISD::NOP", SDT_PPCnop, [SDNPInFlag, SDNPOutFlag]>;
+def PPCload   : SDNode<"PPCISD::LOAD", SDTypeProfile<1, 1, []>,
+                       [SDNPHasChain, SDNPOptInFlag, SDNPOutFlag]>;
+def PPCload_toc : SDNode<"PPCISD::LOAD_TOC", SDTypeProfile<0, 1, []>,
+                          [SDNPHasChain, SDNPInFlag, SDNPOutFlag]>;
+def PPCtoc_restore : SDNode<"PPCISD::TOC_RESTORE", SDTypeProfile<0, 0, []>,
+                            [SDNPHasChain, SDNPInFlag, SDNPOutFlag]>;
 def PPCmtctr      : SDNode<"PPCISD::MTCTR", SDT_PPCCall,
                            [SDNPHasChain, SDNPOptInFlag, SDNPOutFlag]>;
 def PPCbctrl_Darwin  : SDNode<"PPCISD::BCTRL_Darwin", SDTNone,
@@ -363,9 +369,9 @@ def DYNALLOC : Pseudo<(outs GPRC:$result), (ins GPRC:$negsize, memri:$fpsi),
                        [(set GPRC:$result,
                              (PPCdynalloc GPRC:$negsize, iaddr:$fpsi))]>;
                          
-// SELECT_CC_* - Used to implement the SELECT_CC DAG operation.  Expanded by the
-// scheduler into a branch sequence.
-let usesCustomDAGSchedInserter = 1,    // Expanded by the scheduler.
+// SELECT_CC_* - Used to implement the SELECT_CC DAG operation.  Expanded after
+// instruction selection into a branch sequence.
+let usesCustomInserter = 1,    // Expanded after instruction selection.
     PPC970_Single = 1 in {
   def SELECT_CC_I4 : Pseudo<(outs GPRC:$dst), (ins CRRC:$cond, GPRC:$T, GPRC:$F,
                               i32imm:$BROPC), "${:comment} SELECT_CC PSEUDO!",
@@ -424,9 +430,7 @@ let isCall = 1, PPC970_Unit = 7,
           F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11,F12,F13,
           V0,V1,V2,V3,V4,V5,V6,V7,V8,V9,V10,V11,V12,V13,V14,V15,V16,V17,V18,V19,
           LR,CTR,
-          CR0,CR1,CR5,CR6,CR7,
-          CR0LT,CR0GT,CR0EQ,CR0UN,CR1LT,CR1GT,CR1EQ,CR1UN,CR5LT,CR5GT,CR5EQ,
-          CR5UN,CR6LT,CR6GT,CR6EQ,CR6UN,CR7LT,CR7GT,CR7EQ,CR7UN] in {
+          CR0,CR1,CR5,CR6,CR7,CARRY] in {
   // Convenient aliases for call instructions
   let Uses = [RM] in {
     def BL_Darwin  : IForm<18, 0, 1,
@@ -451,9 +455,7 @@ let isCall = 1, PPC970_Unit = 7,
           F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11,F12,F13,
           V0,V1,V2,V3,V4,V5,V6,V7,V8,V9,V10,V11,V12,V13,V14,V15,V16,V17,V18,V19,
           LR,CTR,
-          CR0,CR1,CR5,CR6,CR7,
-          CR0LT,CR0GT,CR0EQ,CR0UN,CR1LT,CR1GT,CR1EQ,CR1UN,CR5LT,CR5GT,CR5EQ,
-          CR5UN,CR6LT,CR6GT,CR6EQ,CR6UN,CR7LT,CR7GT,CR7EQ,CR7UN] in {
+          CR0,CR1,CR5,CR6,CR7,CARRY] in {
   // Convenient aliases for call instructions
   let Uses = [RM] in {
     def BL_SVR4  : IForm<18, 0, 1,
@@ -539,7 +541,7 @@ def DCBZL  : DCB_Form<1014, 1, (outs), (ins memrr:$dst),
                       PPC970_DGroup_Single;
 
 // Atomic operations
-let usesCustomDAGSchedInserter = 1 in {
+let usesCustomInserter = 1 in {
   let Uses = [CR0] in {
     def ATOMIC_LOAD_ADD_I8 : Pseudo<
       (outs GPRC:$dst), (ins memrr:$ptr, GPRC:$incr),
@@ -741,10 +743,10 @@ def LWZX : XForm_1<31,  23, (outs GPRC:$rD), (ins memrr:$src),
                    
 def LHBRX : XForm_1<31, 790, (outs GPRC:$rD), (ins memrr:$src),
                    "lhbrx $rD, $src", LdStGeneral,
-                   [(set GPRC:$rD, (PPClbrx xoaddr:$src, srcvalue:$sv, i16))]>;
+                   [(set GPRC:$rD, (PPClbrx xoaddr:$src, i16))]>;
 def LWBRX : XForm_1<31,  534, (outs GPRC:$rD), (ins memrr:$src),
                    "lwbrx $rD, $src", LdStGeneral,
-                   [(set GPRC:$rD, (PPClbrx xoaddr:$src, srcvalue:$sv, i32))]>;
+                   [(set GPRC:$rD, (PPClbrx xoaddr:$src, i32))]>;
 
 def LFSX   : XForm_25<31, 535, (outs F4RC:$frD), (ins memrr:$src),
                       "lfsx $frD, $src", LdStLFDU,
@@ -837,11 +839,11 @@ def STWUX : XForm_8<31, 183, (outs), (ins GPRC:$rS, GPRC:$rA, GPRC:$rB),
 }
 def STHBRX: XForm_8<31, 918, (outs), (ins GPRC:$rS, memrr:$dst),
                    "sthbrx $rS, $dst", LdStGeneral,
-                   [(PPCstbrx GPRC:$rS, xoaddr:$dst, srcvalue:$dummy, i16)]>, 
+                   [(PPCstbrx GPRC:$rS, xoaddr:$dst, i16)]>, 
                    PPC970_DGroup_Cracked;
 def STWBRX: XForm_8<31, 662, (outs), (ins GPRC:$rS, memrr:$dst),
                    "stwbrx $rS, $dst", LdStGeneral,
-                   [(PPCstbrx GPRC:$rS, xoaddr:$dst, srcvalue:$dummy, i32)]>,
+                   [(PPCstbrx GPRC:$rS, xoaddr:$dst, i32)]>,
                    PPC970_DGroup_Cracked;
 
 def STFIWX: XForm_28<31, 983, (outs), (ins F8RC:$frS, memrr:$dst),
@@ -869,6 +871,7 @@ let PPC970_Unit = 1 in {  // FXU Operations.
 def ADDI   : DForm_2<14, (outs GPRC:$rD), (ins GPRC:$rA, s16imm:$imm),
                      "addi $rD, $rA, $imm", IntGeneral,
                      [(set GPRC:$rD, (add GPRC:$rA, immSExt16:$imm))]>;
+let Defs = [CARRY] in {
 def ADDIC  : DForm_2<12, (outs GPRC:$rD), (ins GPRC:$rA, s16imm:$imm),
                      "addic $rD, $rA, $imm", IntGeneral,
                      [(set GPRC:$rD, (addc GPRC:$rA, immSExt16:$imm))]>,
@@ -876,6 +879,7 @@ def ADDIC  : DForm_2<12, (outs GPRC:$rD), (ins GPRC:$rA, s16imm:$imm),
 def ADDICo : DForm_2<13, (outs GPRC:$rD), (ins GPRC:$rA, s16imm:$imm),
                      "addic. $rD, $rA, $imm", IntGeneral,
                      []>;
+}
 def ADDIS  : DForm_2<15, (outs GPRC:$rD), (ins GPRC:$rA, symbolHi:$imm),
                      "addis $rD, $rA, $imm", IntGeneral,
                      [(set GPRC:$rD, (add GPRC:$rA, imm16ShiftedSExt:$imm))]>;
@@ -886,9 +890,11 @@ def LA     : DForm_2<14, (outs GPRC:$rD), (ins GPRC:$rA, symbolLo:$sym),
 def MULLI  : DForm_2< 7, (outs GPRC:$rD), (ins GPRC:$rA, s16imm:$imm),
                      "mulli $rD, $rA, $imm", IntMulLI,
                      [(set GPRC:$rD, (mul GPRC:$rA, immSExt16:$imm))]>;
+let Defs = [CARRY] in {
 def SUBFIC : DForm_2< 8, (outs GPRC:$rD), (ins GPRC:$rA, s16imm:$imm),
                      "subfic $rD, $rA, $imm", IntGeneral,
                      [(set GPRC:$rD, (subc immSExt16:$imm, GPRC:$rA))]>;
+}
 
 let isReMaterializable = 1 in {
   def LI  : DForm_2_r0<14, (outs GPRC:$rD), (ins symbolLo:$imm),
@@ -961,15 +967,19 @@ def SLW  : XForm_6<31,  24, (outs GPRC:$rA), (ins GPRC:$rS, GPRC:$rB),
 def SRW  : XForm_6<31, 536, (outs GPRC:$rA), (ins GPRC:$rS, GPRC:$rB),
                    "srw $rA, $rS, $rB", IntGeneral,
                    [(set GPRC:$rA, (PPCsrl GPRC:$rS, GPRC:$rB))]>;
+let Defs = [CARRY] in {
 def SRAW : XForm_6<31, 792, (outs GPRC:$rA), (ins GPRC:$rS, GPRC:$rB),
                    "sraw $rA, $rS, $rB", IntShift,
                    [(set GPRC:$rA, (PPCsra GPRC:$rS, GPRC:$rB))]>;
 }
+}
 
 let PPC970_Unit = 1 in {  // FXU Operations.
+let Defs = [CARRY] in {
 def SRAWI : XForm_10<31, 824, (outs GPRC:$rA), (ins GPRC:$rS, u5imm:$SH), 
                      "srawi $rA, $rS, $SH", IntShift,
                      [(set GPRC:$rA, (sra GPRC:$rS, (i32 imm:$SH)))]>;
+}
 def CNTLZW : XForm_11<31,  26, (outs GPRC:$rA), (ins GPRC:$rS),
                       "cntlzw $rA, $rS", IntGeneral,
                       [(set GPRC:$rA, (ctlz GPRC:$rS))]>;
@@ -1009,20 +1019,16 @@ let Uses = [RM] in {
   }
 }
 
-/// FMR is split into 3 versions, one for 4/8 byte FP, and one for extending.
+/// FMR is split into 2 versions, one for 4/8 byte FP, and one for extending.
 ///
 /// Note that these are defined as pseudo-ops on the PPC970 because they are
 /// often coalesced away and we don't want the dispatch group builder to think
 /// that they will fill slots (which could cause the load of a LSU reject to
 /// sneak into a d-group with a store).
-def FMRS   : XForm_26<63, 72, (outs F4RC:$frD), (ins F4RC:$frB),
-                      "fmr $frD, $frB", FPGeneral,
-                      []>,  // (set F4RC:$frD, F4RC:$frB)
-                      PPC970_Unit_Pseudo;
-def FMRD   : XForm_26<63, 72, (outs F8RC:$frD), (ins F8RC:$frB),
-                      "fmr $frD, $frB", FPGeneral,
-                      []>,  // (set F8RC:$frD, F8RC:$frB)
-                      PPC970_Unit_Pseudo;
+def FMR   : XForm_26<63, 72, (outs F4RC:$frD), (ins F4RC:$frB),
+                     "fmr $frD, $frB", FPGeneral,
+                     []>,  // (set F4RC:$frD, F4RC:$frB)
+                     PPC970_Unit_Pseudo;
 def FMRSD  : XForm_26<63, 72, (outs F8RC:$frD), (ins F4RC:$frB),
                       "fmr $frD, $frB", FPGeneral,
                       [(set F8RC:$frD, (fextend F4RC:$frB))]>,
@@ -1164,13 +1170,12 @@ let PPC970_Unit = 1 in {  // FXU Operations.
 def ADD4  : XOForm_1<31, 266, 0, (outs GPRC:$rT), (ins GPRC:$rA, GPRC:$rB),
                      "add $rT, $rA, $rB", IntGeneral,
                      [(set GPRC:$rT, (add GPRC:$rA, GPRC:$rB))]>;
+let Defs = [CARRY] in {
 def ADDC  : XOForm_1<31, 10, 0, (outs GPRC:$rT), (ins GPRC:$rA, GPRC:$rB),
                      "addc $rT, $rA, $rB", IntGeneral,
                      [(set GPRC:$rT, (addc GPRC:$rA, GPRC:$rB))]>,
                      PPC970_DGroup_Cracked;
-def ADDE  : XOForm_1<31, 138, 0, (outs GPRC:$rT), (ins GPRC:$rA, GPRC:$rB),
-                     "adde $rT, $rA, $rB", IntGeneral,
-                     [(set GPRC:$rT, (adde GPRC:$rA, GPRC:$rB))]>;
+}
 def DIVW  : XOForm_1<31, 491, 0, (outs GPRC:$rT), (ins GPRC:$rA, GPRC:$rB),
                      "divw $rT, $rA, $rB", IntDivW,
                      [(set GPRC:$rT, (sdiv GPRC:$rA, GPRC:$rB))]>,
@@ -1191,28 +1196,35 @@ def MULLW : XOForm_1<31, 235, 0, (outs GPRC:$rT), (ins GPRC:$rA, GPRC:$rB),
 def SUBF  : XOForm_1<31, 40, 0, (outs GPRC:$rT), (ins GPRC:$rA, GPRC:$rB),
                      "subf $rT, $rA, $rB", IntGeneral,
                      [(set GPRC:$rT, (sub GPRC:$rB, GPRC:$rA))]>;
+let Defs = [CARRY] in {
 def SUBFC : XOForm_1<31, 8, 0, (outs GPRC:$rT), (ins GPRC:$rA, GPRC:$rB),
                      "subfc $rT, $rA, $rB", IntGeneral,
                      [(set GPRC:$rT, (subc GPRC:$rB, GPRC:$rA))]>,
                      PPC970_DGroup_Cracked;
-def SUBFE : XOForm_1<31, 136, 0, (outs GPRC:$rT), (ins GPRC:$rA, GPRC:$rB),
-                     "subfe $rT, $rA, $rB", IntGeneral,
-                     [(set GPRC:$rT, (sube GPRC:$rB, GPRC:$rA))]>;
-def ADDME  : XOForm_3<31, 234, 0, (outs GPRC:$rT), (ins GPRC:$rA),
-                      "addme $rT, $rA", IntGeneral,
-                      [(set GPRC:$rT, (adde GPRC:$rA, immAllOnes))]>;
-def ADDZE  : XOForm_3<31, 202, 0, (outs GPRC:$rT), (ins GPRC:$rA),
-                      "addze $rT, $rA", IntGeneral,
-                      [(set GPRC:$rT, (adde GPRC:$rA, 0))]>;
+}
 def NEG    : XOForm_3<31, 104, 0, (outs GPRC:$rT), (ins GPRC:$rA),
                       "neg $rT, $rA", IntGeneral,
                       [(set GPRC:$rT, (ineg GPRC:$rA))]>;
+let Uses = [CARRY], Defs = [CARRY] in {
+def ADDE  : XOForm_1<31, 138, 0, (outs GPRC:$rT), (ins GPRC:$rA, GPRC:$rB),
+                      "adde $rT, $rA, $rB", IntGeneral,
+                      [(set GPRC:$rT, (adde GPRC:$rA, GPRC:$rB))]>;
+def ADDME  : XOForm_3<31, 234, 0, (outs GPRC:$rT), (ins GPRC:$rA),
+                      "addme $rT, $rA", IntGeneral,
+                      [(set GPRC:$rT, (adde GPRC:$rA, -1))]>;
+def ADDZE  : XOForm_3<31, 202, 0, (outs GPRC:$rT), (ins GPRC:$rA),
+                      "addze $rT, $rA", IntGeneral,
+                      [(set GPRC:$rT, (adde GPRC:$rA, 0))]>;
+def SUBFE : XOForm_1<31, 136, 0, (outs GPRC:$rT), (ins GPRC:$rA, GPRC:$rB),
+                      "subfe $rT, $rA, $rB", IntGeneral,
+                      [(set GPRC:$rT, (sube GPRC:$rB, GPRC:$rA))]>;
 def SUBFME : XOForm_3<31, 232, 0, (outs GPRC:$rT), (ins GPRC:$rA),
                       "subfme $rT, $rA", IntGeneral,
-                      [(set GPRC:$rT, (sube immAllOnes, GPRC:$rA))]>;
+                      [(set GPRC:$rT, (sube -1, GPRC:$rA))]>;
 def SUBFZE : XOForm_3<31, 200, 0, (outs GPRC:$rT), (ins GPRC:$rA),
                       "subfze $rT, $rA", IntGeneral,
                       [(set GPRC:$rT, (sube 0, GPRC:$rA))]>;
+}
 }
 
 // A-Form instructions.  Most of the instructions executed in the FPU are of
@@ -1344,15 +1356,6 @@ def RLWNM  : MForm_2<23,
 
 
 //===----------------------------------------------------------------------===//
-// DWARF Pseudo Instructions
-//
-
-def DWARF_LOC        : Pseudo<(outs), (ins i32imm:$line, i32imm:$col, i32imm:$file),
-                              "${:comment} .loc $file, $line, $col",
-                      [(dwarf_loc (i32 imm:$line), (i32 imm:$col),
-                                  (i32 imm:$file))]>;
-
-//===----------------------------------------------------------------------===//
 // PowerPC Instruction Patterns
 //
 
@@ -1422,12 +1425,16 @@ def : Pat<(PPChi tconstpool:$in, 0), (LIS tconstpool:$in)>;
 def : Pat<(PPClo tconstpool:$in, 0), (LI tconstpool:$in)>;
 def : Pat<(PPChi tjumptable:$in, 0), (LIS tjumptable:$in)>;
 def : Pat<(PPClo tjumptable:$in, 0), (LI tjumptable:$in)>;
+def : Pat<(PPChi tblockaddress:$in, 0), (LIS tblockaddress:$in)>;
+def : Pat<(PPClo tblockaddress:$in, 0), (LI tblockaddress:$in)>;
 def : Pat<(add GPRC:$in, (PPChi tglobaladdr:$g, 0)),
           (ADDIS GPRC:$in, tglobaladdr:$g)>;
 def : Pat<(add GPRC:$in, (PPChi tconstpool:$g, 0)),
           (ADDIS GPRC:$in, tconstpool:$g)>;
 def : Pat<(add GPRC:$in, (PPChi tjumptable:$g, 0)),
           (ADDIS GPRC:$in, tjumptable:$g)>;
+def : Pat<(add GPRC:$in, (PPChi tblockaddress:$g, 0)),
+          (ADDIS GPRC:$in, tblockaddress:$g)>;
 
 // Fused negative multiply subtract, alternate pattern
 def : Pat<(fsub F8RC:$B, (fmul F8RC:$A, F8RC:$C)),
@@ -1469,11 +1476,11 @@ def : Pat<(extloadf32 xaddr:$src),
           (FMRSD (LFSX xaddr:$src))>;
 
 // Memory barriers
-def : Pat<(membarrier (i32 imm:$ll),
-                      (i32 imm:$ls),
-                      (i32 imm:$sl),
-                      (i32 imm:$ss),
-                      (i32 imm:$device)),
+def : Pat<(membarrier (i32 imm /*ll*/),
+                      (i32 imm /*ls*/),
+                      (i32 imm /*sl*/),
+                      (i32 imm /*ss*/),
+                      (i32 imm /*device*/)),
            (SYNC)>;
 
 include "PPCInstrAltivec.td"

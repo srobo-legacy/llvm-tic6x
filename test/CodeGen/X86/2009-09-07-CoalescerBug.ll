@@ -1,4 +1,4 @@
-; RUN: llvm-as < %s | llc -mtriple=x86_64-unknown-freebsd7.2 -code-model=kernel | FileCheck %s
+; RUN: llc < %s -mtriple=x86_64-unknown-freebsd7.2 -code-model=kernel | FileCheck %s
 ; PR4689
 
 %struct.__s = type { [8 x i8] }
@@ -8,8 +8,7 @@
 define i64 @hammer_time(i64 %modulep, i64 %physfree) nounwind ssp noredzone noimplicitfloat {
 ; CHECK: hammer_time:
 ; CHECK: movq $Xrsvd, %rax
-; CHECK: movq $Xrsvd, %rdi
-; CHECK: movq $Xrsvd, %r8
+; CHECK: movq $Xrsvd, %rcx
 entry:
   br i1 undef, label %if.then, label %if.end
 

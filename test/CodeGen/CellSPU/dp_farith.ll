@@ -1,4 +1,4 @@
-; RUN: llvm-as -o - %s | llc -march=cellspu > %t1.s
+; RUN: llc < %s -march=cellspu > %t1.s
 ; RUN: grep dfa    %t1.s | count 2
 ; RUN: grep dfs    %t1.s | count 2
 ; RUN: grep dfm    %t1.s | count 6
@@ -83,7 +83,7 @@ define double @d_fnms_2(double %arg1, double %arg2, double %arg3) {
 ; FNMS: - (a * b - c) => c - (a * b)
 define <2 x double> @d_fnms_vec_1(<2 x double> %arg1, <2 x double> %arg2, <2 x double> %arg3) {
         %A = fmul <2 x double> %arg1,  %arg2
-        %B = fsub <2 x double> %arg3, %A ;
+        %B = fsub <2 x double> %arg3, %A
         ret <2 x double> %B
 }
 

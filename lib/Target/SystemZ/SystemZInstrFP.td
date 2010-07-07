@@ -25,15 +25,15 @@ def fpimmneg0 : PatLeaf<(fpimm), [{
   return N->isExactlyValue(-0.0);
 }]>;
 
-let usesCustomDAGSchedInserter = 1 in {
+let Uses = [PSW], usesCustomInserter = 1 in {
   def SelectF32 : Pseudo<(outs FP32:$dst), (ins FP32:$src1, FP32:$src2, i8imm:$cc),
                         "# SelectF32 PSEUDO",
                         [(set FP32:$dst,
-                              (SystemZselect FP32:$src1, FP32:$src2, imm:$cc))]>;
+                              (SystemZselect FP32:$src1, FP32:$src2, imm:$cc, PSW))]>;
   def SelectF64 : Pseudo<(outs FP64:$dst), (ins FP64:$src1, FP64:$src2, i8imm:$cc),
                         "# SelectF64 PSEUDO",
                         [(set FP64:$dst,
-                              (SystemZselect FP64:$src1, FP64:$src2, imm:$cc))]>;
+                              (SystemZselect FP64:$src1, FP64:$src2, imm:$cc, PSW))]>;
 }
 
 //===----------------------------------------------------------------------===//
@@ -58,7 +58,7 @@ def FMOV64rr : Pseudo<(outs FP64:$dst), (ins FP64:$src),
                       []>;
 }
 
-let canFoldAsLoad = 1, isReMaterializable = 1, mayHaveSideEffects = 1 in {
+let canFoldAsLoad = 1, isReMaterializable = 1 in {
 def FMOV32rm  : Pseudo<(outs FP32:$dst), (ins rriaddr12:$src),
                       "le\t{$dst, $src}",
                       [(set FP32:$dst, (load rriaddr12:$src))]>;

@@ -18,6 +18,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/CodeGen/ValueTypes.h"
 #include "llvm/CodeGen/SelectionDAGNodes.h"
+#include "llvm/CallingConv.h"
 
 namespace llvm {
   class TargetRegisterInfo;
@@ -142,7 +143,7 @@ typedef bool CCCustomFn(unsigned &ValNo, EVT &ValVT,
 /// return values.  It captures which registers are already assigned and which
 /// stack slots are used.  It provides accessors to allocate these values.
 class CCState {
-  unsigned CallingConv;
+  CallingConv::ID CallingConv;
   bool IsVarArg;
   const TargetMachine &TM;
   const TargetRegisterInfo &TRI;
@@ -152,7 +153,7 @@ class CCState {
   unsigned StackOffset;
   SmallVector<uint32_t, 16> UsedRegs;
 public:
-  CCState(unsigned CC, bool isVarArg, const TargetMachine &TM,
+  CCState(CallingConv::ID CC, bool isVarArg, const TargetMachine &TM,
           SmallVector<CCValAssign, 16> &locs, LLVMContext &C);
 
   void addLoc(const CCValAssign &V) {
@@ -161,7 +162,7 @@ public:
 
   LLVMContext &getContext() const { return Context; }
   const TargetMachine &getTarget() const { return TM; }
-  unsigned getCallingConv() const { return CallingConv; }
+  CallingConv::ID getCallingConv() const { return CallingConv; }
   bool isVarArg() const { return IsVarArg; }
 
   unsigned getNextStackOffset() const { return StackOffset; }
@@ -181,6 +182,13 @@ public:
   /// incorporating info about the result values into this state.
   void AnalyzeReturn(const SmallVectorImpl<ISD::OutputArg> &Outs,
                      CCAssignFn Fn);
+
+  /// CheckReturn - Analyze the return values of a function, returning
+  /// true if the return can be performed without sret-demotion, and
+  /// false otherwise.
+  bool CheckReturn(const SmallVectorImpl<EVT> &OutTys,
+                   const SmallVectorImpl<ISD::ArgFlagsTy> &ArgsFlags,
+                   CCAssignFn Fn);
 
   /// AnalyzeCallOperands - Analyze the outgoing arguments to a call,
   /// incorporating info about the passed values into this state.

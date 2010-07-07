@@ -23,8 +23,6 @@
 
 namespace llvm {
 
-inline void WriteAsOperand(std::ostream &, const MachineBasicBlock*, bool t) {  }
-
 template<>
 inline void DominatorTreeBase<MachineBasicBlock>::addRoot(MachineBasicBlock* MBB) {
   this->Roots.push_back(MBB);
@@ -162,9 +160,7 @@ public:
   
   virtual void releaseMemory();
   
-  virtual void print(std::ostream &OS, const Module* M= 0) const {
-    DT->print(OS, M);
-  }
+  virtual void print(raw_ostream &OS, const Module*) const;
 };
 
 //===-------------------------------------

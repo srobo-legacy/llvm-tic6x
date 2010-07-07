@@ -21,31 +21,10 @@
 #include <cstring>
 using namespace llvm;
 
-Module *llvm::ParseAssemblyFile(const std::string &Filename, SMDiagnostic &Err,
-                                LLVMContext &Context) {
-  std::string ErrorStr;
-  MemoryBuffer *F = MemoryBuffer::getFileOrSTDIN(Filename.c_str(), &ErrorStr);
-  if (F == 0) {
-    Err = SMDiagnostic("", -1, -1,
-                       "Could not open input file '" + Filename + "'", "");
-    return 0;
-  }
-
-  SourceMgr SM;
-  SM.AddNewSourceBuffer(F, SMLoc());
-  
-  OwningPtr<Module> M(new Module(Filename, Context));
-  if (LLParser(F, SM, Err, M.get()).Run())
-    return 0;
-  return M.take();
-}
-
-Module *llvm::ParseAssemblyString(const char *AsmString, Module *M,
-                                  SMDiagnostic &Err, LLVMContext &Context) {
-  MemoryBuffer *F =
-    MemoryBuffer::getMemBuffer(AsmString, AsmString+strlen(AsmString),
-                               "<string>");
-  
+Module *llvm::ParseAssembly(MemoryBuffer *F,
+                            Module *M,
+                            SMDiagnostic &Err,
+                            LLVMContext &Context) {
   SourceMgr SM;
   SM.AddNewSourceBuffer(F, SMLoc());
 
@@ -54,8 +33,31 @@ Module *llvm::ParseAssemblyString(const char *AsmString, Module *M,
     return LLParser(F, SM, Err, M).Run() ? 0 : M;
 
   // Otherwise create a new module.
-  OwningPtr<Module> M2(new Module("<string>", Context));
+  OwningPtr<Module> M2(new Module(F->getBufferIdentifier(), Context));
   if (LLParser(F, SM, Err, M2.get()).Run())
     return 0;
   return M2.take();
+}
+
+Module *llvm::ParseAssemblyFile(const std::string &Filename, SMDiagnostic &Err,
+                                LLVMContext &Context) {
+  std::string ErrorStr;
+  MemoryBuffer *F = MemoryBuffer::getFileOrSTDIN(Filename.c_str(), &ErrorStr);
+  if (F == 0) {
+    Err = SMDiagnostic("", -1, -1,
+                       "Could not open input file '" + Filename + "': " +
+                       ErrorStr, "");
+    return 0;
+  }
+
+  return ParseAssembly(F, 0, Err, Context);
+}
+
+Module *llvm::ParseAssemblyString(const char *AsmString, Module *M,
+                                  SMDiagnostic &Err, LLVMContext &Context) {
+  MemoryBuffer *F =
+    MemoryBuffer::getMemBuffer(AsmString, AsmString+strlen(AsmString),
+                               "<string>");
+
+  return ParseAssembly(F, M, Err, Context);
 }

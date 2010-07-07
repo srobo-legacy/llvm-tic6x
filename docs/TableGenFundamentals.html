@@ -151,11 +151,10 @@ file prints this (at the time of this writing):</p>
   <b>bit</b> isReMaterializable = 0;
   <b>bit</b> isPredicable = 0;
   <b>bit</b> hasDelaySlot = 0;
-  <b>bit</b> usesCustomDAGSchedInserter = 0;
+  <b>bit</b> usesCustomInserter = 0;
   <b>bit</b> hasCtrlDep = 0;
   <b>bit</b> isNotDuplicable = 0;
   <b>bit</b> hasSideEffects = 0;
-  <b>bit</b> mayHaveSideEffects = 0;
   <b>bit</b> neverHasSideEffects = 0;
   InstrItinClass Itinerary = NoItinerary;
   <b>string</b> Constraints = "";
@@ -189,7 +188,7 @@ backend, and is only shown as an example.</p>
 
 <p>As you can see, a lot of information is needed for every instruction
 supported by the code generator, and specifying it all manually would be
-unmaintainble, prone to bugs, and tiring to do in the first place.  Because we
+unmaintainable, prone to bugs, and tiring to do in the first place.  Because we
 are using TableGen, all of the information was derived from the following
 definition:</p>
 
@@ -398,13 +397,6 @@ which case the user must specify it explicitly.</dd>
   <dd>a dag value.  The first element is required to be a record definition, the
   remaining elements in the list may be arbitrary other values, including nested
   `<tt>dag</tt>' values.</dd>
-<dt><tt>(implicit a)</tt></dt>
-  <dd>an implicitly defined physical register.  This tells the dag instruction
-  selection emitter the input pattern's extra definitions matches implicit
-  physical register definitions.</dd>
-<dt><tt>(parallel (a), (b))</tt></dt>
-  <dd>a list of dags specifying parallel operations which map to the same
-  instruction.</dd>
 <dt><tt>!strconcat(a, b)</tt></dt>
   <dd>A string value that is the result of concatenating the 'a' and 'b'
   strings.</dd>
@@ -430,6 +422,10 @@ class.  This operation is analogous to $(foreach) in GNU make.</dd>
   <dd>An integer {0,1} indicating whether list 'a' is empty.</dd>
 <dt><tt>!if(a,b,c)</tt></dt>
   <dd>'b' if the result of integer operator 'a' is nonzero, 'c' otherwise.</dd>
+<dt><tt>!eq(a,b)</tt></dt>
+  <dd>Integer one if string a is equal to string b, zero otherwise.  This
+      only operates on string objects.  Use !cast<string> to compare other
+      types of objects.</dd>
 </dl>
 
 <p>Note that all of the values have rules specifying how they convert to values
@@ -756,6 +752,25 @@ examples:</p>
 <p>File-scope "let" expressions are often useful when a couple of definitions
 need to be added to several records, and the records do not otherwise need to be
 opened, as in the case with the <tt>CALL*</tt> instructions above.</p>
+
+</div>
+
+<!-- *********************************************************************** -->
+<div class="doc_section"><a name="codegen">Code Generator backend info</a></div>
+<!-- *********************************************************************** -->
+
+<p>Expressions used by code generator to describe instructions and isel
+patterns:</p>
+
+<div class="doc_text">
+
+<dt><tt>(implicit a)</tt></dt>
+  <dd>an implicitly defined physical register.  This tells the dag instruction
+  selection emitter the input pattern's extra definitions matches implicit
+  physical register definitions.</dd>
+<dt><tt>(parallel (a), (b))</tt></dt>
+  <dd>a list of dags specifying parallel operations which map to the same
+  instruction.</dd>
 
 </div>
 

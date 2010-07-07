@@ -329,16 +329,22 @@ separate option groups syntactically.
 
    - ``required`` - this option must be specified exactly once (or, in case of
      the list options without the ``multi_val`` property, at least
-     once). Incompatible with ``zero_or_one`` and ``one_or_more``.
+     once). Incompatible with ``optional`` and ``one_or_more``.
 
-   - ``one_or_more`` - the option must be specified at least one time. Useful
-     only for list options in conjunction with ``multi_val``; for ordinary lists
-     it is synonymous with ``required``. Incompatible with ``required`` and
-     ``zero_or_one``.
+   - ``optional`` - the option can be specified either zero times or exactly
+     once. The default for switch options. Useful only for list options in
+     conjunction with ``multi_val``. Incompatible with ``required``,
+     ``zero_or_more`` and ``one_or_more``.
 
-   - ``zero_or_one`` - the option can be specified zero or one times. Useful
-     only for list options in conjunction with ``multi_val``. Incompatible with
-     ``required`` and ``one_or_more``.
+   - ``one_or_more`` - the option must be specified at least once. Can be useful
+     to allow switch options be both obligatory and be specified multiple
+     times. For list options is useful only in conjunction with ``multi_val``;
+     for ordinary it is synonymous with ``required``. Incompatible with
+     ``required``, ``optional`` and ``zero_or_more``.
+
+   - ``zero_or_more`` - the option can be specified zero or more times. Useful
+     to allow a single switch option to be specified more than
+     once. Incompatible with ``required``, ``optional`` and ``one_or_more``.
 
    - ``hidden`` - the description of this option will not appear in
      the ``--help`` output (but will appear in the ``--help-hidden``
@@ -347,18 +353,30 @@ separate option groups syntactically.
    - ``really_hidden`` - the option will not be mentioned in any help
      output.
 
+   - ``comma_separated`` - Indicates that any commas specified for an option's
+     value should be used to split the value up into multiple values for the
+     option. This property is valid only for list options. In conjunction with
+     ``forward_value`` can be used to implement option forwarding in style of
+     gcc's ``-Wa,``.
+
    - ``multi_val n`` - this option takes *n* arguments (can be useful in some
      special cases). Usage example: ``(parameter_list_option "foo", (multi_val
-     3))``. Only list options can have this attribute; you can, however, use
-     the ``one_or_more`` and ``zero_or_one`` properties.
+     3))``; the command-line syntax is '-foo a b c'. Only list options can have
+     this attribute; you can, however, use the ``one_or_more``, ``optional``
+     and ``required`` properties.
 
    - ``init`` - this option has a default value, either a string (if it is a
-     parameter), or a boolean (if it is a switch; boolean constants are called
-     ``true`` and ``false``). List options can't have this attribute. Usage
-     examples: ``(switch_option "foo", (init true))``; ``(prefix_option "bar",
-     (init "baz"))``.
+     parameter), or a boolean (if it is a switch; as in C++, boolean constants
+     are called ``true`` and ``false``). List options can't have ``init``
+     attribute.
+     Usage examples: ``(switch_option "foo", (init true))``; ``(prefix_option
+     "bar", (init "baz"))``.
 
-   - ``extern`` - this option is defined in some other plugin, see below.
+   - ``extern`` - this option is defined in some other plugin, see `below`__.
+
+   __ extern_
+
+.. _extern:
 
 External options
 ----------------
@@ -430,8 +448,16 @@ use TableGen inheritance instead.
 
 * Possible tests are:
 
-  - ``switch_on`` - Returns true if a given command-line switch is
-    provided by the user. Example: ``(switch_on "opt")``.
+  - ``switch_on`` - Returns true if a given command-line switch is provided by
+    the user. Can be given a list as argument, in that case ``(switch_on ["foo",
+    "bar", "baz"])`` is equivalent to ``(and (switch_on "foo"), (switch_on
+    "bar"), (switch_on "baz"))``.
+    Example: ``(switch_on "opt")``.
+
+  - ``any_switch_on`` - Given a list of switch options, returns true if any of
+    the switches is turned on.
+    Example: ``(any_switch_on ["foo", "bar", "baz"])`` is equivalent to ``(or
+    (switch_on "foo"), (switch_on "bar"), (switch_on "baz"))``.
 
   - ``parameter_equals`` - Returns true if a command-line parameter equals
     a given value.
@@ -439,36 +465,56 @@ use TableGen inheritance instead.
 
   - ``element_in_list`` - Returns true if a command-line parameter
     list contains a given value.
-    Example: ``(parameter_in_list "l", "pthread")``.
+    Example: ``(element_in_list "l", "pthread")``.
 
   - ``input_languages_contain`` - Returns true if a given language
     belongs to the current input language set.
     Example: ``(input_languages_contain "c++")``.
 
-  - ``in_language`` - Evaluates to true if the input file language
-    equals to the argument. At the moment works only with ``cmd_line``
-    and ``actions`` (on non-join nodes).
+  - ``in_language`` - Evaluates to true if the input file language is equal to
+    the argument. At the moment works only with ``cmd_line`` and ``actions`` (on
+    non-join nodes).
     Example: ``(in_language "c++")``.
 
-  - ``not_empty`` - Returns true if a given option (which should be
-    either a parameter or a parameter list) is set by the
-    user.
+  - ``not_empty`` - Returns true if a given option (which should be either a
+    parameter or a parameter list) is set by the user. Like ``switch_on``, can
+    be also given a list as argument.
     Example: ``(not_empty "o")``.
 
+  - ``any_not_empty`` - Returns true if ``not_empty`` returns true for any of
+    the options in the list.
+    Example: ``(any_not_empty ["foo", "bar", "baz"])`` is equivalent to ``(or
+    (not_empty "foo"), (not_empty "bar"), (not_empty "baz"))``.
+
   - ``empty`` - The opposite of ``not_empty``. Equivalent to ``(not (not_empty
-    X))``. Provided for convenience.
+    X))``. Provided for convenience. Can be given a list as argument.
+
+  - ``any_not_empty`` - Returns true if ``not_empty`` returns true for any of
+    the options in the list.
+    Example: ``(any_empty ["foo", "bar", "baz"])`` is equivalent to ``(not (and
+    (not_empty "foo"), (not_empty "bar"), (not_empty "baz")))``.
+
+  - ``single_input_file`` - Returns true if there was only one input file
+    provided on the command-line. Used without arguments:
+    ``(single_input_file)``.
+
+  - ``multiple_input_files`` - Equivalent to ``(not (single_input_file))`` (the
+    case of zero input files is considered an error).
 
   - ``default`` - Always evaluates to true. Should always be the last
     test in the ``case`` expression.
 
-  - ``and`` - A standard logical combinator that returns true iff all
-    of its arguments return true. Used like this: ``(and (test1),
-    (test2), ... (testN))``. Nesting of ``and`` and ``or`` is allowed,
-    but not encouraged.
+  - ``and`` - A standard binary logical combinator that returns true iff all of
+    its arguments return true. Used like this: ``(and (test1), (test2),
+    ... (testN))``. Nesting of ``and`` and ``or`` is allowed, but not
+    encouraged.
 
-  - ``or`` - Another logical combinator that returns true only if any
-    one of its arguments returns true. Example: ``(or (test1),
-    (test2), ... (testN))``.
+  - ``or`` - A binary logical combinator that returns true iff any of its
+    arguments returns true. Example: ``(or (test1), (test2), ... (testN))``.
+
+  - ``not`` - Standard unary logical combinator that negates its
+    argument. Example: ``(not (or (test1), (test2), ... (testN)))``.
+
 
 
 Writing a tool description
@@ -499,8 +545,8 @@ The complete list of all currently implemented tool properties follows.
   - ``in_language`` - input language name. Can be either a string or a
     list, in case the tool supports multiple input languages.
 
-  - ``out_language`` - output language name. Tools are not allowed to
-    have multiple output languages.
+  - ``out_language`` - output language name. Multiple output languages are not
+    allowed.
 
   - ``output_suffix`` - output file suffix. Can also be changed
     dynamically, see documentation on actions.
@@ -518,7 +564,11 @@ The complete list of all currently implemented tool properties follows.
 
   - ``actions`` - A single big ``case`` expression that specifies how
     this tool reacts on command-line options (described in more detail
-    below).
+    `below`__).
+
+__ actions_
+
+.. _actions:
 
 Actions
 -------
@@ -556,33 +606,42 @@ The list of all possible actions follows.
 
 * Possible actions:
 
-   - ``append_cmd`` - append a string to the tool invocation
-     command.
-     Example: ``(case (switch_on "pthread"), (append_cmd
-     "-lpthread"))``
+   - ``append_cmd`` - Append a string to the tool invocation command.
+     Example: ``(case (switch_on "pthread"), (append_cmd "-lpthread"))``.
 
-   - ``error` - exit with error.
+   - ``error`` - Exit with error.
      Example: ``(error "Mixing -c and -S is not allowed!")``.
 
-   - ``forward`` - forward an option unchanged.
+   - ``warning`` - Print a warning.
+     Example: ``(warning "Specifying both -O1 and -O2 is meaningless!")``.
+
+   - ``forward`` - Forward the option unchanged.
      Example: ``(forward "Wall")``.
 
-   - ``forward_as`` - Change the name of an option, but forward the
-     argument unchanged.
+   - ``forward_as`` - Change the option's name, but forward the argument
+     unchanged.
      Example: ``(forward_as "O0", "--disable-optimization")``.
 
-   - ``output_suffix`` - modify the output suffix of this
-     tool.
+   - ``forward_value`` - Forward only option's value. Cannot be used with switch
+     options (since they don't have values), but works fine with lists.
+     Example: ``(forward_value "Wa,")``.
+
+   - ``forward_transformed_value`` - As above, but applies a hook to the
+     option's value before forwarding (see `below`__). When
+     ``forward_transformed_value`` is applied to a list
+     option, the hook must have signature
+     ``std::string hooks::HookName (const std::vector<std::string>&)``.
+     Example: ``(forward_transformed_value "m", "ConvertToMAttr")``.
+
+     __ hooks_
+
+   - ``output_suffix`` - Modify the output suffix of this tool.
      Example: ``(output_suffix "i")``.
 
-   - ``stop_compilation`` - stop compilation after this tool processes
-     its input. Used without arguments.
+   - ``stop_compilation`` - Stop compilation after this tool processes its
+     input. Used without arguments.
+     Example: ``(stop_compilation)``.
 
-   - ``unpack_values`` - used for for splitting and forwarding
-     comma-separated lists of options, e.g. ``-Wa,-foo=bar,-baz`` is
-     converted to ``-foo=bar -baz`` and appended to the tool invocation
-     command.
-     Example: ``(unpack_values "Wa,")``.
 
 Language map
 ============
@@ -603,10 +662,50 @@ For example, without those definitions the following command wouldn't work::
     $ llvmc hello.cpp
     llvmc: Unknown suffix: cpp
 
-The language map entries should be added only for tools that are
-linked with the root node. Since tools are not allowed to have
-multiple output languages, for nodes "inside" the graph the input and
-output languages should match. This is enforced at compile-time.
+The language map entries are needed only for the tools that are linked from the
+root node. Since a tool can't have multiple output languages, for inner nodes of
+the graph the input and output languages should match. This is enforced at
+compile-time.
+
+Option preprocessor
+===================
+
+It is sometimes useful to run error-checking code before processing the
+compilation graph. For example, if optimization options "-O1" and "-O2" are
+implemented as switches, we might want to output a warning if the user invokes
+the driver with both of these options enabled.
+
+The ``OptionPreprocessor`` feature is reserved specially for these
+occasions. Example (adapted from the built-in Base plugin)::
+
+
+    def Preprocess : OptionPreprocessor<
+    (case (not (any_switch_on ["O0", "O1", "O2", "O3"])),
+               (set_option "O2"),
+          (and (switch_on "O3"), (any_switch_on ["O0", "O1", "O2"])),
+               (unset_option ["O0", "O1", "O2"]),
+          (and (switch_on "O2"), (any_switch_on ["O0", "O1"])),
+               (unset_option ["O0", "O1"]),
+          (and (switch_on "O1"), (switch_on "O0")),
+               (unset_option "O0"))
+    >;
+
+Here, ``OptionPreprocessor`` is used to unset all spurious ``-O`` options so
+that they are not forwarded to the compiler. If no optimization options are
+specified, ``-O2`` is enabled.
+
+``OptionPreprocessor`` is basically a single big ``case`` expression, which is
+evaluated only once right after the plugin is loaded. The only allowed actions
+in ``OptionPreprocessor`` are ``error``, ``warning``, and two special actions:
+``unset_option`` and ``set_option``. As their names suggest, they can be used to
+set or unset a given option. To set an option with ``set_option``, use the
+two-argument form: ``(set_option "parameter", VALUE)``. Here, ``VALUE`` can be
+either a string, a string list, or a boolean constant.
+
+For convenience, ``set_option`` and ``unset_option`` also work on lists. That
+is, instead of ``[(unset_option "A"), (unset_option "B")]`` you can use
+``(unset_option ["A", "B"])``. Obviously, ``(set_option ["A", "B"])`` is valid
+only if both ``A`` and ``B`` are switches.
 
 
 More advanced topics
@@ -699,12 +798,16 @@ accessible only in the C++ code (i.e. hooks). Use the following code::
     extern const char* ProgramName;
     }
 
+    namespace hooks {
+
     std::string MyHook() {
     //...
     if (strcmp(ProgramName, "mydriver") == 0) {
        //...
 
     }
+
+    } // end namespace hooks
 
 In general, you're encouraged not to make the behaviour dependent on the
 executable file name, and use command-line switches instead. See for example how

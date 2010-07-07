@@ -1,10 +1,10 @@
-; RUN: llvm-as < %s | llc -march=x86-64 > %t
+; RUN: llc < %s -march=x86-64 > %t
 ; RUN: grep inc %t | count 1
 ; RUN: not grep incw %t
 
 @X = common global i16 0		; <i16*> [#uses=1]
 
-define void @foo(i32 %N) nounwind {
+define i32 @foo(i32 %N) nounwind {
 entry:
 	%0 = icmp sgt i32 %N, 0		; <i1> [#uses=1]
 	br i1 %0, label %bb, label %return
@@ -18,5 +18,6 @@ bb:		; preds = %bb, %entry
 	br i1 %exitcond, label %return, label %bb
 
 return:		; preds = %bb, %entry
-	ret void
+        %h = phi i32 [ 0, %entry ], [ %indvar.next, %bb ]
+	ret i32 %h
 }

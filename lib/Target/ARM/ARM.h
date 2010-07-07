@@ -23,9 +23,7 @@ namespace llvm {
 
 class ARMBaseTargetMachine;
 class FunctionPass;
-class MachineCodeEmitter;
 class JITCodeEmitter;
-class ObjectCodeEmitter;
 class formatted_raw_ostream;
 
 // Enums corresponding to ARM condition codes
@@ -92,18 +90,17 @@ inline static const char *ARMCondCodeToString(ARMCC::CondCodes CC) {
   }
 }
 
-FunctionPass *createARMISelDag(ARMBaseTargetMachine &TM);
+FunctionPass *createARMISelDag(ARMBaseTargetMachine &TM,
+                               CodeGenOpt::Level OptLevel);
 
-FunctionPass *createARMCodeEmitterPass(ARMBaseTargetMachine &TM,
-                                       MachineCodeEmitter &MCE);
 FunctionPass *createARMJITCodeEmitterPass(ARMBaseTargetMachine &TM,
                                           JITCodeEmitter &JCE);
-FunctionPass *createARMObjectCodeEmitterPass(ARMBaseTargetMachine &TM,
-                                             ObjectCodeEmitter &OCE);
 
 FunctionPass *createARMLoadStoreOptimizationPass(bool PreAlloc = false);
+FunctionPass *createARMExpandPseudoPass();
 FunctionPass *createARMConstantIslandPass();
 FunctionPass *createNEONPreAllocPass();
+FunctionPass *createNEONMoveFixPass();
 FunctionPass *createThumb2ITBlockPass();
 FunctionPass *createThumb2SizeReductionPass();
 

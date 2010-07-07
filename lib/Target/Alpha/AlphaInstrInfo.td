@@ -92,7 +92,7 @@ def immSExt16int  : PatLeaf<(imm), [{ //(int)imm fits in a 16 bit sign extended 
          ((int64_t)N->getZExtValue() << 32) >> 32;
 }], SExt16>;
 
-def zappat : PatFrag<(ops node:$LHS), (and node:$LHS, imm:$L), [{
+def zappat : PatFrag<(ops node:$LHS), (and node:$LHS, imm), [{
   ConstantSDNode *RHS = dyn_cast<ConstantSDNode>(N->getOperand(1));
   if (!RHS) return 0;
   uint64_t build = get_zapImm(N->getOperand(0), (uint64_t)RHS->getZExtValue());
@@ -164,7 +164,7 @@ def MEMLABEL : PseudoInstAlpha<(outs), (ins s64imm:$i, s64imm:$j, s64imm:$k, s64
          "LSMARKER$$$i$$$j$$$k$$$m:", [], s_pseudo>;
 
 
-let usesCustomDAGSchedInserter = 1 in {   // Expanded by the scheduler.
+let usesCustomInserter = 1 in {   // Expanded after instruction selection.
 def CAS32 : PseudoInstAlpha<(outs GPRC:$dst), (ins GPRC:$ptr, GPRC:$cmp, GPRC:$swp), "",
       [(set GPRC:$dst, (atomic_cmp_swap_32 GPRC:$ptr, GPRC:$cmp, GPRC:$swp))], s_pseudo>;
 def CAS64 : PseudoInstAlpha<(outs GPRC:$dst), (ins GPRC:$ptr, GPRC:$cmp, GPRC:$swp), "",
@@ -391,7 +391,7 @@ def : Pat<(setune GPRC:$X, GPRC:$Y), (CMPEQi (CMPEQ GPRC:$X, GPRC:$Y), 0)>;
 def : Pat<(setune GPRC:$X, immUExt8:$Y), (CMPEQi (CMPEQ GPRC:$X, immUExt8:$Y), 0)>;
 
 
-let isReturn = 1, isTerminator = 1, Ra = 31, Rb = 26, disp = 1, Uses = [R26] in {
+let isReturn = 1, isTerminator = 1, isBarrier = 1, Ra = 31, Rb = 26, disp = 1, Uses = [R26] in {
   def RETDAG : MbrForm< 0x1A, 0x02, (ops), "ret $$31,($$26),1", s_jsr>; //Return from subroutine
   def RETDAGp : MbrpForm< 0x1A, 0x02, (ops), "ret $$31,($$26),1", [(retflag)], s_jsr>; //Return from subroutine
 }
@@ -602,9 +602,9 @@ def RPCC : MfcForm<0x18, 0xC000, "rpcc $RA", s_rpcc>; //Read process cycle count
 def MB  : MfcPForm<0x18, 0x4000, "mb",  s_imisc>; //memory barrier
 def WMB : MfcPForm<0x18, 0x4400, "wmb", s_imisc>; //write memory barrier
 
-def : Pat<(membarrier (i64 imm:$ll), (i64 imm:$ls), (i64 imm:$sl), (i64 1), (i64 imm:$dev)),
+def : Pat<(membarrier (i64 imm), (i64 imm), (i64 imm), (i64 1), (i64 imm)),
           (WMB)>;
-def : Pat<(membarrier (i64 imm:$ll), (i64 imm:$ls), (i64 imm:$sl), (i64 imm:$ss), (i64 imm:$dev)),
+def : Pat<(membarrier (i64 imm), (i64 imm), (i64 imm), (i64 imm), (i64 imm)),
           (MB)>;
 
 //Basic Floating point ops

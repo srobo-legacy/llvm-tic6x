@@ -21,14 +21,13 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/FunctionUtils.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/Support/Compiler.h"
 #include "llvm/Support/CFG.h"
 using namespace llvm;
 
 STATISTIC(NumPartialInlined, "Number of functions partially inlined");
 
 namespace {
-  struct VISIBILITY_HIDDEN PartialInliner : public ModulePass {
+  struct PartialInliner : public ModulePass {
     virtual void getAnalysisUsage(AnalysisUsage &AU) const { }
     static char ID; // Pass identification, replacement for typeid
     PartialInliner() : ModulePass(&ID) {}
@@ -48,7 +47,8 @@ ModulePass* llvm::createPartialInliningPass() { return new PartialInliner(); }
 Function* PartialInliner::unswitchFunction(Function* F) {
   // First, verify that this function is an unswitching candidate...
   BasicBlock* entryBlock = F->begin();
-  if (!isa<BranchInst>(entryBlock->getTerminator()))
+  BranchInst *BR = dyn_cast<BranchInst>(entryBlock->getTerminator());
+  if (!BR || BR->isUnconditional())
     return 0;
   
   BasicBlock* returnBlock = 0;
@@ -117,7 +117,7 @@ Function* PartialInliner::unswitchFunction(Function* F) {
   DominatorTree DT;
   DT.runOnFunction(*duplicateFunction);
   
-  // Extract the body of the the if.
+  // Extract the body of the if.
   Function* extractedFunction = ExtractCodeRegion(DT, toExtract);
   
   // Inline the top-level if test into all callers.
@@ -145,7 +145,7 @@ bool PartialInliner::runOnModule(Module& M) {
   worklist.reserve(M.size());
   for (Module::iterator FI = M.begin(), FE = M.end(); FI != FE; ++FI)
     if (!FI->use_empty() && !FI->isDeclaration())
-    worklist.push_back(&*FI);
+      worklist.push_back(&*FI);
     
   bool changed = false;
   while (!worklist.empty()) {

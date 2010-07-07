@@ -66,6 +66,7 @@ void RegisterInfoEmitter::runHeader(raw_ostream &OS) {
      << "  virtual bool needsStackRealignment(const MachineFunction &) const\n"
      << "     { return false; }\n"
      << "  unsigned getSubReg(unsigned RegNo, unsigned Index) const;\n"
+     << "  unsigned getSubRegIndex(unsigned RegNo, unsigned SubRegNo) const;\n"
      << "};\n\n";
 
   const std::vector<CodeGenRegisterClass> &RegisterClasses =
@@ -161,7 +162,7 @@ private:
 
 public:
   RegisterSorter(std::map<Record*, std::set<Record*>, LessRecord> &RS)
-    : RegisterSubRegs(RS) {};
+    : RegisterSubRegs(RS) {}
 
   bool operator()(Record *RegA, Record *RegB) {
     // B is sub-register of A.
@@ -767,7 +768,7 @@ void RegisterInfoEmitter::run(raw_ostream &OS) {
   }
 
   OS<<"\n  const TargetRegisterDesc RegisterDescriptors[] = { // Descriptors\n";
-  OS << "    { \"NOREG\",\t\"NOREG\",\t0,\t0,\t0 },\n";
+  OS << "    { \"NOREG\",\t0,\t0,\t0 },\n";
 
   // Now that register alias and sub-registers sets have been emitted, emit the
   // register descriptors now.
@@ -775,11 +776,6 @@ void RegisterInfoEmitter::run(raw_ostream &OS) {
   for (unsigned i = 0, e = Registers.size(); i != e; ++i) {
     const CodeGenRegister &Reg = Registers[i];
     OS << "    { \"";
-    if (!Reg.TheDef->getValueAsString("AsmName").empty())
-      OS << Reg.TheDef->getValueAsString("AsmName");
-    else
-      OS << Reg.getName();
-    OS << "\",\t\"";
     OS << Reg.getName() << "\",\t";
     if (RegisterAliases.count(Reg.TheDef))
       OS << Reg.getName() << "_AliasSet,\t";
@@ -832,6 +828,23 @@ void RegisterInfoEmitter::run(raw_ostream &OS) {
       OS << "    case " << (I->second)[i].first << ": return "
          << getQualifiedName((I->second)[i].second) << ";\n";
     OS << "    };\n" << "    break;\n";
+  }
+  OS << "  };\n";
+  OS << "  return 0;\n";
+  OS << "}\n\n";
+
+  OS << "unsigned " << ClassName 
+     << "::getSubRegIndex(unsigned RegNo, unsigned SubRegNo) const {\n"
+     << "  switch (RegNo) {\n"
+     << "  default:\n    return 0;\n";
+  for (std::map<Record*, std::vector<std::pair<int, Record*> > >::iterator 
+        I = SubRegVectors.begin(), E = SubRegVectors.end(); I != E; ++I) {
+    OS << "  case " << getQualifiedName(I->first) << ":\n";
+    for (unsigned i = 0, e = I->second.size(); i != e; ++i)
+      OS << "    if (SubRegNo == "
+         << getQualifiedName((I->second)[i].second)
+         << ")  return " << (I->second)[i].first << ";\n";
+    OS << "    return 0;\n";
   }
   OS << "  };\n";
   OS << "  return 0;\n";

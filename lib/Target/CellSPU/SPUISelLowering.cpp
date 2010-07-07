@@ -25,7 +25,7 @@
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/SelectionDAG.h"
-#include "llvm/Target/TargetLoweringObjectFile.h"
+#include "llvm/CodeGen/TargetLoweringObjectFileImpl.h"
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/ADT/VectorExtras.h"
 #include "llvm/Support/Debug.h"
@@ -42,8 +42,8 @@ namespace {
 
   //! EVT mapping to useful data for Cell SPU
   struct valtype_map_s {
-    const EVT   valtype;
-    const int   prefslot_byte;
+    EVT   valtype;
+    int   prefslot_byte;
   };
 
   const valtype_map_s valtype_map[] = {
@@ -118,8 +118,7 @@ namespace {
             TLI.LowerCallTo(InChain, RetTy, isSigned, !isSigned, false, false,
                             0, TLI.getLibcallCallingConv(LC), false,
                             /*isReturnValueUsed=*/true,
-                            Callee, Args, DAG,
-                            Op.getDebugLoc());
+                            Callee, Args, DAG, Op.getDebugLoc());
 
     return CallInfo.first;
   }
@@ -350,6 +349,9 @@ SPUTargetLowering::SPUTargetLowering(SPUTargetMachine &TM)
   // Custom lower i128 -> i64 truncates
   setOperationAction(ISD::TRUNCATE, MVT::i64, Custom);
 
+  // Custom lower i32/i64 -> i128 sign extend
+  setOperationAction(ISD::SIGN_EXTEND, MVT::i128, Custom);
+
   setOperationAction(ISD::FP_TO_SINT, MVT::i8, Promote);
   setOperationAction(ISD::FP_TO_UINT, MVT::i8, Promote);
   setOperationAction(ISD::FP_TO_SINT, MVT::i16, Promote);
@@ -383,10 +385,6 @@ SPUTargetLowering::SPUTargetLowering(SPUTargetMachine &TM)
 
   // We cannot sextinreg(i1).  Expand to shifts.
   setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i1, Expand);
-
-  // Support label based line numbers.
-  setOperationAction(ISD::DBG_STOPPOINT, MVT::Other, Expand);
-  setOperationAction(ISD::DEBUG_LOC, MVT::Other, Expand);
 
   // We want to legalize GlobalAddress and ConstantPool nodes into the
   // appropriate instructions to materialize the address.
@@ -511,9 +509,6 @@ SPUTargetLowering::getTargetNodeName(unsigned Opcode) const
     node_names[(unsigned) SPUISD::VEC2PREFSLOT] = "SPUISD::VEC2PREFSLOT";
     node_names[(unsigned) SPUISD::SHLQUAD_L_BITS] = "SPUISD::SHLQUAD_L_BITS";
     node_names[(unsigned) SPUISD::SHLQUAD_L_BYTES] = "SPUISD::SHLQUAD_L_BYTES";
-    node_names[(unsigned) SPUISD::VEC_SHL] = "SPUISD::VEC_SHL";
-    node_names[(unsigned) SPUISD::VEC_SRL] = "SPUISD::VEC_SRL";
-    node_names[(unsigned) SPUISD::VEC_SRA] = "SPUISD::VEC_SRA";
     node_names[(unsigned) SPUISD::VEC_ROTL] = "SPUISD::VEC_ROTL";
     node_names[(unsigned) SPUISD::VEC_ROTR] = "SPUISD::VEC_ROTR";
     node_names[(unsigned) SPUISD::ROTBYTES_LEFT] = "SPUISD::ROTBYTES_LEFT";
@@ -673,7 +668,7 @@ LowerLOAD(SDValue Op, SelectionDAG &DAG, const SPUSubtarget *ST) {
     // Re-emit as a v16i8 vector load
     result = DAG.getLoad(MVT::v16i8, dl, the_chain, basePtr,
                          LN->getSrcValue(), LN->getSrcValueOffset(),
-                         LN->isVolatile(), 16);
+                         LN->isVolatile(), LN->isNonTemporal(), 16);
 
     // Update the chain
     the_chain = result.getValue(1);
@@ -752,9 +747,7 @@ LowerSTORE(SDValue Op, SelectionDAG &DAG, const SPUSubtarget *ST) {
   case ISD::UNINDEXED: {
     // The vector type we really want to load from the 16-byte chunk.
     EVT vecVT = EVT::getVectorVT(*DAG.getContext(),
-                                 VT, (128 / VT.getSizeInBits())),
-        stVecVT = EVT::getVectorVT(*DAG.getContext(),
-                                   StVT, (128 / StVT.getSizeInBits()));
+                                 VT, (128 / VT.getSizeInBits()));
 
     SDValue alignLoadVec;
     SDValue basePtr = SN->getBasePtr();
@@ -826,7 +819,7 @@ LowerSTORE(SDValue Op, SelectionDAG &DAG, const SPUSubtarget *ST) {
     // Re-emit as a v16i8 vector load
     alignLoadVec = DAG.getLoad(MVT::v16i8, dl, the_chain, basePtr,
                                SN->getSrcValue(), SN->getSrcValueOffset(),
-                               SN->isVolatile(), 16);
+                               SN->isVolatile(), SN->isNonTemporal(), 16);
 
     // Update the chain
     the_chain = alignLoadVec.getValue(1);
@@ -849,9 +842,9 @@ LowerSTORE(SDValue Op, SelectionDAG &DAG, const SPUSubtarget *ST) {
     // to the stack pointer, which is always aligned.
 #if !defined(NDEBUG)
       if (DebugFlag && isCurrentDebugType(DEBUG_TYPE)) {
-        cerr << "CellSPU LowerSTORE: basePtr = ";
+        errs() << "CellSPU LowerSTORE: basePtr = ";
         basePtr.getNode()->dump(&DAG);
-        cerr << "\n";
+        errs() << "\n";
       }
 #endif
 
@@ -867,16 +860,17 @@ LowerSTORE(SDValue Op, SelectionDAG &DAG, const SPUSubtarget *ST) {
 
     result = DAG.getStore(the_chain, dl, result, basePtr,
                           LN->getSrcValue(), LN->getSrcValueOffset(),
-                          LN->isVolatile(), LN->getAlignment());
+                          LN->isVolatile(), LN->isNonTemporal(),
+                          LN->getAlignment());
 
 #if 0 && !defined(NDEBUG)
     if (DebugFlag && isCurrentDebugType(DEBUG_TYPE)) {
       const SDValue &currentRoot = DAG.getRoot();
 
       DAG.setRoot(result);
-      cerr << "------- CellSPU:LowerStore result:\n";
+      errs() << "------- CellSPU:LowerStore result:\n";
       DAG.dump();
-      cerr << "-------\n";
+      errs() << "-------\n";
       DAG.setRoot(currentRoot);
     }
 #endif
@@ -1015,7 +1009,7 @@ LowerConstantFP(SDValue Op, SelectionDAG &DAG) {
 
 SDValue
 SPUTargetLowering::LowerFormalArguments(SDValue Chain,
-                                        unsigned CallConv, bool isVarArg,
+                                        CallingConv::ID CallConv, bool isVarArg,
                                         const SmallVectorImpl<ISD::InputArg>
                                           &Ins,
                                         DebugLoc dl, SelectionDAG &DAG,
@@ -1090,9 +1084,9 @@ SPUTargetLowering::LowerFormalArguments(SDValue Chain,
       // We need to load the argument to a virtual register if we determined
       // above that we ran out of physical registers of the appropriate type
       // or we're forced to do vararg
-      int FI = MFI->CreateFixedObject(ObjSize, ArgOffset);
+      int FI = MFI->CreateFixedObject(ObjSize, ArgOffset, true, false);
       SDValue FIN = DAG.getFrameIndex(FI, PtrVT);
-      ArgVal = DAG.getLoad(ObjectVT, dl, Chain, FIN, NULL, 0);
+      ArgVal = DAG.getLoad(ObjectVT, dl, Chain, FIN, NULL, 0, false, false, 0);
       ArgOffset += StackSlotSize;
     }
 
@@ -1110,10 +1104,12 @@ SPUTargetLowering::LowerFormalArguments(SDValue Chain,
     // Create the frame slot
 
     for (; ArgRegIdx != NumArgRegs; ++ArgRegIdx) {
-      VarArgsFrameIndex = MFI->CreateFixedObject(StackSlotSize, ArgOffset);
+      VarArgsFrameIndex = MFI->CreateFixedObject(StackSlotSize, ArgOffset,
+                                                 true, false);
       SDValue FIN = DAG.getFrameIndex(VarArgsFrameIndex, PtrVT);
       SDValue ArgVal = DAG.getRegister(ArgRegs[ArgRegIdx], MVT::v16i8);
-      SDValue Store = DAG.getStore(Chain, dl, ArgVal, FIN, NULL, 0);
+      SDValue Store = DAG.getStore(Chain, dl, ArgVal, FIN, NULL, 0,
+                                   false, false, 0);
       Chain = Store.getOperand(0);
       MemOps.push_back(Store);
 
@@ -1144,12 +1140,14 @@ static SDNode *isLSAAddress(SDValue Op, SelectionDAG &DAG) {
 
 SDValue
 SPUTargetLowering::LowerCall(SDValue Chain, SDValue Callee,
-                             unsigned CallConv, bool isVarArg,
-                             bool isTailCall,
+                             CallingConv::ID CallConv, bool isVarArg,
+                             bool &isTailCall,
                              const SmallVectorImpl<ISD::OutputArg> &Outs,
                              const SmallVectorImpl<ISD::InputArg> &Ins,
                              DebugLoc dl, SelectionDAG &DAG,
                              SmallVectorImpl<SDValue> &InVals) {
+  // CellSPU target does not yet support tail call optimization.
+  isTailCall = false;
 
   const SPUSubtarget *ST = SPUTM.getSubtargetImpl();
   unsigned NumOps     = Outs.size();
@@ -1159,11 +1157,6 @@ SPUTargetLowering::LowerCall(SDValue Chain, SDValue Callee,
 
   // Handy pointer type
   EVT PtrVT = DAG.getTargetLoweringInfo().getPointerTy();
-
-  // Accumulate how many bytes are to be pushed on the stack, including the
-  // linkage area, and parameter passing area.  According to the SPU ABI,
-  // we minimally need space for [LR] and [SP]
-  unsigned NumStackBytes = SPUFrameInfo::minStackSize();
 
   // Set up a copy of the stack pointer for use loading and storing any
   // arguments that may not fit in the registers available for argument
@@ -1198,7 +1191,8 @@ SPUTargetLowering::LowerCall(SDValue Chain, SDValue Callee,
       if (ArgRegIdx != NumArgRegs) {
         RegsToPass.push_back(std::make_pair(ArgRegs[ArgRegIdx++], Arg));
       } else {
-        MemOpChains.push_back(DAG.getStore(Chain, dl, Arg, PtrOff, NULL, 0));
+        MemOpChains.push_back(DAG.getStore(Chain, dl, Arg, PtrOff, NULL, 0,
+                                           false, false, 0));
         ArgOffset += StackSlotSize;
       }
       break;
@@ -1207,7 +1201,8 @@ SPUTargetLowering::LowerCall(SDValue Chain, SDValue Callee,
       if (ArgRegIdx != NumArgRegs) {
         RegsToPass.push_back(std::make_pair(ArgRegs[ArgRegIdx++], Arg));
       } else {
-        MemOpChains.push_back(DAG.getStore(Chain, dl, Arg, PtrOff, NULL, 0));
+        MemOpChains.push_back(DAG.getStore(Chain, dl, Arg, PtrOff, NULL, 0,
+                                           false, false, 0));
         ArgOffset += StackSlotSize;
       }
       break;
@@ -1220,15 +1215,20 @@ SPUTargetLowering::LowerCall(SDValue Chain, SDValue Callee,
       if (ArgRegIdx != NumArgRegs) {
         RegsToPass.push_back(std::make_pair(ArgRegs[ArgRegIdx++], Arg));
       } else {
-        MemOpChains.push_back(DAG.getStore(Chain, dl, Arg, PtrOff, NULL, 0));
+        MemOpChains.push_back(DAG.getStore(Chain, dl, Arg, PtrOff, NULL, 0,
+                                           false, false, 0));
         ArgOffset += StackSlotSize;
       }
       break;
     }
   }
 
-  // Update number of stack bytes actually used, insert a call sequence start
-  NumStackBytes = (ArgOffset - SPUFrameInfo::minStackSize());
+  // Accumulate how many bytes are to be pushed on the stack, including the
+  // linkage area, and parameter passing area.  According to the SPU ABI,
+  // we minimally need space for [LR] and [SP].
+  unsigned NumStackBytes = ArgOffset - SPUFrameInfo::minStackSize();
+
+  // Insert a call sequence start
   Chain = DAG.getCALLSEQ_START(Chain, DAG.getIntPtrConstant(NumStackBytes,
                                                             true));
 
@@ -1371,7 +1371,7 @@ SPUTargetLowering::LowerCall(SDValue Chain, SDValue Callee,
 
 SDValue
 SPUTargetLowering::LowerReturn(SDValue Chain,
-                               unsigned CallConv, bool isVarArg,
+                               CallingConv::ID CallConv, bool isVarArg,
                                const SmallVectorImpl<ISD::OutputArg> &Outs,
                                DebugLoc dl, SelectionDAG &DAG) {
 
@@ -1963,7 +1963,9 @@ static SDValue LowerEXTRACT_VECTOR_ELT(SDValue Op, SelectionDAG &DAG) {
     assert(prefslot_begin != -1 && prefslot_end != -1 &&
            "LowerEXTRACT_VECTOR_ELT: preferred slots uninitialized");
 
-    unsigned int ShufBytes[16];
+    unsigned int ShufBytes[16] = {
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    };
     for (int i = 0; i < 16; ++i) {
       // zero fill uppper part of preferred slot, don't care about the
       // other slots:
@@ -2608,6 +2610,59 @@ static SDValue LowerTRUNCATE(SDValue Op, SelectionDAG &DAG)
   return SDValue();             // Leave the truncate unmolested
 }
 
+/*!
+ * Emit the instruction sequence for i64/i32 -> i128 sign extend. The basic
+ * algorithm is to duplicate the sign bit using rotmai to generate at
+ * least one byte full of sign bits. Then propagate the "sign-byte" into
+ * the leftmost words and the i64/i32 into the rightmost words using shufb.
+ *
+ * @param Op The sext operand
+ * @param DAG The current DAG
+ * @return The SDValue with the entire instruction sequence
+ */
+static SDValue LowerSIGN_EXTEND(SDValue Op, SelectionDAG &DAG)
+{
+  DebugLoc dl = Op.getDebugLoc();
+
+  // Type to extend to
+  MVT OpVT = Op.getValueType().getSimpleVT();
+
+  // Type to extend from
+  SDValue Op0 = Op.getOperand(0);
+  MVT Op0VT = Op0.getValueType().getSimpleVT();
+
+  // The type to extend to needs to be a i128 and
+  // the type to extend from needs to be i64 or i32.
+  assert((OpVT == MVT::i128 && (Op0VT == MVT::i64 || Op0VT == MVT::i32)) &&
+          "LowerSIGN_EXTEND: input and/or output operand have wrong size");
+
+  // Create shuffle mask
+  unsigned mask1 = 0x10101010; // byte 0 - 3 and 4 - 7
+  unsigned mask2 = Op0VT == MVT::i64 ? 0x00010203 : 0x10101010; // byte  8 - 11
+  unsigned mask3 = Op0VT == MVT::i64 ? 0x04050607 : 0x00010203; // byte 12 - 15
+  SDValue shufMask = DAG.getNode(ISD::BUILD_VECTOR, dl, MVT::v4i32,
+                                 DAG.getConstant(mask1, MVT::i32),
+                                 DAG.getConstant(mask1, MVT::i32),
+                                 DAG.getConstant(mask2, MVT::i32),
+                                 DAG.getConstant(mask3, MVT::i32));
+
+  // Word wise arithmetic right shift to generate at least one byte
+  // that contains sign bits.
+  MVT mvt = Op0VT == MVT::i64 ? MVT::v2i64 : MVT::v4i32;
+  SDValue sraVal = DAG.getNode(ISD::SRA,
+                 dl,
+                 mvt,
+                 DAG.getNode(SPUISD::PREFSLOT2VEC, dl, mvt, Op0, Op0),
+                 DAG.getConstant(31, MVT::i32));
+
+  // Shuffle bytes - Copy the sign bits into the upper 64 bits
+  // and the input value into the lower 64 bits.
+  SDValue extShuffle = DAG.getNode(SPUISD::SHUFB, dl, mvt,
+      DAG.getNode(ISD::ANY_EXTEND, dl, MVT::i128, Op0), sraVal, shufMask);
+
+  return DAG.getNode(ISD::BIT_CONVERT, dl, MVT::i128, extShuffle);
+}
+
 //! Custom (target-specific) lowering entry point
 /*!
   This is where LLVM's DAG selection process calls to do target-specific
@@ -2622,9 +2677,9 @@ SPUTargetLowering::LowerOperation(SDValue Op, SelectionDAG &DAG)
   switch (Opc) {
   default: {
 #ifndef NDEBUG
-    cerr << "SPUTargetLowering::LowerOperation(): need to lower this!\n";
-    cerr << "Op.getOpcode() = " << Opc << "\n";
-    cerr << "*Op.getNode():\n";
+    errs() << "SPUTargetLowering::LowerOperation(): need to lower this!\n";
+    errs() << "Op.getOpcode() = " << Opc << "\n";
+    errs() << "*Op.getNode():\n";
     Op.getNode()->dump();
 #endif
     llvm_unreachable(0);
@@ -2700,6 +2755,9 @@ SPUTargetLowering::LowerOperation(SDValue Op, SelectionDAG &DAG)
 
   case ISD::TRUNCATE:
     return LowerTRUNCATE(Op, DAG);
+
+  case ISD::SIGN_EXTEND:
+    return LowerSIGN_EXTEND(Op, DAG);
   }
 
   return SDValue();
@@ -2715,9 +2773,9 @@ void SPUTargetLowering::ReplaceNodeResults(SDNode *N,
 
   switch (Opc) {
   default: {
-    cerr << "SPUTargetLowering::ReplaceNodeResults(): need to fix this!\n";
-    cerr << "Op.getOpcode() = " << Opc << "\n";
-    cerr << "*Op.getNode():\n";
+    errs() << "SPUTargetLowering::ReplaceNodeResults(): need to fix this!\n";
+    errs() << "Op.getOpcode() = " << Opc << "\n";
+    errs() << "*Op.getNode():\n";
     N->dump();
     abort();
     /*NOTREACHED*/
@@ -2771,7 +2829,7 @@ SPUTargetLowering::PerformDAGCombine(SDNode *N, DAGCombinerInfo &DCI) const
 
 #if !defined(NDEBUG)
           if (DebugFlag && isCurrentDebugType(DEBUG_TYPE)) {
-            cerr << "\n"
+            errs() << "\n"
                  << "Replace: (add (SPUindirect <arg>, <arg>), 0)\n"
                  << "With:    (SPUindirect <arg>, <arg>)\n";
           }
@@ -2787,7 +2845,7 @@ SPUTargetLowering::PerformDAGCombine(SDNode *N, DAGCombinerInfo &DCI) const
 
 #if !defined(NDEBUG)
           if (DebugFlag && isCurrentDebugType(DEBUG_TYPE)) {
-            cerr << "\n"
+            errs() << "\n"
                  << "Replace: (add (SPUindirect <arg>, " << CN1->getSExtValue()
                  << "), " << CN0->getSExtValue() << ")\n"
                  << "With:    (SPUindirect <arg>, "
@@ -2811,11 +2869,11 @@ SPUTargetLowering::PerformDAGCombine(SDNode *N, DAGCombinerInfo &DCI) const
       // Types must match, however...
 #if !defined(NDEBUG)
       if (DebugFlag && isCurrentDebugType(DEBUG_TYPE)) {
-        cerr << "\nReplace: ";
+        errs() << "\nReplace: ";
         N->dump(&DAG);
-        cerr << "\nWith:    ";
+        errs() << "\nWith:    ";
         Op0.getNode()->dump(&DAG);
-        cerr << "\n";
+        errs() << "\n";
       }
 #endif
 
@@ -2830,11 +2888,11 @@ SPUTargetLowering::PerformDAGCombine(SDNode *N, DAGCombinerInfo &DCI) const
         // (SPUindirect (SPUaform <addr>, 0), 0) ->
         // (SPUaform <addr>, 0)
 
-        DEBUG(cerr << "Replace: ");
+        DEBUG(errs() << "Replace: ");
         DEBUG(N->dump(&DAG));
-        DEBUG(cerr << "\nWith:    ");
+        DEBUG(errs() << "\nWith:    ");
         DEBUG(Op0.getNode()->dump(&DAG));
-        DEBUG(cerr << "\n");
+        DEBUG(errs() << "\n");
 
         return Op0;
       }
@@ -2847,7 +2905,7 @@ SPUTargetLowering::PerformDAGCombine(SDNode *N, DAGCombinerInfo &DCI) const
 
 #if !defined(NDEBUG)
           if (DebugFlag && isCurrentDebugType(DEBUG_TYPE)) {
-            cerr << "\n"
+            errs() << "\n"
                  << "Replace: (SPUindirect (add <arg>, <arg>), 0)\n"
                  << "With:    (SPUindirect <arg>, <arg>)\n";
           }
@@ -2862,9 +2920,6 @@ SPUTargetLowering::PerformDAGCombine(SDNode *N, DAGCombinerInfo &DCI) const
   }
   case SPUISD::SHLQUAD_L_BITS:
   case SPUISD::SHLQUAD_L_BYTES:
-  case SPUISD::VEC_SHL:
-  case SPUISD::VEC_SRL:
-  case SPUISD::VEC_SRA:
   case SPUISD::ROTBYTES_LEFT: {
     SDValue Op1 = N->getOperand(1);
 
@@ -2909,11 +2964,11 @@ SPUTargetLowering::PerformDAGCombine(SDNode *N, DAGCombinerInfo &DCI) const
   // Otherwise, return unchanged.
 #ifndef NDEBUG
   if (Result.getNode()) {
-    DEBUG(cerr << "\nReplace.SPU: ");
+    DEBUG(errs() << "\nReplace.SPU: ");
     DEBUG(N->dump(&DAG));
-    DEBUG(cerr << "\nWith:        ");
+    DEBUG(errs() << "\nWith:        ");
     DEBUG(Result.getNode()->dump(&DAG));
-    DEBUG(cerr << "\n");
+    DEBUG(errs() << "\n");
   }
 #endif
 
@@ -2992,9 +3047,6 @@ SPUTargetLowering::computeMaskedBitsForTargetNode(const SDValue Op,
   case SPUISD::VEC2PREFSLOT:
   case SPUISD::SHLQUAD_L_BITS:
   case SPUISD::SHLQUAD_L_BYTES:
-  case SPUISD::VEC_SHL:
-  case SPUISD::VEC_SRL:
-  case SPUISD::VEC_SRA:
   case SPUISD::VEC_ROTL:
   case SPUISD::VEC_ROTR:
   case SPUISD::ROTBYTES_LEFT:

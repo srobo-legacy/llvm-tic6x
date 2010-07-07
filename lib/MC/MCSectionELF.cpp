@@ -8,28 +8,26 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/MC/MCSectionELF.h"
+#include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCContext.h"
+#include "llvm/MC/MCSymbol.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Target/TargetAsmInfo.h"
-
 using namespace llvm;
 
 MCSectionELF *MCSectionELF::
-Create(const StringRef &Section, unsigned Type, unsigned Flags,
+Create(StringRef Section, unsigned Type, unsigned Flags,
        SectionKind K, bool isExplicit, MCContext &Ctx) {
   return new (Ctx) MCSectionELF(Section, Type, Flags, K, isExplicit);
 }
 
 // ShouldOmitSectionDirective - Decides whether a '.section' directive
 // should be printed before the section name
-bool MCSectionELF::ShouldOmitSectionDirective(const char *Name,
-                                        const TargetAsmInfo &TAI) const {
+bool MCSectionELF::ShouldOmitSectionDirective(StringRef Name,
+                                              const MCAsmInfo &MAI) const {
   
   // FIXME: Does .section .bss/.data/.text work everywhere??
-  if (strcmp(Name, ".text") == 0 ||
-      strcmp(Name, ".data") == 0 ||
-      (strcmp(Name, ".bss") == 0 &&
-       !TAI.usesELFSectionDirectiveForBSS())) 
+  if (Name == ".text" || Name == ".data" ||
+      (Name == ".bss" && !MAI.usesELFSectionDirectiveForBSS()))
     return true;
 
   return false;
@@ -37,17 +35,16 @@ bool MCSectionELF::ShouldOmitSectionDirective(const char *Name,
 
 // ShouldPrintSectionType - Only prints the section type if supported
 bool MCSectionELF::ShouldPrintSectionType(unsigned Ty) const {
-  
   if (IsExplicit && !(Ty == SHT_NOBITS || Ty == SHT_PROGBITS))
     return false;
 
   return true;
 }
 
-void MCSectionELF::PrintSwitchToSection(const TargetAsmInfo &TAI,
+void MCSectionELF::PrintSwitchToSection(const MCAsmInfo &MAI,
                                         raw_ostream &OS) const {
    
-  if (ShouldOmitSectionDirective(SectionName.c_str(), TAI)) {
+  if (ShouldOmitSectionDirective(SectionName, MAI)) {
     OS << '\t' << getSectionName() << '\n';
     return;
   }
@@ -55,7 +52,7 @@ void MCSectionELF::PrintSwitchToSection(const TargetAsmInfo &TAI,
   OS << "\t.section\t" << getSectionName();
   
   // Handle the weird solaris syntax if desired.
-  if (TAI.usesSunStyleELFSectionSwitchSyntax() && 
+  if (MAI.usesSunStyleELFSectionSwitchSyntax() && 
       !(Flags & MCSectionELF::SHF_MERGE)) {
     if (Flags & MCSectionELF::SHF_ALLOC)
       OS << ",#alloc";
@@ -82,7 +79,7 @@ void MCSectionELF::PrintSwitchToSection(const TargetAsmInfo &TAI,
     
     // If there are target-specific flags, print them.
     if (Flags & ~MCSectionELF::TARGET_INDEP_SHF)
-      PrintTargetSpecificSectionFlags(TAI, OS);
+      PrintTargetSpecificSectionFlags(MAI, OS);
     
     OS << '"';
 
@@ -90,7 +87,7 @@ void MCSectionELF::PrintSwitchToSection(const TargetAsmInfo &TAI,
       OS << ',';
    
       // If comment string is '@', e.g. as on ARM - use '%' instead
-      if (TAI.getCommentString()[0] == '@')
+      if (MAI.getCommentString()[0] == '@')
         OS << '%';
       else
         OS << '@';
@@ -129,7 +126,7 @@ void MCSectionELF::PrintSwitchToSection(const TargetAsmInfo &TAI,
 // header index.
 bool MCSectionELF::HasCommonSymbols() const {
   
-  if (strncmp(SectionName.c_str(), ".gnu.linkonce.", 14) == 0)
+  if (StringRef(SectionName).startswith(".gnu.linkonce."))
     return true;
 
   return false;

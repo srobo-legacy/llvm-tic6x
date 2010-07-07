@@ -44,10 +44,13 @@
 #include "llvm/CodeGen/PseudoSourceValue.h"
 #include "llvm/CodeGen/SelectionDAG.h"
 #include "llvm/CodeGen/SelectionDAGISel.h"
+#include "llvm/CallingConv.h"
 #include "llvm/CodeGen/SelectionDAGNodes.h"
 #include "llvm/CodeGen/ValueTypes.h"
+#include "llvm/CodeGen/TargetLoweringObjectFileImpl.h"
 #include "llvm/Target/TargetLoweringObjectFile.h"
 #include "llvm/ADT/VectorExtras.h"
+#include "llvm/Support/ErrorHandling.h"
 using namespace llvm;
 
 namespace llvm {
@@ -87,6 +90,14 @@ TMS320C64XLowering::TMS320C64XLowering(TMS320C64XTargetMachine &tm) :
 	setOperationAction(ISD::UDIVREM, MVT::i32, Expand);
 	setOperationAction(ISD::SDIVREM, MVT::i32, Expand);
 
+	// On dspbridge, divides and remainders are implemented by these two
+	// routines. Possibly in the future we should check the target triple
+	// to see whether we're targeting something with a real libc, and make
+	// a choice about what divide/modulus libcalls to make. Until then,
+	// assume we're always on dspbridge.
+	setLibcallName(RTLIB::UDIV_I32, "__divu");
+	setLibcallName(RTLIB::UREM_I32, "__remu");
+
 	// We can generate two conditional instructions for select, not so
 	// easy for select_cc
 	setOperationAction(ISD::SELECT, MVT::i32, Custom);
@@ -94,6 +105,7 @@ TMS320C64XLowering::TMS320C64XLowering(TMS320C64XTargetMachine &tm) :
 	// Manually beat condition code setting into cmps
 	setOperationAction(ISD::SETCC, MVT::i32, Custom);
 	// We can emulate br_cc, maybe not brcond, do what works
+	setOperationAction(ISD::BRCOND, MVT::Other, Expand);
 	setOperationAction(ISD::BRCOND, MVT::i32, Expand);
 	setOperationAction(ISD::BR_CC, MVT::i32, Custom);
 	setOperationAction(ISD::BR_JT, MVT::Other, Expand);
@@ -171,7 +183,7 @@ TMS320C64XLowering::getFunctionAlignment(Function const*) const
 using namespace TMS320C64X;
 SDValue
 TMS320C64XLowering::LowerFormalArguments(SDValue Chain,
-				unsigned CallConv, bool isVarArg,
+				CallingConv::ID CallConv,bool isVarArg,
 				const SmallVectorImpl<ISD::InputArg> &Ins,
 				DebugLoc dl, SelectionDAG &DAG,
 				SmallVectorImpl<SDValue> &InVals)
@@ -232,19 +244,23 @@ TMS320C64XLowering::LowerFormalArguments(SDValue Chain,
 				InVals.push_back(Arg);
 			} else {
 				// XXX - i64?
-				int frame_idx = MFI-> CreateFixedObject(4,
-								stack_offset);
+				int frame_idx = MFI->CreateFixedObject(4,
+						stack_offset, true, false);
 				SDValue FIPtr = DAG.getFrameIndex(frame_idx,
 								MVT::i32);
 				SDValue load;
 				if (ObjectVT == MVT::i32) {
+					// XXX - Non temporal? Eh?
 					load = DAG.getLoad(MVT::i32, dl, Chain,
-							FIPtr, NULL, 0);
+							FIPtr, NULL, 0, false,
+							false, 4);
 				} else {
+					// XXX - work out alignment
 					load = DAG.getExtLoad(ISD::SEXTLOAD,
 							dl, MVT::i32,  Chain,
 							FIPtr, NULL, 0,
-							ObjectVT);
+							ObjectVT, false, false,
+							4);
 					load = DAG.getNode(ISD::TRUNCATE, dl,
 							ObjectVT, load);
 				}
@@ -259,7 +275,8 @@ TMS320C64XLowering::LowerFormalArguments(SDValue Chain,
 }
 
 SDValue
-TMS320C64XLowering::LowerReturn(SDValue Chain, unsigned CallConv, bool isVarArg,
+TMS320C64XLowering::LowerReturn(SDValue Chain, CallingConv::ID CallConv,
+				bool isVarArg,
                                 const SmallVectorImpl<ISD::OutputArg> &Outs,
                                 DebugLoc dl, SelectionDAG &DAG)
 {
@@ -296,8 +313,8 @@ TMS320C64XLowering::LowerReturn(SDValue Chain, unsigned CallConv, bool isVarArg,
 }
 
 SDValue
-TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
-			bool isVarArg, bool isTailCall,
+TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, CallingConv::ID
+			CallConv, bool isVarArg, bool &isTailCall,
 			const SmallVectorImpl<ISD::OutputArg> &Outs,
 			const SmallVectorImpl<ISD::InputArg> &Ins,
 			DebugLoc dl, SelectionDAG &DAG,
@@ -314,6 +331,8 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 	arg_idx = 0;
 	bytes = 0;
 	fixed_args = 0;
+
+	isTailCall = false;
 
 	CCState CCInfo(CallConv, isVarArg, getTargetMachine(), ArgLocs,
 							*DAG.getContext());
@@ -337,9 +356,13 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 		stacksize = (ArgLocs.size() - fixed_args + 1) * 4;
 	}
 
-	Chain = DAG.getCALLSEQ_START(Chain, DAG.getTargetConstant(stacksize,
-						MVT::i32));
-	SDValue in_flag = Chain.getValue(1);
+	// Round the amount of stack we allocate to hold stack-arguments up to
+	// an 8 byte alignment - it turns out the stack on the DSP side needs
+	// to remain dword aligned.
+	stacksize = (stacksize + 7) & ~7;
+
+	Chain = DAG.getCALLSEQ_START(Chain, DAG.getConstant(stacksize,
+							MVT::i32));
 
 	SmallVector<std::pair<unsigned int, SDValue>, 16> reg_args;
 	SmallVector<SDValue, 16> stack_args;
@@ -383,7 +406,8 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 				DAG.getIntPtrConstant(bytes));
 
 			SDValue store = DAG.getStore(Chain, dl, arg, addr,
-							NULL, 0);
+							NULL, 0, false, false,
+							4);
 			stack_args.push_back(store);
 		}
 	}
@@ -468,7 +492,7 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 	}
 
 	Chain = DAG.getCALLSEQ_END(Chain,
-			DAG.getTargetConstant(stacksize, MVT::i32),
+			DAG.getConstant(stacksize, MVT::i32),
 			DAG.getTargetConstant(0, MVT::i32),
 			in_flag);
 	in_flag = Chain.getValue(1);
@@ -479,7 +503,7 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, unsigned CallConv,
 
 SDValue
 TMS320C64XLowering::LowerCallResult(SDValue Chain, SDValue InFlag,
-				unsigned CallConv, bool isVarArg,
+				CallingConv::ID CallConv, bool isVarArg,
 				const SmallVectorImpl<ISD::InputArg> &Ins,
 				DebugLoc dl, SelectionDAG &DAG,
 				SmallVectorImpl<SDValue> &InVals)
@@ -555,7 +579,7 @@ TMS320C64XLowering::LowerExtLoad(SDValue op, SelectionDAG &DAG)
 	return DAG.getExtLoad(ISD::SEXTLOAD, op.getDebugLoc(), list.VTs[0],
 			l->getOperand(0), l->getOperand(1), l->getSrcValue(),
 			l->getSrcValueOffset(), l->getMemoryVT(),
-			l->isVolatile(), l->getAlignment());
+			l->isVolatile(), false, l->getAlignment());
 }
 
 SDValue
@@ -569,7 +593,7 @@ TMS320C64XLowering::LowerReturnAddr(SDValue op, SelectionDAG &DAG)
 	// Although it could be offset by something, not certain
 	SDValue retaddr = DAG.getFrameIndex(0, getPointerTy());
 	return DAG.getLoad(getPointerTy(), op.getDebugLoc(), DAG.getEntryNode(),
-							retaddr, NULL, 0);
+					retaddr, NULL, 0, false, false, 4);
 }
 
 SDValue
@@ -674,7 +698,7 @@ TMS320C64XLowering::LowerSETCC(SDValue op, SelectionDAG &DAG)
 SDValue
 TMS320C64XLowering::LowerSelect(SDValue op, SelectionDAG &DAG)
 {
-	SDValue ops[6];
+	SDValue ops[4];
 
 	// Operand 1 is true/false, selects operand 2 or 3 respectively
 	// We'll generate this with two conditional move instructions - moving
@@ -686,9 +710,7 @@ TMS320C64XLowering::LowerSelect(SDValue op, SelectionDAG &DAG)
 	ops[1] = op.getOperand(2);
 	ops[2] = DAG.getTargetConstant(0, MVT::i32);
 	ops[3] = op.getOperand(0);
-	ops[4] = DAG.getTargetConstant(1, MVT::i32);
-	ops[5] = op.getOperand(0);
-	return DAG.getNode(TMSISD::SELECT, op.getDebugLoc(), MVT::i32, ops, 6);
+	return DAG.getNode(TMSISD::SELECT, op.getDebugLoc(), MVT::i32, ops, 4);
 }
 
 SDValue
@@ -706,12 +728,12 @@ TMS320C64XLowering::LowerVASTART(SDValue op, SelectionDAG &DAG)
 		stackgap = (num_normal_params - 10) * 4;
 	}
 
-	SDValue Chain = DAG.getNode(ISD::ADD, op.getDebugLoc(), MVT::i32,
+	SDValue Chain = DAG.getNode(TMSISD::VASTART, op.getDebugLoc(), MVT::i32,
 				DAG.getRegister(TMS320C64X::B15, MVT::i32),
 				DAG.getConstant(stackgap, MVT::i32));
 	const Value *SV = cast<SrcValueSDNode>(op.getOperand(2))->getValue();
 	return DAG.getStore(op.getOperand(0), op.getDebugLoc(), Chain,
-						op.getOperand(1), SV, 0);
+				op.getOperand(1), SV, 0, false, false, 4);
 }
 
 SDValue
@@ -727,14 +749,16 @@ TMS320C64XLowering::LowerVAARG(SDValue op, SelectionDAG &DAG)
 
 	// Load point to vaarg list
 	SDValue loadptr = DAG.getLoad(MVT::i32, op.getDebugLoc(), chain,
-								valoc, SV, 0);
+					valoc, SV, 0, false, false, 4);
 	// Calculate address of next vaarg
 	SDValue newptr = DAG.getNode(ISD::ADD, op.getDebugLoc(), MVT::i32,
-			chain, DAG.getConstant(vt.getSizeInBits()/8, MVT::i32));
+			loadptr, DAG.getConstant(vt.getSizeInBits()/8,
+			MVT::i32));
 	// Store that back to wherever we're storing the vaarg list
 	chain = DAG.getStore(loadptr.getValue(1), op.getDebugLoc(),
-						newptr, valoc, SV, 0);
+				newptr, valoc, SV, 0, false, false, 4);
 
 	// Actually load the argument
-	return DAG.getLoad(vt, op.getDebugLoc(), chain, loadptr, NULL, 0);
+	return DAG.getLoad(vt, op.getDebugLoc(), chain, loadptr, NULL, 0,
+					false, false, 4);
 }

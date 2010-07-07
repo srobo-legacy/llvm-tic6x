@@ -31,14 +31,6 @@ let hasCtrlDep = 1, Defs = [R1], Uses = [R1] in {
 }
 
 //===----------------------------------------------------------------------===//
-// DWARF debugging Pseudo Instructions
-//===----------------------------------------------------------------------===//
-
-def DWARF_LOC : Pseudo<(outs), (ins i32imm:$line, i32imm:$col, i32imm:$file),
-           ".loc $file, $line, $col",
-           [(dwarf_loc (i32 imm:$line), (i32 imm:$col), (i32 imm:$file))]>;
-
-//===----------------------------------------------------------------------===//
 // Loads:
 // NB: The ordering is actually important, since the instruction selection
 // will try each of the instructions in sequence, i.e., the D-form first with
@@ -3601,21 +3593,23 @@ def : Pat<(SPUcall (SPUaform texternalsym:$func, 0)),
           (BRASL texternalsym:$func)>;
 
 // Unconditional branches:
-let isBranch = 1, isTerminator = 1, hasCtrlDep = 1, isBarrier = 1 in {
-  def BR :
-    UncondBranch<0b001001100, (outs), (ins brtarget:$dest),
-      "br\t$dest",
-      [(br bb:$dest)]>;
+let isBranch = 1, isTerminator = 1, hasCtrlDep = 1 in {
+  let isBarrier = 1 in {
+    def BR :
+      UncondBranch<0b001001100, (outs), (ins brtarget:$dest),
+        "br\t$dest",
+        [(br bb:$dest)]>;
 
-  // Unconditional, absolute address branch
-  def BRA:
-    UncondBranch<0b001100000, (outs), (ins brtarget:$dest),
-      "bra\t$dest",
-      [/* no pattern */]>;
+    // Unconditional, absolute address branch
+    def BRA:
+      UncondBranch<0b001100000, (outs), (ins brtarget:$dest),
+        "bra\t$dest",
+        [/* no pattern */]>;
 
-  // Indirect branch
-  def BI:
-    BIForm<0b00010101100, "bi\t$func", [(brind R32C:$func)]>;
+    // Indirect branch
+    def BI:
+      BIForm<0b00010101100, "bi\t$func", [(brind R32C:$func)]>;
+  }
 
   // Conditional branches:
   class BRNZInst<dag IOL, list<dag> pattern>:

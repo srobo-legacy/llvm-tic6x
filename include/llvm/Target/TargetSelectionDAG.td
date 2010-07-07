@@ -269,6 +269,10 @@ def externalsym : SDNode<"ISD::ExternalSymbol",       SDTPtrLeaf, [],
                          "ExternalSymbolSDNode">;
 def texternalsym: SDNode<"ISD::TargetExternalSymbol", SDTPtrLeaf, [],
                          "ExternalSymbolSDNode">;
+def blockaddress : SDNode<"ISD::BlockAddress",        SDTPtrLeaf, [],
+                         "BlockAddressSDNode">;
+def tblockaddress: SDNode<"ISD::TargetBlockAddress",  SDTPtrLeaf, [],
+                         "BlockAddressSDNode">;
 
 def add        : SDNode<"ISD::ADD"       , SDTIntBinOp   ,
                         [SDNPCommutative, SDNPAssociative]>;
@@ -325,6 +329,8 @@ def fneg       : SDNode<"ISD::FNEG"       , SDTFPUnaryOp>;
 def fsqrt      : SDNode<"ISD::FSQRT"      , SDTFPUnaryOp>;
 def fsin       : SDNode<"ISD::FSIN"       , SDTFPUnaryOp>;
 def fcos       : SDNode<"ISD::FCOS"       , SDTFPUnaryOp>;
+def fexp2      : SDNode<"ISD::FEXP2"      , SDTFPUnaryOp>;
+def flog2      : SDNode<"ISD::FLOG2"      , SDTFPUnaryOp>;
 def frint      : SDNode<"ISD::FRINT"      , SDTFPUnaryOp>;
 def ftrunc     : SDNode<"ISD::FTRUNC"     , SDTFPUnaryOp>;
 def fceil      : SDNode<"ISD::FCEIL"      , SDTFPUnaryOp>;
@@ -473,7 +479,6 @@ class PatLeaf<dag frag, code pred = [{}], SDNodeXForm xform = NOOP_SDNodeXForm>
 def vtInt      : PatLeaf<(vt),  [{ return N->getVT().isInteger(); }]>;
 def vtFP       : PatLeaf<(vt),  [{ return N->getVT().isFloatingPoint(); }]>;
 
-def immAllOnes : PatLeaf<(imm), [{ return N->isAllOnesValue(); }]>;
 def immAllOnesV: PatLeaf<(build_vector), [{
   return ISD::isBuildVectorAllOnes(N);
 }]>;
@@ -490,7 +495,7 @@ def immAllZerosV_bc: PatLeaf<(bitconvert), [{
 
 
 // Other helper fragments.
-def not  : PatFrag<(ops node:$in), (xor node:$in, immAllOnes)>;
+def not  : PatFrag<(ops node:$in), (xor node:$in, -1)>;
 def vnot : PatFrag<(ops node:$in), (xor node:$in, immAllOnesV)>;
 def vnot_conv : PatFrag<(ops node:$in), (xor node:$in, immAllOnesV_bc)>;
 def ineg : PatFrag<(ops node:$in), (sub 0, node:$in)>;
@@ -837,11 +842,6 @@ class Pat<dag pattern, dag result> : Pattern<pattern, [result]>;
 // Complex pattern definitions.
 //
 
-class CPAttribute;
-// Pass the parent Operand as root to CP function rather 
-// than the root of the sub-DAG
-def CPAttrParentAsRoot : CPAttribute;
-
 // Complex patterns, e.g. X86 addressing mode, requires pattern matching code
 // in C++. NumOperands is the number of operands returned by the select function;
 // SelectFunc is the name of the function used to pattern match the max. pattern;
@@ -849,19 +849,10 @@ def CPAttrParentAsRoot : CPAttribute;
 // e.g. X86 addressing mode - def addr : ComplexPattern<4, "SelectAddr", [add]>;
 //
 class ComplexPattern<ValueType ty, int numops, string fn,
-                     list<SDNode> roots = [], list<SDNodeProperty> props = [],
-                     list<CPAttribute> attrs = []> {
+                     list<SDNode> roots = [], list<SDNodeProperty> props = []> {
   ValueType Ty = ty;
   int NumOperands = numops;
   string SelectFunc = fn;
   list<SDNode> RootNodes = roots;
   list<SDNodeProperty> Properties = props;
-  list<CPAttribute> Attributes = attrs;
 }
-
-//===----------------------------------------------------------------------===//
-// Dwarf support.
-//
-def SDT_dwarf_loc : SDTypeProfile<0, 3,
-                      [SDTCisInt<0>, SDTCisInt<1>, SDTCisInt<2>]>;
-def dwarf_loc : SDNode<"ISD::DEBUG_LOC", SDT_dwarf_loc,[SDNPHasChain]>;

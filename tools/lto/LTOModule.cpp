@@ -17,18 +17,18 @@
 #include "llvm/Constants.h"
 #include "llvm/LLVMContext.h"
 #include "llvm/Module.h"
-#include "llvm/ModuleProvider.h"
 #include "llvm/ADT/OwningPtr.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/Support/SystemUtils.h"
-#include "llvm/Support/Mangler.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/System/Host.h"
 #include "llvm/System/Path.h"
 #include "llvm/System/Process.h"
+#include "llvm/Target/Mangler.h"
 #include "llvm/Target/SubtargetFeature.h"
-#include "llvm/Target/TargetAsmInfo.h"
+#include "llvm/MC/MCAsmInfo.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetRegistry.h"
 #include "llvm/Target/TargetSelect.h"
@@ -37,8 +37,8 @@ using namespace llvm;
 
 bool LTOModule::isBitcodeFile(const void* mem, size_t length)
 {
-    return ( llvm::sys::IdentifyFileType((char*)mem, length) 
-                                            == llvm::sys::Bitcode_FileType );
+    return llvm::sys::IdentifyFileType((char*)mem, length) 
+        == llvm::sys::Bitcode_FileType;
 }
 
 bool LTOModule::isBitcodeFile(const char* path)
@@ -50,7 +50,7 @@ bool LTOModule::isBitcodeFileForTarget(const void* mem, size_t length,
                                        const char* triplePrefix) 
 {
     MemoryBuffer* buffer = makeBuffer(mem, length);
-    if ( buffer == NULL )
+    if (!buffer)
         return false;
     return isTargetMatch(buffer, triplePrefix);
 }
@@ -68,15 +68,14 @@ bool LTOModule::isBitcodeFileForTarget(const char* path,
 // takes ownership of buffer
 bool LTOModule::isTargetMatch(MemoryBuffer* buffer, const char* triplePrefix)
 {
-    OwningPtr<ModuleProvider> mp(getBitcodeModuleProvider(buffer,
-                                                          getGlobalContext()));
-    // on success, mp owns buffer and both are deleted at end of this method
-    if ( !mp ) {
+    OwningPtr<Module> m(getLazyBitcodeModule(buffer, getGlobalContext()));
+    // on success, m owns buffer and both are deleted at end of this method
+    if (!m) {
         delete buffer;
         return false;
     }
-    std::string actualTarget = mp->getModule()->getTargetTriple();
-    return ( strncmp(actualTarget.c_str(), triplePrefix, 
+    std::string actualTarget = m->getTargetTriple();
+    return (strncmp(actualTarget.c_str(), triplePrefix, 
                     strlen(triplePrefix)) == 0);
 }
 
@@ -90,7 +89,7 @@ LTOModule* LTOModule::makeLTOModule(const char* path,
                                     std::string& errMsg)
 {
     OwningPtr<MemoryBuffer> buffer(MemoryBuffer::getFile(path, &errMsg));
-    if ( !buffer )
+    if (!buffer)
         return NULL;
     return makeLTOModule(buffer.get(), errMsg);
 }
@@ -103,8 +102,8 @@ MemoryBuffer* LTOModule::makeBuffer(const void* mem, size_t length)
 {
     const char* startPtr = (char*)mem;
     const char* endPtr = startPtr+length;
-    if ( (((uintptr_t)endPtr & (sys::Process::GetPageSize()-1)) == 0) 
-        || (*endPtr != 0) ) 
+    if ((((uintptr_t)endPtr & (sys::Process::GetPageSize()-1)) == 0) 
+        || (*endPtr != 0)) 
         return MemoryBuffer::getMemBufferCopy(startPtr, endPtr);
     else
         return MemoryBuffer::getMemBuffer(startPtr, endPtr);
@@ -115,30 +114,9 @@ LTOModule* LTOModule::makeLTOModule(const void* mem, size_t length,
                                     std::string& errMsg)
 {
     OwningPtr<MemoryBuffer> buffer(makeBuffer(mem, length));
-    if ( !buffer )
+    if (!buffer)
         return NULL;
     return makeLTOModule(buffer.get(), errMsg);
-}
-
-/// getFeatureString - Return a string listing the features associated with the
-/// target triple.
-///
-/// FIXME: This is an inelegant way of specifying the features of a
-/// subtarget. It would be better if we could encode this information into the
-/// IR. See <rdar://5972456>.
-std::string getFeatureString(const char *TargetTriple) {
-  InitializeAllTargets();
-
-  SubtargetFeatures Features;
-
-  if (strncmp(TargetTriple, "powerpc-apple-", 14) == 0) {
-    Features.AddFeature("altivec", true);
-  } else if (strncmp(TargetTriple, "powerpc64-apple-", 16) == 0) {
-    Features.AddFeature("64bit", true);
-    Features.AddFeature("altivec", true);
-  }
-
-  return Features.getString();
 }
 
 LTOModule* LTOModule::makeLTOModule(MemoryBuffer* buffer,
@@ -148,7 +126,7 @@ LTOModule* LTOModule::makeLTOModule(MemoryBuffer* buffer,
 
     // parse bitcode buffer
     OwningPtr<Module> m(ParseBitcodeFile(buffer, getGlobalContext(), &errMsg));
-    if ( !m )
+    if (!m)
         return NULL;
 
     std::string Triple = m->getTargetTriple();
@@ -157,11 +135,12 @@ LTOModule* LTOModule::makeLTOModule(MemoryBuffer* buffer,
 
     // find machine architecture for this module
     const Target* march = TargetRegistry::lookupTarget(Triple, errMsg);
-    if ( march == NULL ) 
+    if (!march) 
         return NULL;
 
     // construct LTModule, hand over ownership of module and target
-    std::string FeatureStr = getFeatureString(Triple.c_str());
+    const std::string FeatureStr = 
+        SubtargetFeatures::getDefaultSubtargetFeatures(llvm::Triple(Triple));
     TargetMachine* target = march->createTargetMachine(Triple, FeatureStr);
     return new LTOModule(m.take(), target);
 }
@@ -196,7 +175,7 @@ bool LTOModule::objcClassNameFromExpression(Constant* c, std::string& name)
         if (GlobalVariable* gvn = dyn_cast<GlobalVariable>(op)) {
             Constant* cn = gvn->getInitializer(); 
             if (ConstantArray* ca = dyn_cast<ConstantArray>(cn)) {
-                if ( ca->isCString() ) {
+                if (ca->isCString()) {
                     name = ".objc_class_name_" + ca->getAsString();
                     return true;
                 }
@@ -212,9 +191,9 @@ void LTOModule::addObjCClass(GlobalVariable* clgv)
     if (ConstantStruct* c = dyn_cast<ConstantStruct>(clgv->getInitializer())) {
         // second slot in __OBJC,__class is pointer to superclass name
         std::string superclassName;
-        if ( objcClassNameFromExpression(c->getOperand(1), superclassName) ) {
+        if (objcClassNameFromExpression(c->getOperand(1), superclassName)) {
             NameAndAttributes info;
-            if ( _undefines.find(superclassName.c_str()) == _undefines.end() ) {
+            if (_undefines.find(superclassName.c_str()) == _undefines.end()) {
                 const char* symbolName = ::strdup(superclassName.c_str());
                 info.name = ::strdup(symbolName);
                 info.attributes = LTO_SYMBOL_DEFINITION_UNDEFINED;
@@ -224,7 +203,7 @@ void LTOModule::addObjCClass(GlobalVariable* clgv)
         }
         // third slot in __OBJC,__class is pointer to class name
         std::string className;
-         if ( objcClassNameFromExpression(c->getOperand(2), className) ) {
+         if (objcClassNameFromExpression(c->getOperand(2), className)) {
             const char* symbolName = ::strdup(className.c_str());
             NameAndAttributes info;
             info.name = symbolName;
@@ -245,9 +224,9 @@ void LTOModule::addObjCCategory(GlobalVariable* clgv)
     if (ConstantStruct* c = dyn_cast<ConstantStruct>(clgv->getInitializer())) {
         // second slot in __OBJC,__category is pointer to target class name
         std::string targetclassName;
-        if ( objcClassNameFromExpression(c->getOperand(1), targetclassName) ) {
+        if (objcClassNameFromExpression(c->getOperand(1), targetclassName)) {
             NameAndAttributes info;
-            if ( _undefines.find(targetclassName.c_str()) == _undefines.end() ){
+            if (_undefines.find(targetclassName.c_str()) == _undefines.end()) {
                 const char* symbolName = ::strdup(targetclassName.c_str());
                 info.name = ::strdup(symbolName);
                 info.attributes = LTO_SYMBOL_DEFINITION_UNDEFINED;
@@ -263,9 +242,9 @@ void LTOModule::addObjCCategory(GlobalVariable* clgv)
 void LTOModule::addObjCClassRef(GlobalVariable* clgv)
 {
     std::string targetclassName;
-    if ( objcClassNameFromExpression(clgv->getInitializer(), targetclassName) ){
+    if (objcClassNameFromExpression(clgv->getInitializer(), targetclassName)) {
         NameAndAttributes info;
-        if ( _undefines.find(targetclassName.c_str()) == _undefines.end() ) {
+        if (_undefines.find(targetclassName.c_str()) == _undefines.end()) {
             const char* symbolName = ::strdup(targetclassName.c_str());
             info.name = ::strdup(symbolName);
             info.attributes = LTO_SYMBOL_DEFINITION_UNDEFINED;
@@ -300,23 +279,23 @@ void LTOModule::addDefinedDataSymbol(GlobalValue* v, Mangler& mangler)
     // a class was missing.   
     // The following synthesizes the implicit .objc_* symbols for the linker
     // from the ObjC data structures generated by the front end.
-    if ( v->hasSection() /* && isTargetDarwin */ ) {
+    if (v->hasSection() /* && isTargetDarwin */) {
         // special case if this data blob is an ObjC class definition
-        if ( v->getSection().compare(0, 15, "__OBJC,__class,") == 0 ) {
+        if (v->getSection().compare(0, 15, "__OBJC,__class,") == 0) {
             if (GlobalVariable* gv = dyn_cast<GlobalVariable>(v)) {
                 addObjCClass(gv);
             }
         }                        
     
         // special case if this data blob is an ObjC category definition
-        else if ( v->getSection().compare(0, 18, "__OBJC,__category,") == 0 ) {
+        else if (v->getSection().compare(0, 18, "__OBJC,__category,") == 0) {
             if (GlobalVariable* gv = dyn_cast<GlobalVariable>(v)) {
                 addObjCCategory(gv);
             }
         }                        
         
         // special case if this data blob is the list of referenced classes
-        else if ( v->getSection().compare(0, 18, "__OBJC,__cls_refs,") == 0 ) {
+        else if (v->getSection().compare(0, 18, "__OBJC,__cls_refs,") == 0) {
             if (GlobalVariable* gv = dyn_cast<GlobalVariable>(v)) {
                 addObjCClassRef(gv);
             }
@@ -339,28 +318,28 @@ void LTOModule::addDefinedSymbol(GlobalValue* def, Mangler &mangler,
         return;
 
     // string is owned by _defines
-    const char* symbolName = ::strdup(mangler.getMangledName(def).c_str());
+    const char* symbolName = ::strdup(mangler.getNameWithPrefix(def).c_str());
 
     // set alignment part log2() can have rounding errors
     uint32_t align = def->getAlignment();
     uint32_t attr = align ? CountTrailingZeros_32(def->getAlignment()) : 0;
     
     // set permissions part
-    if ( isFunction )
+    if (isFunction)
         attr |= LTO_SYMBOL_PERMISSIONS_CODE;
     else {
         GlobalVariable* gv = dyn_cast<GlobalVariable>(def);
-        if ( (gv != NULL) && gv->isConstant() )
+        if (gv && gv->isConstant())
             attr |= LTO_SYMBOL_PERMISSIONS_RODATA;
         else
             attr |= LTO_SYMBOL_PERMISSIONS_DATA;
     }
     
     // set definition part 
-    if ( def->hasWeakLinkage() || def->hasLinkOnceLinkage() ) {
+    if (def->hasWeakLinkage() || def->hasLinkOnceLinkage()) {
         attr |= LTO_SYMBOL_DEFINITION_WEAK;
     }
-    else if ( def->hasCommonLinkage()) {
+    else if (def->hasCommonLinkage()) {
         attr |= LTO_SYMBOL_DEFINITION_TENTATIVE;
     }
     else { 
@@ -368,12 +347,12 @@ void LTOModule::addDefinedSymbol(GlobalValue* def, Mangler &mangler,
     }
     
     // set scope part
-    if ( def->hasHiddenVisibility() )
+    if (def->hasHiddenVisibility())
         attr |= LTO_SYMBOL_SCOPE_HIDDEN;
-    else if ( def->hasProtectedVisibility() )
+    else if (def->hasProtectedVisibility())
         attr |= LTO_SYMBOL_SCOPE_PROTECTED;
-    else if ( def->hasExternalLinkage() || def->hasWeakLinkage() 
-              || def->hasLinkOnceLinkage() || def->hasCommonLinkage() )
+    else if (def->hasExternalLinkage() || def->hasWeakLinkage()
+             || def->hasLinkOnceLinkage() || def->hasCommonLinkage())
         attr |= LTO_SYMBOL_SCOPE_DEFAULT;
     else
         attr |= LTO_SYMBOL_SCOPE_INTERNAL;
@@ -388,7 +367,7 @@ void LTOModule::addDefinedSymbol(GlobalValue* def, Mangler &mangler,
 
 void LTOModule::addAsmGlobalSymbol(const char *name) {
     // only add new define if not already defined
-    if ( _defines.count(name) == 0 ) 
+    if (_defines.count(name) == 0) 
         return;
         
     // string is owned by _defines
@@ -412,7 +391,7 @@ void LTOModule::addPotentialUndefinedSymbol(GlobalValue* decl, Mangler &mangler)
     if (isa<GlobalAlias>(decl))
         return;
 
-    std::string name = mangler.getMangledName(decl);
+    std::string name = mangler.getNameWithPrefix(decl);
 
     // we already have the symbol
     if (_undefines.find(name) != _undefines.end())
@@ -434,7 +413,7 @@ void LTOModule::addPotentialUndefinedSymbol(GlobalValue* decl, Mangler &mangler)
 void LTOModule::findExternalRefs(Value* value, Mangler &mangler) {
 
     if (GlobalValue* gv = dyn_cast<GlobalValue>(value)) {
-        if ( !gv->hasExternalLinkage() )
+        if (!gv->hasExternalLinkage())
             addPotentialUndefinedSymbol(gv, mangler);
         // If this is a variable definition, do not recursively process
         // initializer.  It might contain a reference to this variable
@@ -442,11 +421,11 @@ void LTOModule::findExternalRefs(Value* value, Mangler &mangler) {
         // processed in addDefinedDataSymbol(). 
         return;
     }
-    
+
     // GlobalValue, even with InternalLinkage type, may have operands with 
     // ExternalLinkage type. Do not ignore these operands.
     if (Constant* c = dyn_cast<Constant>(value)) {
-        // Handle ConstantExpr, ConstantStruct, ConstantArry etc..
+        // Handle ConstantExpr, ConstantStruct, ConstantArry etc.
         for (unsigned i = 0, e = c->getNumOperands(); i != e; ++i)
             findExternalRefs(c->getOperand(i), mangler);
     }
@@ -454,23 +433,15 @@ void LTOModule::findExternalRefs(Value* value, Mangler &mangler) {
 
 void LTOModule::lazyParseSymbols()
 {
-    if ( !_symbolsParsed ) {
+    if (!_symbolsParsed) {
         _symbolsParsed = true;
         
         // Use mangler to add GlobalPrefix to names to match linker names.
-        Mangler mangler(*_module, _target->getTargetAsmInfo()->getGlobalPrefix());
-        // add chars used in ObjC method names so method names aren't mangled
-        mangler.markCharAcceptable('[');
-        mangler.markCharAcceptable(']');
-        mangler.markCharAcceptable('(');
-        mangler.markCharAcceptable(')');
-        mangler.markCharAcceptable('-');
-        mangler.markCharAcceptable('+');
-        mangler.markCharAcceptable(' ');
+        Mangler mangler(*_target->getMCAsmInfo());
 
         // add functions
         for (Module::iterator f = _module->begin(); f != _module->end(); ++f) {
-            if ( f->isDeclaration() ) 
+            if (f->isDeclaration())
                 addPotentialUndefinedSymbol(f, mangler);
             else 
                 addDefinedFunctionSymbol(f, mangler);
@@ -479,7 +450,7 @@ void LTOModule::lazyParseSymbols()
         // add data 
         for (Module::global_iterator v = _module->global_begin(), 
                                     e = _module->global_end(); v !=  e; ++v) {
-            if ( v->isDeclaration() ) 
+            if (v->isDeclaration())
                 addPotentialUndefinedSymbol(v, mangler);
             else 
                 addDefinedDataSymbol(v, mangler);
@@ -516,7 +487,7 @@ void LTOModule::lazyParseSymbols()
                                                 it != _undefines.end(); ++it) {
             // if this symbol also has a definition, then don't make an undefine
             // because it is a tentative definition
-            if ( _defines.count(it->getKey()) == 0 ) {
+            if (_defines.count(it->getKey()) == 0) {
               NameAndAttributes info = it->getValue();
               _symbols.push_back(info);
             }
@@ -535,7 +506,7 @@ uint32_t LTOModule::getSymbolCount()
 lto_symbol_attributes LTOModule::getSymbolAttributes(uint32_t index)
 {
     lazyParseSymbols();
-    if ( index < _symbols.size() )
+    if (index < _symbols.size())
         return _symbols[index].attributes;
     else
         return lto_symbol_attributes(0);
@@ -544,7 +515,7 @@ lto_symbol_attributes LTOModule::getSymbolAttributes(uint32_t index)
 const char* LTOModule::getSymbolName(uint32_t index)
 {
     lazyParseSymbols();
-    if ( index < _symbols.size() )
+    if (index < _symbols.size())
         return _symbols[index].name;
     else
         return NULL;

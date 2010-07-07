@@ -28,11 +28,12 @@ namespace llvm {
   class ELFSection;
   struct ELFSym;
   class GlobalVariable;
+  class JITDebugRegisterer;
   class Mangler;
   class MachineCodeEmitter;
   class MachineConstantPoolEntry;
   class ObjectCodeEmitter;
-  class TargetAsmInfo;
+  class MCAsmInfo;
   class TargetELFWriterInfo;
   class TargetLoweringObjectFile;
   class raw_ostream;
@@ -51,6 +52,7 @@ namespace llvm {
   ///
   class ELFWriter : public MachineFunctionPass {
     friend class ELFCodeEmitter;
+    friend class JITDebugRegisterer;
   public:
     static char ID;
 
@@ -86,9 +88,9 @@ namespace llvm {
     /// and other object file specific stuff
     const TargetLoweringObjectFile &TLOF;
 
-    /// TAI - Target Asm Info, provide information about section names for
+    /// MAI - Target Asm Info, provide information about section names for
     /// globals and other target specific stuff.
-    const TargetAsmInfo *TAI;
+    const MCAsmInfo *MAI;
 
     //===------------------------------------------------------------------===//
     // Properties inferred automatically from the target machine.
@@ -118,7 +120,7 @@ namespace llvm {
     unsigned NumSections;   // Always = SectionList.size()
 
     /// SectionLookup - This is a mapping from section name to section number in
-    /// the SectionList. Used to quickly gather the Section Index from TAI names
+    /// the SectionList. Used to quickly gather the Section Index from MAI names
     std::map<std::string, ELFSection*> SectionLookup;
 
     /// PendingGlobals - Globals not processed as symbols yet.

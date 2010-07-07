@@ -1,4 +1,4 @@
-; RUN: llvm-as < %s | opt -instcombine | llvm-dis | FileCheck %s
+; RUN: opt < %s -instcombine -S | FileCheck %s
 
 ; This turns into a&1 != 0
 define <2 x i1> @test1(<2 x i64> %a) {
@@ -50,6 +50,22 @@ entry:
 ; CHECK:   fcmp uno <4 x float> %a, %b
 }
 
+
+; rdar://7434900
+define <2 x i64> @test5(<4 x float> %a, <4 x float> %b) nounwind readnone {
+entry:
+	%cmp = fcmp ult <4 x float> %a, zeroinitializer	
+	%sext = sext <4 x i1> %cmp to <4 x i32>	
+	%cmp4 = fcmp ult <4 x float> %b, zeroinitializer
+	%sext5 = sext <4 x i1> %cmp4 to <4 x i32>
+	%and = and <4 x i32> %sext, %sext5
+	%conv = bitcast <4 x i32> %and to <2 x i64>
+	ret <2 x i64> %conv
+        
+; CHECK: @test5
+; CHECK:   sext <4 x i1> %cmp to <4 x i32>	
+; CHECK:   sext <4 x i1> %cmp4 to <4 x i32>	
+}
 
 
 define void @convert(<2 x i32>* %dst.addr, <2 x i64> %src) nounwind {

@@ -30,9 +30,7 @@ namespace sys {
   /// @brief An abstraction for finding and executing programs.
   class Program {
     /// Opaque handle for target specific data.
-	void *Data;
-
-    unsigned Pid_;
+    void *Data_;
 
     // Noncopyable.
     Program(const Program& other);
@@ -43,10 +41,10 @@ namespace sys {
   public:
 
     Program();
-	~Program();
-	
+    ~Program();
+
     /// Return process ID of this program.
-    unsigned GetPid() { return Pid_; }
+    unsigned GetPid() const;
 
     /// This function executes the program using the \p arguments provided.  The
     /// invoked program will inherit the stdin, stdout, and stderr file
@@ -99,7 +97,17 @@ namespace sys {
       ///< it doesn't.
       std::string* ErrMsg = 0 ///< If non-zero, provides a pointer to a string
       ///< instance in which error messages will be returned. If the string
-      ///< is non-empty upon return an error occurred while invoking the
+      ///< is non-empty upon return an error occurred while waiting.
+      );
+
+    /// This function terminates the program.
+    /// @returns true if an error occured.
+    /// @see Execute
+    /// @brief Terminates the program.
+    bool Kill
+    ( std::string* ErrMsg = 0 ///< If non-zero, provides a pointer to a string
+      ///< instance in which error messages will be returned. If the string
+      ///< is non-empty upon return an error occurred while killing the
       ///< program.
       );
 
@@ -112,10 +120,12 @@ namespace sys {
     /// @brief Construct a Program by finding it by name.
     static Path FindProgramByName(const std::string& name);
 
-    // These methods change the specified standard stream (stdin or stdout) to
-    // binary mode. They return true if an error occurred
+    // These methods change the specified standard stream (stdin,
+    // stdout, or stderr) to binary mode. They return true if an error
+    // occurred
     static bool ChangeStdinToBinary();
     static bool ChangeStdoutToBinary();
+    static bool ChangeStderrToBinary();
 
     /// A convenience function equivalent to Program prg; prg.Execute(..);
     /// prg.Wait(..);

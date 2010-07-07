@@ -8,42 +8,48 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/MC/MCSymbol.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
-
 using namespace llvm;
 
-/// NeedsQuoting - Return true if the string \arg Str needs quoting, i.e., it
-/// does not match [a-zA-Z_.][a-zA-Z0-9_.]*.
-//
-// FIXME: This could be more permissive, do we care?
-static inline bool NeedsQuoting(const StringRef &Str) {
-  if (Str.empty())
-    return true;
+// Sentinel value for the absolute pseudo section.
+const MCSection *MCSymbol::AbsolutePseudoSection =
+  reinterpret_cast<const MCSection *>(1);
 
-  // Check that first character is in [a-zA-Z_.].
-  if (!((Str[0] >= 'a' && Str[0] <= 'z') ||
-        (Str[0] >= 'A' && Str[0] <= 'Z') ||
-        (Str[0] == '_' || Str[0] == '.')))
-    return true;
+static bool isAcceptableChar(char C) {
+  if ((C < 'a' || C > 'z') &&
+      (C < 'A' || C > 'Z') &&
+      (C < '0' || C > '9') &&
+      C != '_' && C != '$' && C != '.' && C != '@')
+    return false;
+  return true;
+}
 
-  // Check subsequent characters are in [a-zA-Z0-9_.].
-  for (unsigned i = 1, e = Str.size(); i != e; ++i)
-    if (!((Str[i] >= 'a' && Str[i] <= 'z') ||
-          (Str[i] >= 'A' && Str[i] <= 'Z') ||
-          (Str[i] >= '0' && Str[i] <= '9') ||
-          (Str[i] == '_' || Str[i] == '.')))
+/// NameNeedsQuoting - Return true if the identifier \arg Str needs quotes to be
+/// syntactically correct.
+static bool NameNeedsQuoting(StringRef Str) {
+  assert(!Str.empty() && "Cannot create an empty MCSymbol");
+  
+  // If any of the characters in the string is an unacceptable character, force
+  // quotes.
+  for (unsigned i = 0, e = Str.size(); i != e; ++i)
+    if (!isAcceptableChar(Str[i]))
       return true;
-
   return false;
 }
 
 void MCSymbol::print(raw_ostream &OS) const {
-  if (NeedsQuoting(getName()))
-    OS << '"' << getName() << '"';
-  else
+  // The name for this MCSymbol is required to be a valid target name.  However,
+  // some targets support quoting names with funny characters.  If the name
+  // contains a funny character, then print it quoted.
+  if (!NameNeedsQuoting(getName())) {
     OS << getName();
+    return;
+  }
+    
+  OS << '"' << getName() << '"';
 }
 
 void MCSymbol::dump() const {
-  print(errs());
+  print(dbgs());
 }

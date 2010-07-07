@@ -19,7 +19,6 @@
 #include "llvm/Instructions.h"
 #include "llvm/Operator.h"
 #include "llvm/Module.h"
-#include "llvm/Metadata.h"
 #include "llvm/ValueSymbolTable.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Debug.h"
@@ -27,9 +26,6 @@
 #include "llvm/Support/LeakDetector.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/ValueHandle.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/System/RWMutex.h"
-#include "llvm/System/Threading.h"
 #include "llvm/ADT/DenseMap.h"
 #include <algorithm>
 using namespace llvm;
@@ -44,18 +40,16 @@ static inline const Type *checkType(const Type *Ty) {
 }
 
 Value::Value(const Type *ty, unsigned scid)
-  : SubclassID(scid), HasValueHandle(0), SubclassOptionalData(0),
-    SubclassData(0), VTy(checkType(ty)),
+  : SubclassID(scid), HasValueHandle(0),
+    SubclassOptionalData(0), SubclassData(0), VTy(checkType(ty)),
     UseList(0), Name(0) {
   if (isa<CallInst>(this) || isa<InvokeInst>(this))
-    assert((VTy->isFirstClassType() ||
-            VTy == Type::getVoidTy(ty->getContext()) ||
-            isa<OpaqueType>(ty) || VTy->getTypeID() == Type::StructTyID) &&
+    assert((VTy->isFirstClassType() || VTy->isVoidTy() ||
+            ty->isOpaqueTy() || VTy->isStructTy()) &&
            "invalid CallInst  type!");
   else if (!isa<Constant>(this) && !isa<BasicBlock>(this))
-    assert((VTy->isFirstClassType() ||
-            VTy == Type::getVoidTy(ty->getContext()) ||
-           isa<OpaqueType>(ty)) &&
+    assert((VTy->isFirstClassType() || VTy->isVoidTy() ||
+            ty->isOpaqueTy()) &&
            "Cannot create non-first-class values except for constants!");
 }
 
@@ -63,7 +57,7 @@ Value::~Value() {
   // Notify all ValueHandles (if present) that this value is going away.
   if (HasValueHandle)
     ValueHandleBase::ValueIsDeleted(this);
-  
+
 #ifndef NDEBUG      // Only in -g mode...
   // Check to make sure that there are no uses of this value that are still
   // around when the value is destroyed.  If there are, then we have a dangling
@@ -72,9 +66,9 @@ Value::~Value() {
   // a <badref>
   //
   if (!use_empty()) {
-    errs() << "While deleting: " << *VTy << " %" << getNameStr() << "\n";
+    dbgs() << "While deleting: " << *VTy << " %" << getNameStr() << "\n";
     for (use_iterator I = use_begin(), E = use_end(); I != E; ++I)
-      errs() << "Use still stuck around after Def is destroyed:"
+      dbgs() << "Use still stuck around after Def is destroyed:"
            << **I << "\n";
   }
 #endif
@@ -84,7 +78,7 @@ Value::~Value() {
   // at this point.
   if (Name)
     Name->Destroy();
-  
+
   // There should be no uses of this object anymore, remove it.
   LeakDetector::removeGarbageObject(this);
 }
@@ -137,13 +131,13 @@ static bool getSymTab(Value *V, ValueSymbolTable *&ST) {
       if (Function *PP = P->getParent())
         ST = &PP->getValueSymbolTable();
   } else if (BasicBlock *BB = dyn_cast<BasicBlock>(V)) {
-    if (Function *P = BB->getParent()) 
+    if (Function *P = BB->getParent())
       ST = &P->getValueSymbolTable();
   } else if (GlobalValue *GV = dyn_cast<GlobalValue>(V)) {
-    if (Module *P = GV->getParent()) 
+    if (Module *P = GV->getParent())
       ST = &P->getValueSymbolTable();
   } else if (Argument *A = dyn_cast<Argument>(V)) {
-    if (Function *P = A->getParent()) 
+    if (Function *P = A->getParent())
       ST = &P->getValueSymbolTable();
   } else if (NamedMDNode *N = dyn_cast<NamedMDNode>(V)) {
     if (Module *P = N->getParent()) {
@@ -176,43 +170,39 @@ void Value::setName(const Twine &NewName) {
     return;
 
   SmallString<256> NameData;
-  NewName.toVector(NameData);
-
-  const char *NameStr = NameData.data();
-  unsigned NameLen = NameData.size();
+  StringRef NameRef = NewName.toStringRef(NameData);
 
   // Name isn't changing?
-  if (getName() == StringRef(NameStr, NameLen))
+  if (getName() == NameRef)
     return;
 
-  assert(getType() != Type::getVoidTy(getContext()) &&
-         "Cannot assign a name to void values!");
-  
+  assert(!getType()->isVoidTy() && "Cannot assign a name to void values!");
+
   // Get the symbol table to update for this object.
   ValueSymbolTable *ST;
   if (getSymTab(this, ST))
     return;  // Cannot set a name on this value (e.g. constant).
 
   if (!ST) { // No symbol table to update?  Just do the change.
-    if (NameLen == 0) {
+    if (NameRef.empty()) {
       // Free the name for this value.
       Name->Destroy();
       Name = 0;
       return;
     }
-    
+
     if (Name)
       Name->Destroy();
-    
+
     // NOTE: Could optimize for the case the name is shrinking to not deallocate
     // then reallocated.
-      
+
     // Create the new name.
-    Name = ValueName::Create(NameStr, NameStr+NameLen);
+    Name = ValueName::Create(NameRef.begin(), NameRef.end());
     Name->setValue(this);
     return;
   }
-  
+
   // NOTE: Could optimize for the case the name is shrinking to not deallocate
   // then reallocated.
   if (hasName()) {
@@ -221,17 +211,17 @@ void Value::setName(const Twine &NewName) {
     Name->Destroy();
     Name = 0;
 
-    if (NameLen == 0)
+    if (NameRef.empty())
       return;
   }
 
   // Name is changing to something new.
-  Name = ST->createValueName(StringRef(NameStr, NameLen), this);
+  Name = ST->createValueName(NameRef, this);
 }
 
 
 /// takeName - transfer the name from V to this value, setting V's name to
-/// empty.  It is an error to call V->takeName(V). 
+/// empty.  It is an error to call V->takeName(V).
 void Value::takeName(Value *V) {
   ValueSymbolTable *ST = 0;
   // If this value has a name, drop it.
@@ -243,19 +233,19 @@ void Value::takeName(Value *V) {
       if (V->hasName()) V->setName("");
       return;  // Cannot set a name on this value (e.g. constant).
     }
-    
+
     // Remove old name.
     if (ST)
       ST->removeValueName(Name);
     Name->Destroy();
     Name = 0;
-  } 
-  
+  }
+
   // Now we know that this has no name.
-  
+
   // If V has no name either, we're done.
   if (!V->hasName()) return;
-   
+
   // Get this's symtab if we didn't before.
   if (!ST) {
     if (getSymTab(this, ST)) {
@@ -264,12 +254,12 @@ void Value::takeName(Value *V) {
       return;  // Cannot set a name on this value (e.g. constant).
     }
   }
-  
+
   // Get V's ST, this should always succed, because V has a name.
   ValueSymbolTable *VST;
   bool Failure = getSymTab(V, VST);
   assert(!Failure && "V has a name, so it should have a ST!"); Failure=Failure;
-  
+
   // If these values are both in the same symtab, we can do this very fast.
   // This works even if both values have no symtab yet.
   if (ST == VST) {
@@ -279,16 +269,16 @@ void Value::takeName(Value *V) {
     Name->setValue(this);
     return;
   }
-  
+
   // Otherwise, things are slightly more complex.  Remove V's name from VST and
   // then reinsert it into ST.
-  
+
   if (VST)
     VST->removeValueName(V->Name);
   Name = V->Name;
   V->Name = 0;
   Name->setValue(this);
-  
+
   if (ST)
     ST->reinsertValue(this);
 }
@@ -304,7 +294,7 @@ void Value::uncheckedReplaceAllUsesWith(Value *New) {
   // Notify all ValueHandles (if present) that this value is going away.
   if (HasValueHandle)
     ValueHandleBase::ValueIsRAUWd(this, New);
- 
+
   while (!use_empty()) {
     Use &U = *UseList;
     // Must handle Constants specially, we cannot call replaceUsesOfWith on a
@@ -315,7 +305,7 @@ void Value::uncheckedReplaceAllUsesWith(Value *New) {
         continue;
       }
     }
-    
+
     U.set(New);
   }
 }
@@ -330,7 +320,7 @@ void Value::replaceAllUsesWith(Value *New) {
 }
 
 Value *Value::stripPointerCasts() {
-  if (!isa<PointerType>(getType()))
+  if (!getType()->isPointerTy())
     return this;
   Value *V = this;
   do {
@@ -340,28 +330,35 @@ Value *Value::stripPointerCasts() {
       V = GEP->getPointerOperand();
     } else if (Operator::getOpcode(V) == Instruction::BitCast) {
       V = cast<Operator>(V)->getOperand(0);
+    } else if (GlobalAlias *GA = dyn_cast<GlobalAlias>(V)) {
+      if (GA->mayBeOverridden())
+        return V;
+      V = GA->getAliasee();
     } else {
       return V;
     }
-    assert(isa<PointerType>(V->getType()) && "Unexpected operand type!");
+    assert(V->getType()->isPointerTy() && "Unexpected operand type!");
   } while (1);
 }
 
-Value *Value::getUnderlyingObject() {
-  if (!isa<PointerType>(getType()))
+Value *Value::getUnderlyingObject(unsigned MaxLookup) {
+  if (!getType()->isPointerTy())
     return this;
   Value *V = this;
-  unsigned MaxLookup = 6;
-  do {
+  for (unsigned Count = 0; MaxLookup == 0 || Count < MaxLookup; ++Count) {
     if (GEPOperator *GEP = dyn_cast<GEPOperator>(V)) {
       V = GEP->getPointerOperand();
     } else if (Operator::getOpcode(V) == Instruction::BitCast) {
       V = cast<Operator>(V)->getOperand(0);
+    } else if (GlobalAlias *GA = dyn_cast<GlobalAlias>(V)) {
+      if (GA->mayBeOverridden())
+        return V;
+      V = GA->getAliasee();
     } else {
       return V;
     }
-    assert(isa<PointerType>(V->getType()) && "Unexpected operand type!");
-  } while (--MaxLookup);
+    assert(V->getType()->isPointerTy() && "Unexpected operand type!");
+  }
   return V;
 }
 
@@ -369,7 +366,7 @@ Value *Value::getUnderlyingObject() {
 /// return the value in the PHI node corresponding to PredBB.  If not, return
 /// ourself.  This is useful if you want to know the value something has in a
 /// predecessor block.
-Value *Value::DoPHITranslation(const BasicBlock *CurBB, 
+Value *Value::DoPHITranslation(const BasicBlock *CurBB,
                                const BasicBlock *PredBB) {
   PHINode *PN = dyn_cast<PHINode>(this);
   if (PN && PN->getParent() == CurBB)
@@ -387,7 +384,7 @@ LLVMContext &Value::getContext() const { return VTy->getContext(); }
 /// List is known to point into the existing use list.
 void ValueHandleBase::AddToExistingUseList(ValueHandleBase **List) {
   assert(List && "Handle list is null?");
-  
+
   // Splice ourselves into the list.
   Next = *List;
   *List = this;
@@ -398,12 +395,22 @@ void ValueHandleBase::AddToExistingUseList(ValueHandleBase **List) {
   }
 }
 
+void ValueHandleBase::AddToExistingUseListAfter(ValueHandleBase *List) {
+  assert(List && "Must insert after existing node");
+
+  Next = List->Next;
+  setPrevPtr(&List->Next);
+  List->Next = this;
+  if (Next)
+    Next->setPrevPtr(&Next);
+}
+
 /// AddToUseList - Add this ValueHandle to the use list for VP.
 void ValueHandleBase::AddToUseList() {
   assert(VP && "Null pointer doesn't have a use list!");
-  
+
   LLVMContextImpl *pImpl = VP->getContext().pImpl;
-  
+
   if (VP->HasValueHandle) {
     // If this value already has a ValueHandle, then it must be in the
     // ValueHandles map already.
@@ -412,7 +419,7 @@ void ValueHandleBase::AddToUseList() {
     AddToExistingUseList(&Entry);
     return;
   }
-  
+
   // Ok, it doesn't have any handles yet, so we must insert it into the
   // DenseMap.  However, doing this insertion could cause the DenseMap to
   // reallocate itself, which would invalidate all of the PrevP pointers that
@@ -420,19 +427,19 @@ void ValueHandleBase::AddToUseList() {
   // updating the stale pointers only if needed.
   DenseMap<Value*, ValueHandleBase*> &Handles = pImpl->ValueHandles;
   const void *OldBucketPtr = Handles.getPointerIntoBucketsArray();
-  
+
   ValueHandleBase *&Entry = Handles[VP];
   assert(Entry == 0 && "Value really did already have handles?");
   AddToExistingUseList(&Entry);
   VP->HasValueHandle = true;
-  
+
   // If reallocation didn't happen or if this was the first insertion, don't
   // walk the table.
-  if (Handles.isPointerIntoBucketsArray(OldBucketPtr) || 
+  if (Handles.isPointerIntoBucketsArray(OldBucketPtr) ||
       Handles.size() == 1) {
     return;
   }
-  
+
   // Okay, reallocation did happen.  Fix the Prev Pointers.
   for (DenseMap<Value*, ValueHandleBase*>::iterator I = Handles.begin(),
        E = Handles.end(); I != E; ++I) {
@@ -448,14 +455,14 @@ void ValueHandleBase::RemoveFromUseList() {
   // Unlink this from its use list.
   ValueHandleBase **PrevPtr = getPrevPtr();
   assert(*PrevPtr == this && "List invariant broken");
-  
+
   *PrevPtr = Next;
   if (Next) {
     assert(Next->getPrevPtr() == &Next && "List invariant broken");
     Next->setPrevPtr(PrevPtr);
     return;
   }
-  
+
   // If the Next pointer was null, then it is possible that this was the last
   // ValueHandle watching VP.  If so, delete its entry from the ValueHandles
   // map.
@@ -476,63 +483,88 @@ void ValueHandleBase::ValueIsDeleted(Value *V) {
   LLVMContextImpl *pImpl = V->getContext().pImpl;
   ValueHandleBase *Entry = pImpl->ValueHandles[V];
   assert(Entry && "Value bit set but no entries exist");
-  
-  while (Entry) {
-    // Advance pointer to avoid invalidation.
-    ValueHandleBase *ThisNode = Entry;
-    Entry = Entry->Next;
-    
-    switch (ThisNode->getKind()) {
+
+  // We use a local ValueHandleBase as an iterator so that
+  // ValueHandles can add and remove themselves from the list without
+  // breaking our iteration.  This is not really an AssertingVH; we
+  // just have to give ValueHandleBase some kind.
+  for (ValueHandleBase Iterator(Assert, *Entry); Entry; Entry = Iterator.Next) {
+    Iterator.RemoveFromUseList();
+    Iterator.AddToExistingUseListAfter(Entry);
+    assert(Entry->Next == &Iterator && "Loop invariant broken.");
+
+    switch (Entry->getKind()) {
     case Assert:
-#ifndef NDEBUG      // Only in -g mode...
-      errs() << "While deleting: " << *V->getType() << " %" << V->getNameStr()
-             << "\n";
-#endif
-      llvm_unreachable("An asserting value handle still pointed to this"
-                       " value!");
+      break;
+    case Tracking:
+      // Mark that this value has been deleted by setting it to an invalid Value
+      // pointer.
+      Entry->operator=(DenseMapInfo<Value *>::getTombstoneKey());
+      break;
     case Weak:
       // Weak just goes to null, which will unlink it from the list.
-      ThisNode->operator=(0);
+      Entry->operator=(0);
       break;
     case Callback:
       // Forward to the subclass's implementation.
-      static_cast<CallbackVH*>(ThisNode)->deleted();
+      static_cast<CallbackVH*>(Entry)->deleted();
       break;
     }
   }
-  
-  // All callbacks and weak references should be dropped by now.
-  assert(!V->HasValueHandle && "All references to V were not removed?");
+
+  // All callbacks, weak references, and assertingVHs should be dropped by now.
+  if (V->HasValueHandle) {
+#ifndef NDEBUG      // Only in +Asserts mode...
+    dbgs() << "While deleting: " << *V->getType() << " %" << V->getNameStr()
+           << "\n";
+    if (pImpl->ValueHandles[V]->getKind() == Assert)
+      llvm_unreachable("An asserting value handle still pointed to this"
+                       " value!");
+
+#endif
+    llvm_unreachable("All references to V were not removed?");
+  }
 }
 
 
 void ValueHandleBase::ValueIsRAUWd(Value *Old, Value *New) {
   assert(Old->HasValueHandle &&"Should only be called if ValueHandles present");
   assert(Old != New && "Changing value into itself!");
-  
+
   // Get the linked list base, which is guaranteed to exist since the
   // HasValueHandle flag is set.
   LLVMContextImpl *pImpl = Old->getContext().pImpl;
   ValueHandleBase *Entry = pImpl->ValueHandles[Old];
 
   assert(Entry && "Value bit set but no entries exist");
-  
-  while (Entry) {
-    // Advance pointer to avoid invalidation.
-    ValueHandleBase *ThisNode = Entry;
-    Entry = Entry->Next;
-    
-    switch (ThisNode->getKind()) {
+
+  // We use a local ValueHandleBase as an iterator so that
+  // ValueHandles can add and remove themselves from the list without
+  // breaking our iteration.  This is not really an AssertingVH; we
+  // just have to give ValueHandleBase some kind.
+  for (ValueHandleBase Iterator(Assert, *Entry); Entry; Entry = Iterator.Next) {
+    Iterator.RemoveFromUseList();
+    Iterator.AddToExistingUseListAfter(Entry);
+    assert(Entry->Next == &Iterator && "Loop invariant broken.");
+
+    switch (Entry->getKind()) {
     case Assert:
       // Asserting handle does not follow RAUW implicitly.
       break;
+    case Tracking:
+      // Tracking goes to new value like a WeakVH. Note that this may make it
+      // something incompatible with its templated type. We don't want to have a
+      // virtual (or inline) interface to handle this though, so instead we make
+      // the TrackingVH accessors guarantee that a client never sees this value.
+
+      // FALLTHROUGH
     case Weak:
       // Weak goes to the new value, which will unlink it from Old's list.
-      ThisNode->operator=(New);
+      Entry->operator=(New);
       break;
     case Callback:
       // Forward to the subclass's implementation.
-      static_cast<CallbackVH*>(ThisNode)->allUsesReplacedWith(New);
+      static_cast<CallbackVH*>(Entry)->allUsesReplacedWith(New);
       break;
     }
   }

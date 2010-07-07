@@ -20,12 +20,13 @@
 
 #include <string>
 #include <vector>
-#include <iosfwd>
 #include <cstring>
-#include "llvm/Support/DataTypes.h"
+#include "llvm/ADT/Triple.h"
+#include "llvm/System/DataTypes.h"
 
 namespace llvm {
-
+  class raw_ostream;
+  
 //===----------------------------------------------------------------------===//
 ///
 /// SubtargetFeatureKV - Used to provide key value pairs for feature and
@@ -102,11 +103,14 @@ public:
   void *getInfo(const SubtargetInfoKV *Table, size_t TableSize);
   
   /// Print feature string.
-  void print(std::ostream &OS) const;
-  void print(std::ostream *OS) const { if (OS) print(*OS); }
+  void print(raw_ostream &OS) const;
   
   // Dump feature info.
   void dump() const;
+
+  /// Retrieve a formatted string of the default features for
+  /// the specified target triple.
+  static std::string getDefaultSubtargetFeatures(const Triple &Triple);
 };
 
 } // End namespace llvm

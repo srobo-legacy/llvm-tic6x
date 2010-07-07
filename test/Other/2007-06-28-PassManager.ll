@@ -1,7 +1,7 @@
-; RUN:  llvm-as < %s |  opt -analyze -inline -disable-output
-; PR 1526
-; RUN:  llvm-as < %s |  opt -analyze -indvars -disable-output
-; PR 1539
+; RUN: opt < %s -analyze -inline
+; PR1526
+; RUN: opt < %s -analyze -indvars
+; PR1539
 define i32 @test1() {
-       ret i32 0;
+       ret i32 0
 }

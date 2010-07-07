@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "pic16-lower"
+#include "PIC16ABINames.h"
 #include "PIC16ISelLowering.h"
 #include "PIC16TargetObjectFile.h"
 #include "PIC16TargetMachine.h"
@@ -225,6 +226,7 @@ PIC16TargetLowering::PIC16TargetLowering(PIC16TargetMachine &TM)
   setLibcallName(RTLIB::DIV_F32, getIntrinsicName(RTLIB::DIV_F32));
 
   // Floationg point comparison
+  setLibcallName(RTLIB::O_F32, getIntrinsicName(RTLIB::O_F32));
   setLibcallName(RTLIB::UO_F32, getIntrinsicName(RTLIB::UO_F32));
   setLibcallName(RTLIB::OLE_F32, getIntrinsicName(RTLIB::OLE_F32));
   setLibcallName(RTLIB::OGE_F32, getIntrinsicName(RTLIB::OGE_F32));
@@ -368,6 +370,11 @@ static void PopulateResults(SDValue N, SmallVectorImpl<SDValue>&Results) {
 MVT::SimpleValueType
 PIC16TargetLowering::getSetCCResultType(EVT ValType) const {
   return MVT::i8;
+}
+
+MVT::SimpleValueType
+PIC16TargetLowering::getCmpLibcallReturnType() const {
+  return MVT::i8; 
 }
 
 /// The type legalizer framework of generating legalizer can generate libcalls
@@ -533,6 +540,10 @@ SDValue PIC16TargetLowering::ExpandStore(SDNode *N, SelectionDAG &DAG) {
     SDValue SrcLo, SrcHi;
     GetExpandedParts(Src, DAG, SrcLo, SrcHi);
     SDValue ChainLo = Chain, ChainHi = Chain;
+    // FIXME: This makes unsafe assumptions. The Chain may be a TokenFactor
+    // created for an unrelated purpose, in which case it may not have
+    // exactly two operands. Also, even if it does have two operands, they
+    // may not be the low and high parts of an aligned load that was split.
     if (Chain.getOpcode() == ISD::TokenFactor) {
       ChainLo = Chain.getOperand(0);
       ChainHi = Chain.getOperand(1);
@@ -560,16 +571,19 @@ SDValue PIC16TargetLowering::ExpandStore(SDNode *N, SelectionDAG &DAG) {
     GetExpandedParts(SrcHi, DAG, SrcHi1, SrcHi2);
 
     SDValue ChainLo = Chain, ChainHi = Chain;
+    // FIXME: This makes unsafe assumptions; see the FIXME above.
     if (Chain.getOpcode() == ISD::TokenFactor) {  
       ChainLo = Chain.getOperand(0);
       ChainHi = Chain.getOperand(1);
     }
     SDValue ChainLo1 = ChainLo, ChainLo2 = ChainLo, ChainHi1 = ChainHi,
             ChainHi2 = ChainHi;
+    // FIXME: This makes unsafe assumptions; see the FIXME above.
     if (ChainLo.getOpcode() == ISD::TokenFactor) {
       ChainLo1 = ChainLo.getOperand(0);
       ChainLo2 = ChainLo.getOperand(1);
     }
+    // FIXME: This makes unsafe assumptions; see the FIXME above.
     if (ChainHi.getOpcode() == ISD::TokenFactor) {
       ChainHi1 = ChainHi.getOperand(0);
       ChainHi2 = ChainHi.getOperand(1);
@@ -601,17 +615,18 @@ SDValue PIC16TargetLowering::ExpandStore(SDNode *N, SelectionDAG &DAG) {
     SDValue SrcLo, SrcHi;
     GetExpandedParts(Src, DAG, SrcLo, SrcHi);
     SDValue ChainLo = Chain, ChainHi = Chain;
+    // FIXME: This makes unsafe assumptions; see the FIXME above.
     if (Chain.getOpcode() == ISD::TokenFactor) {
       ChainLo = Chain.getOperand(0);
       ChainHi = Chain.getOperand(1);
     }
     SDValue Store1 = DAG.getStore(ChainLo, dl, SrcLo, Ptr, NULL,
-                                  0 + StoreOffset);
+                                  0 + StoreOffset, false, false, 0);
 
     Ptr = DAG.getNode(ISD::ADD, dl, Ptr.getValueType(), Ptr,
                       DAG.getConstant(4, Ptr.getValueType()));
     SDValue Store2 = DAG.getStore(ChainHi, dl, SrcHi, Ptr, NULL,
-                                  1 + StoreOffset);
+                                  1 + StoreOffset, false, false, 0);
 
     return DAG.getNode(ISD::TokenFactor, dl, MVT::Other, Store1,
                        Store2);
@@ -915,7 +930,7 @@ SDValue PIC16TargetLowering::ExpandLoad(SDNode *N, SelectionDAG &DAG) {
   }
   else if (VT == MVT::i16) {
     BP = DAG.getNode(ISD::BUILD_PAIR, dl, VT, PICLoads[0], PICLoads[1]);
-    if (MemVT == MVT::i8)
+    if ((MemVT == MVT::i8) || (MemVT == MVT::i1))
       Chain = getChain(PICLoads[0]);
     else
       Chain = DAG.getNode(ISD::TokenFactor, dl, MVT::Other, 
@@ -927,7 +942,7 @@ SDValue PIC16TargetLowering::ExpandLoad(SDNode *N, SelectionDAG &DAG) {
     BPs[1] = DAG.getNode(ISD::BUILD_PAIR, dl, MVT::i16,
                          PICLoads[2], PICLoads[3]);
     BP = DAG.getNode(ISD::BUILD_PAIR, dl, VT, BPs[0], BPs[1]);
-    if (MemVT == MVT::i8)
+    if ((MemVT == MVT::i8) || (MemVT == MVT::i1))
       Chain = getChain(PICLoads[0]);
     else if (MemVT == MVT::i16)
       Chain = DAG.getNode(ISD::TokenFactor, dl, MVT::Other, 
@@ -1061,7 +1076,7 @@ SDValue PIC16TargetLowering::ConvertToMemOperand(SDValue Op,
 
   // Put the value on stack.
   // Get a stack slot index and convert to es.
-  int FI = MF.getFrameInfo()->CreateStackObject(1, 1);
+  int FI = MF.getFrameInfo()->CreateStackObject(1, 1, false);
   const char *tmpName = createESName(PAN::getTempdataLabel(FuncName));
   SDValue ES = DAG.getTargetExternalSymbol(tmpName, MVT::i8);
 
@@ -1247,7 +1262,7 @@ LowerDirectCallReturn(SDValue RetLabel, SDValue Chain, SDValue InFlag,
 
 SDValue
 PIC16TargetLowering::LowerReturn(SDValue Chain,
-                                 unsigned CallConv, bool isVarArg,
+                                 CallingConv::ID CallConv, bool isVarArg,
                                  const SmallVectorImpl<ISD::OutputArg> &Outs,
                                  DebugLoc dl, SelectionDAG &DAG) {
 
@@ -1261,7 +1276,6 @@ PIC16TargetLowering::LowerReturn(SDValue Chain,
   std::string FuncName = F->getName();
 
   const char *tmpName = createESName(PAN::getFrameLabel(FuncName));
-  SDVTList VTs  = DAG.getVTList (MVT::i8, MVT::Other);
   SDValue ES = DAG.getTargetExternalSymbol(tmpName, MVT::i8);
   SDValue BS = DAG.getConstant(1, MVT::i8);
   SDValue RetVal;
@@ -1339,12 +1353,14 @@ GetDataAddress(DebugLoc dl, SDValue Callee, SDValue &Chain,
 
 SDValue
 PIC16TargetLowering::LowerCall(SDValue Chain, SDValue Callee,
-                               unsigned CallConv, bool isVarArg,
-                               bool isTailCall,
+                               CallingConv::ID CallConv, bool isVarArg,
+                               bool &isTailCall,
                                const SmallVectorImpl<ISD::OutputArg> &Outs,
                                const SmallVectorImpl<ISD::InputArg> &Ins,
                                DebugLoc dl, SelectionDAG &DAG,
                                SmallVectorImpl<SDValue> &InVals) {
+    // PIC16 target does not yet support tail call optimization.
+    isTailCall = false;
 
     assert(Callee.getValueType() == MVT::i16 &&
            "Don't know how to legalize this call node!!!");
@@ -1473,7 +1489,8 @@ bool PIC16TargetLowering::isDirectLoad(const SDValue Op) {
 // operand no. of the operand to be converted in 'MemOp'. Remember, PIC16 has 
 // no instruction that can operation on two registers. Most insns take
 // one register and one memory operand (addwf) / Constant (addlw).
-bool PIC16TargetLowering::NeedToConvertToMemOp(SDValue Op, unsigned &MemOp) {
+bool PIC16TargetLowering::NeedToConvertToMemOp(SDValue Op, unsigned &MemOp, 
+                      SelectionDAG &DAG) {
   // If one of the operand is a constant, return false.
   if (Op.getOperand(0).getOpcode() == ISD::Constant ||
       Op.getOperand(1).getOpcode() == ISD::Constant)
@@ -1482,16 +1499,51 @@ bool PIC16TargetLowering::NeedToConvertToMemOp(SDValue Op, unsigned &MemOp) {
   // Return false if one of the operands is already a direct
   // load and that operand has only one use.
   if (isDirectLoad(Op.getOperand(0))) {
-    if (Op.getOperand(0).hasOneUse())
-      return false;
-    else 
-      MemOp = 0;
+    if (Op.getOperand(0).hasOneUse()) {  
+      // Legal and profitable folding check uses the NodeId of DAG nodes.
+      // This NodeId is assigned by topological order. Therefore first 
+      // assign topological order then perform legal and profitable check.
+      // Note:- Though this ordering is done before begining with legalization,
+      // newly added node during legalization process have NodeId=-1 (NewNode)
+      // therefore before performing any check proper ordering of the node is
+      // required.
+      DAG.AssignTopologicalOrder();
+
+      // Direct load operands are folded in binary operations. But before folding
+      // verify if this folding is legal. Fold only if it is legal otherwise
+      // convert this direct load to a separate memory operation.
+      if(ISel->IsLegalToFold(Op.getOperand(0), Op.getNode(), Op.getNode()))
+        return false;
+      else 
+        MemOp = 0;
+    }
   }
+
+  // For operations that are non-cummutative there is no need to check 
+  // for right operand because folding right operand may result in 
+  // incorrect operation. 
+  if (! SelectionDAG::isCommutativeBinOp(Op.getOpcode()))
+    return true;
+
   if (isDirectLoad(Op.getOperand(1))) {
-    if (Op.getOperand(1).hasOneUse())
-      return false;
-    else 
-      MemOp = 1; 
+    if (Op.getOperand(1).hasOneUse()) {
+      // Legal and profitable folding check uses the NodeId of DAG nodes.
+      // This NodeId is assigned by topological order. Therefore first 
+      // assign topological order then perform legal and profitable check.
+      // Note:- Though this ordering is done before begining with legalization,
+      // newly added node during legalization process have NodeId=-1 (NewNode)
+      // therefore before performing any check proper ordering of the node is
+      // required.
+      DAG.AssignTopologicalOrder();
+
+      // Direct load operands are folded in binary operations. But before folding
+      // verify if this folding is legal. Fold only if it is legal otherwise
+      // convert this direct load to a separate memory operation.
+      if(ISel->IsLegalToFold(Op.getOperand(1), Op.getNode(), Op.getNode()))
+         return false;
+      else 
+         MemOp = 1; 
+    }
   }
   return true;
 }  
@@ -1505,7 +1557,7 @@ SDValue PIC16TargetLowering::LowerBinOp(SDValue Op, SelectionDAG &DAG) {
   assert (Op.getValueType() == MVT::i8 && "illegal Op to lower");
 
   unsigned MemOp = 1;
-  if (NeedToConvertToMemOp(Op, MemOp)) {
+  if (NeedToConvertToMemOp(Op, MemOp, DAG)) {
     // Put one value on stack.
     SDValue NewVal = ConvertToMemOperand (Op.getOperand(MemOp), DAG, dl);
 
@@ -1524,7 +1576,7 @@ SDValue PIC16TargetLowering::LowerADD(SDValue Op, SelectionDAG &DAG) {
   assert (Op.getValueType() == MVT::i8 && "illegal add to lower");
   DebugLoc dl = Op.getDebugLoc();
   unsigned MemOp = 1;
-  if (NeedToConvertToMemOp(Op, MemOp)) {
+  if (NeedToConvertToMemOp(Op, MemOp, DAG)) {
     // Put one value on stack.
     SDValue NewVal = ConvertToMemOperand (Op.getOperand(MemOp), DAG, dl);
     
@@ -1552,30 +1604,47 @@ SDValue PIC16TargetLowering::LowerSUB(SDValue Op, SelectionDAG &DAG) {
   DebugLoc dl = Op.getDebugLoc();
   // We should have handled larger operands in type legalizer itself.
   assert (Op.getValueType() == MVT::i8 && "illegal sub to lower");
-
-  // Nothing to do if the first operand is already a direct load and it has
-  // only one use.
-  if (isDirectLoad(Op.getOperand(0)) && Op.getOperand(0).hasOneUse())
-    return Op;
-
-  // Put first operand on stack.
-  SDValue NewVal = ConvertToMemOperand (Op.getOperand(0), DAG, dl);
-
+  unsigned MemOp = 1;
   SDVTList Tys = DAG.getVTList(MVT::i8, MVT::Flag);
-  switch (Op.getOpcode()) {
-    default:
-      assert (0 && "Opcode unknown."); 
-    case ISD::SUBE:
-      return DAG.getNode(Op.getOpcode(), dl, Tys, NewVal, Op.getOperand(1),
-                         Op.getOperand(2));
-      break;
-    case ISD::SUBC:
-      return DAG.getNode(Op.getOpcode(), dl, Tys, NewVal, Op.getOperand(1));
-      break;
-    case ISD::SUB:
-      return DAG.getNode(Op.getOpcode(), dl, MVT::i8, NewVal, Op.getOperand(1));
-      break;
-  }
+
+  // Since we don't have an instruction for X - c , 
+  // we can change it to X + (-c)
+  ConstantSDNode *C = dyn_cast<ConstantSDNode>(Op.getOperand(1));
+  if (C && (Op.getOpcode() == ISD::SUB))
+    {
+      return DAG.getNode(ISD::ADD, 
+                         dl, MVT::i8, Op.getOperand(0), 
+                         DAG.getConstant(0-(C->getZExtValue()), MVT::i8));
+    }
+
+  if (NeedToConvertToMemOp(Op, MemOp, DAG) ||
+      (isDirectLoad(Op.getOperand(1)) && 
+       (!isDirectLoad(Op.getOperand(0))) &&
+       (Op.getOperand(0).getOpcode() != ISD::Constant)))
+    {
+      // Put first operand on stack.
+      SDValue NewVal = ConvertToMemOperand (Op.getOperand(0), DAG, dl);
+      
+      switch (Op.getOpcode()) {
+      default:
+        assert (0 && "Opcode unknown."); 
+      case ISD::SUBE:
+        return DAG.getNode(Op.getOpcode(), 
+                           dl, Tys, NewVal, Op.getOperand(1),
+                           Op.getOperand(2));
+        break;
+      case ISD::SUBC:
+        return DAG.getNode(Op.getOpcode(), 
+                           dl, Tys, NewVal, Op.getOperand(1));
+        break;
+      case ISD::SUB:
+        return DAG.getNode(Op.getOpcode(), 
+                           dl, MVT::i8, NewVal, Op.getOperand(1));
+        break;
+      }
+    }
+  else 
+    return Op;
 }
 
 void PIC16TargetLowering::InitReservedFrameCount(const Function *F) {
@@ -1595,7 +1664,7 @@ void PIC16TargetLowering::InitReservedFrameCount(const Function *F) {
 
 SDValue
 PIC16TargetLowering::LowerFormalArguments(SDValue Chain,
-                                          unsigned CallConv,
+                                          CallingConv::ID CallConv,
                                           bool isVarArg,
                                       const SmallVectorImpl<ISD::InputArg> &Ins,
                                           DebugLoc dl,
@@ -1805,7 +1874,8 @@ SDValue PIC16TargetLowering::LowerSELECT_CC(SDValue Op, SelectionDAG &DAG) {
 
 MachineBasicBlock *
 PIC16TargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
-                                                 MachineBasicBlock *BB) const {
+                                                 MachineBasicBlock *BB,
+                   DenseMap<MachineBasicBlock*, MachineBasicBlock*> *EM) const {
   const TargetInstrInfo &TII = *getTargetMachine().getInstrInfo();
   unsigned CC = (PIC16CC::CondCodes)MI->getOperand(3).getImm();
   DebugLoc dl = MI->getDebugLoc();
@@ -1831,9 +1901,18 @@ PIC16TargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
   F->insert(It, copy0MBB);
   F->insert(It, sinkMBB);
 
-  // Update machine-CFG edges by transferring all successors of the current
+  // Update machine-CFG edges by first adding all successors of the current
   // block to the new block which will contain the Phi node for the select.
-  sinkMBB->transferSuccessors(BB);
+  // Also inform sdisel of the edge changes.
+  for (MachineBasicBlock::succ_iterator I = BB->succ_begin(), 
+         E = BB->succ_end(); I != E; ++I) {
+    EM->insert(std::make_pair(*I, sinkMBB));
+    sinkMBB->addSuccessor(*I);
+  }
+  // Next, remove all successors of the current block, and add the true
+  // and fallthrough blocks as its successors.
+  while (!BB->succ_empty())
+    BB->removeSuccessor(BB->succ_begin());
   // Next, add the true and fallthrough blocks as its successors.
   BB->addSuccessor(copy0MBB);
   BB->addSuccessor(sinkMBB);

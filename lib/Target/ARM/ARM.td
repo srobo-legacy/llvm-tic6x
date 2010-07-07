@@ -40,9 +40,6 @@ def FeatureNEON : SubtargetFeature<"neon", "ARMFPUType", "NEON",
                                    "Enable NEON instructions">;
 def FeatureThumb2 : SubtargetFeature<"thumb2", "ThumbMode", "Thumb2",
                                      "Enable Thumb2 instructions">;
-def FeatureNEONFP : SubtargetFeature<"neonfp", "UseNEONForSinglePrecisionFP",
-                                     "true",
-                                     "Use NEON for single-precision FP">;
 
 //===----------------------------------------------------------------------===//
 // ARM Processors supported.
@@ -92,30 +89,23 @@ def : ProcNoItin<"xscale",          [ArchV5TE]>;
 def : ProcNoItin<"iwmmxt",          [ArchV5TE]>;
 
 // V6 Processors.
-def : Processor<"arm1136j-s",       V6Itineraries,
-                [ArchV6]>;
-def : Processor<"arm1136jf-s",      V6Itineraries,
-                [ArchV6, FeatureVFP2]>;
-def : Processor<"arm1176jz-s",      V6Itineraries,
-                [ArchV6]>;
-def : Processor<"arm1176jzf-s",     V6Itineraries,
-                [ArchV6, FeatureVFP2]>;
-def : Processor<"mpcorenovfp",      V6Itineraries,
-                [ArchV6]>;
-def : Processor<"mpcore",           V6Itineraries,
-                [ArchV6, FeatureVFP2]>;
+def : Processor<"arm1136j-s",       ARMV6Itineraries, [ArchV6]>;
+def : Processor<"arm1136jf-s",      ARMV6Itineraries, [ArchV6, FeatureVFP2]>;
+def : Processor<"arm1176jz-s",      ARMV6Itineraries, [ArchV6]>;
+def : Processor<"arm1176jzf-s",     ARMV6Itineraries, [ArchV6, FeatureVFP2]>;
+def : Processor<"mpcorenovfp",      ARMV6Itineraries, [ArchV6]>;
+def : Processor<"mpcore",           ARMV6Itineraries, [ArchV6, FeatureVFP2]>;
 
 // V6T2 Processors.
-def : Processor<"arm1156t2-s",      V6Itineraries,
-                [ArchV6T2, FeatureThumb2]>;
-def : Processor<"arm1156t2f-s",     V6Itineraries,
-                [ArchV6T2, FeatureThumb2, FeatureVFP2]>;
+def : Processor<"arm1156t2-s",     ARMV6Itineraries,
+                 [ArchV6T2, FeatureThumb2]>;
+def : Processor<"arm1156t2f-s",    ARMV6Itineraries,
+                 [ArchV6T2, FeatureThumb2, FeatureVFP2]>;
 
 // V7 Processors.
 def : Processor<"cortex-a8",        CortexA8Itineraries,
-                [ArchV7A, FeatureThumb2, FeatureNEON, FeatureNEONFP]>;
-def : Processor<"cortex-a9",        CortexA9Itineraries,
                 [ArchV7A, FeatureThumb2, FeatureNEON]>;
+def : ProcNoItin<"cortex-a9",       [ArchV7A, FeatureThumb2, FeatureNEON]>;
 
 //===----------------------------------------------------------------------===//
 // Register File Description
@@ -137,12 +127,16 @@ def ARMInstrInfo : InstrInfo {
                        "SizeFlag",
                        "IndexModeBits",
                        "Form",
-                       "isUnaryDataProc"];
+                       "isUnaryDataProc",
+                       "canXformTo16Bit",
+                       "Dom"];
   let TSFlagsShifts = [0,
                        4,
                        7,
                        9,
-                       15];
+                       15,
+                       16,
+                       17];
 }
 
 //===----------------------------------------------------------------------===//

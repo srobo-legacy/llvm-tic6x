@@ -59,21 +59,23 @@ namespace {
     }
 
     void dump() {
-      cerr << "SystemZRRIAddressMode " << this << '\n';
+      errs() << "SystemZRRIAddressMode " << this << '\n';
       if (BaseType == RegBase) {
-        cerr << "Base.Reg ";
-        if (Base.Reg.getNode() != 0) Base.Reg.getNode()->dump();
-        else cerr << "nul";
-        cerr << '\n';
+        errs() << "Base.Reg ";
+        if (Base.Reg.getNode() != 0)
+          Base.Reg.getNode()->dump();
+        else
+          errs() << "nul";
+        errs() << '\n';
       } else {
-        cerr << " Base.FrameIndex " << Base.FrameIndex << '\n';
+        errs() << " Base.FrameIndex " << Base.FrameIndex << '\n';
       }
       if (!isRI) {
-        cerr << "IndexReg ";
+        errs() << "IndexReg ";
         if (IndexReg.getNode() != 0) IndexReg.getNode()->dump();
-        else cerr << "nul";
+        else errs() << "nul";
       }
-      cerr << " Disp " << Disp << '\n';
+      errs() << " Disp " << Disp << '\n';
     }
   };
 }
@@ -97,8 +99,6 @@ namespace {
       : SelectionDAGISel(TM, OptLevel),
         Lowering(*TM.getTargetLowering()),
         Subtarget(*TM.getSubtargetImpl()) { }
-
-    virtual void InstructionSelect();
 
     virtual const char *getPassName() const {
       return "SystemZ DAG->DAG Pattern Instruction Selection";
@@ -126,23 +126,23 @@ namespace {
     #include "SystemZGenDAGISel.inc"
 
   private:
-    bool SelectAddrRI12Only(SDValue Op, SDValue& Addr,
+    bool SelectAddrRI12Only(SDNode *Op, SDValue& Addr,
                             SDValue &Base, SDValue &Disp);
-    bool SelectAddrRI12(SDValue Op, SDValue& Addr,
+    bool SelectAddrRI12(SDNode *Op, SDValue& Addr,
                         SDValue &Base, SDValue &Disp,
                         bool is12BitOnly = false);
-    bool SelectAddrRI(SDValue Op, SDValue& Addr,
+    bool SelectAddrRI(SDNode *Op, SDValue& Addr,
                       SDValue &Base, SDValue &Disp);
-    bool SelectAddrRRI12(SDValue Op, SDValue Addr,
+    bool SelectAddrRRI12(SDNode *Op, SDValue Addr,
                          SDValue &Base, SDValue &Disp, SDValue &Index);
-    bool SelectAddrRRI20(SDValue Op, SDValue Addr,
+    bool SelectAddrRRI20(SDNode *Op, SDValue Addr,
                          SDValue &Base, SDValue &Disp, SDValue &Index);
-    bool SelectLAAddr(SDValue Op, SDValue Addr,
+    bool SelectLAAddr(SDNode *Op, SDValue Addr,
                       SDValue &Base, SDValue &Disp, SDValue &Index);
 
-    SDNode *Select(SDValue Op);
+    SDNode *Select(SDNode *Node);
 
-    bool TryFoldLoad(SDValue P, SDValue N,
+    bool TryFoldLoad(SDNode *P, SDValue N,
                      SDValue &Base, SDValue &Disp, SDValue &Index);
 
     bool MatchAddress(SDValue N, SystemZRRIAddressMode &AM,
@@ -150,10 +150,6 @@ namespace {
     bool MatchAddressBase(SDValue N, SystemZRRIAddressMode &AM);
     bool MatchAddressRI(SDValue N, SystemZRRIAddressMode &AM,
                         bool is12Bit);
-
-  #ifndef NDEBUG
-    unsigned Indent;
-  #endif
   };
 }  // end anonymous namespace
 
@@ -195,7 +191,7 @@ static bool isImmZExt12(int64_t Val, int64_t &Imm) {
 bool SystemZDAGToDAGISel::MatchAddress(SDValue N, SystemZRRIAddressMode &AM,
                                        bool is12Bit, unsigned Depth) {
   DebugLoc dl = N.getDebugLoc();
-  DOUT << "MatchAddress: "; DEBUG(AM.dump());
+  DEBUG(errs() << "MatchAddress: "; AM.dump());
   // Limit recursion.
   if (Depth > 5)
     return MatchAddressBase(N, AM);
@@ -365,12 +361,12 @@ void SystemZDAGToDAGISel::getAddressOperands(const SystemZRRIAddressMode &AM,
 
 /// Returns true if the address can be represented by a base register plus
 /// an unsigned 12-bit displacement [r+imm].
-bool SystemZDAGToDAGISel::SelectAddrRI12Only(SDValue Op, SDValue& Addr,
+bool SystemZDAGToDAGISel::SelectAddrRI12Only(SDNode *Op, SDValue& Addr,
                                              SDValue &Base, SDValue &Disp) {
   return SelectAddrRI12(Op, Addr, Base, Disp, /*is12BitOnly*/true);
 }
 
-bool SystemZDAGToDAGISel::SelectAddrRI12(SDValue Op, SDValue& Addr,
+bool SystemZDAGToDAGISel::SelectAddrRI12(SDNode *Op, SDValue& Addr,
                                          SDValue &Base, SDValue &Disp,
                                          bool is12BitOnly) {
   SystemZRRIAddressMode AM20(/*isRI*/true), AM12(/*isRI*/true);
@@ -403,7 +399,7 @@ bool SystemZDAGToDAGISel::SelectAddrRI12(SDValue Op, SDValue& Addr,
     if (AM12.Disp == 0 && AM20.Disp != 0)
       return false;
 
-  DOUT << "MatchAddress (final): "; DEBUG(AM12.dump());
+  DEBUG(errs() << "MatchAddress (final): "; AM12.dump());
 
   EVT VT = Addr.getValueType();
   if (AM12.BaseType == SystemZRRIAddressMode::RegBase) {
@@ -420,7 +416,7 @@ bool SystemZDAGToDAGISel::SelectAddrRI12(SDValue Op, SDValue& Addr,
 
 /// Returns true if the address can be represented by a base register plus
 /// a signed 20-bit displacement [r+imm].
-bool SystemZDAGToDAGISel::SelectAddrRI(SDValue Op, SDValue& Addr,
+bool SystemZDAGToDAGISel::SelectAddrRI(SDNode *Op, SDValue& Addr,
                                        SDValue &Base, SDValue &Disp) {
   SystemZRRIAddressMode AM(/*isRI*/true);
   bool Done = false;
@@ -446,7 +442,7 @@ bool SystemZDAGToDAGISel::SelectAddrRI(SDValue Op, SDValue& Addr,
   if (!Done && MatchAddress(Addr, AM, /* is12Bit */ false))
     return false;
 
-  DOUT << "MatchAddress (final): "; DEBUG(AM.dump());
+  DEBUG(errs() << "MatchAddress (final): "; AM.dump());
 
   EVT VT = Addr.getValueType();
   if (AM.BaseType == SystemZRRIAddressMode::RegBase) {
@@ -463,7 +459,7 @@ bool SystemZDAGToDAGISel::SelectAddrRI(SDValue Op, SDValue& Addr,
 
 /// Returns true if the address can be represented by a base register plus
 /// index register plus an unsigned 12-bit displacement [base + idx + imm].
-bool SystemZDAGToDAGISel::SelectAddrRRI12(SDValue Op, SDValue Addr,
+bool SystemZDAGToDAGISel::SelectAddrRRI12(SDNode *Op, SDValue Addr,
                                 SDValue &Base, SDValue &Disp, SDValue &Index) {
   SystemZRRIAddressMode AM20, AM12;
   bool Done = false;
@@ -494,7 +490,7 @@ bool SystemZDAGToDAGISel::SelectAddrRRI12(SDValue Op, SDValue Addr,
     if (AM12.Disp == 0 && AM20.Disp != 0)
       return false;
 
-  DOUT << "MatchAddress (final): "; DEBUG(AM12.dump());
+  DEBUG(errs() << "MatchAddress (final): "; AM12.dump());
 
   EVT VT = Addr.getValueType();
   if (AM12.BaseType == SystemZRRIAddressMode::RegBase) {
@@ -512,7 +508,7 @@ bool SystemZDAGToDAGISel::SelectAddrRRI12(SDValue Op, SDValue Addr,
 
 /// Returns true if the address can be represented by a base register plus
 /// index register plus a signed 20-bit displacement [base + idx + imm].
-bool SystemZDAGToDAGISel::SelectAddrRRI20(SDValue Op, SDValue Addr,
+bool SystemZDAGToDAGISel::SelectAddrRRI20(SDNode *Op, SDValue Addr,
                                 SDValue &Base, SDValue &Disp, SDValue &Index) {
   SystemZRRIAddressMode AM;
   bool Done = false;
@@ -538,7 +534,7 @@ bool SystemZDAGToDAGISel::SelectAddrRRI20(SDValue Op, SDValue Addr,
   if (!Done && MatchAddress(Addr, AM, /* is12Bit */ false))
     return false;
 
-  DOUT << "MatchAddress (final): "; DEBUG(AM.dump());
+  DEBUG(errs() << "MatchAddress (final): "; AM.dump());
 
   EVT VT = Addr.getValueType();
   if (AM.BaseType == SystemZRRIAddressMode::RegBase) {
@@ -556,7 +552,7 @@ bool SystemZDAGToDAGISel::SelectAddrRRI20(SDValue Op, SDValue Addr,
 
 /// SelectLAAddr - it calls SelectAddr and determines if the maximal addressing
 /// mode it matches can be cost effectively emitted as an LA/LAY instruction.
-bool SystemZDAGToDAGISel::SelectLAAddr(SDValue Op, SDValue Addr,
+bool SystemZDAGToDAGISel::SelectLAAddr(SDNode *Op, SDValue Addr,
                                   SDValue &Base, SDValue &Disp, SDValue &Index) {
   SystemZRRIAddressMode AM;
 
@@ -589,55 +585,25 @@ bool SystemZDAGToDAGISel::SelectLAAddr(SDValue Op, SDValue Addr,
   return false;
 }
 
-bool SystemZDAGToDAGISel::TryFoldLoad(SDValue P, SDValue N,
+bool SystemZDAGToDAGISel::TryFoldLoad(SDNode *P, SDValue N,
                                  SDValue &Base, SDValue &Disp, SDValue &Index) {
   if (ISD::isNON_EXTLoad(N.getNode()) &&
-      N.hasOneUse() &&
-      IsLegalAndProfitableToFold(N.getNode(), P.getNode(), P.getNode()))
+      IsLegalToFold(N, P, P))
     return SelectAddrRRI20(P, N.getOperand(1), Base, Disp, Index);
   return false;
 }
 
-/// InstructionSelect - This callback is invoked by
-/// SelectionDAGISel when it has created a SelectionDAG for us to codegen.
-void SystemZDAGToDAGISel::InstructionSelect() {
-  DEBUG(BB->dump());
-
-  // Codegen the basic block.
-#ifndef NDEBUG
-  DOUT << "===== Instruction selection begins:\n";
-  Indent = 0;
-#endif
-  SelectRoot(*CurDAG);
-#ifndef NDEBUG
-  DOUT << "===== Instruction selection ends:\n";
-#endif
-
-  CurDAG->RemoveDeadNodes();
-}
-
-SDNode *SystemZDAGToDAGISel::Select(SDValue Op) {
-  SDNode *Node = Op.getNode();
+SDNode *SystemZDAGToDAGISel::Select(SDNode *Node) {
   EVT NVT = Node->getValueType(0);
-  DebugLoc dl = Op.getDebugLoc();
+  DebugLoc dl = Node->getDebugLoc();
   unsigned Opcode = Node->getOpcode();
 
   // Dump information about the Node being selected
-  #ifndef NDEBUG
-  DOUT << std::string(Indent, ' ') << "Selecting: ";
-  DEBUG(Node->dump(CurDAG));
-  DOUT << "\n";
-  Indent += 2;
-  #endif
+  DEBUG(errs() << "Selecting: "; Node->dump(CurDAG); errs() << "\n");
 
   // If we have a custom node, we already have selected!
   if (Node->isMachineOpcode()) {
-    #ifndef NDEBUG
-    DOUT << std::string(Indent-2, ' ') << "== ";
-    DEBUG(Node->dump(CurDAG));
-    DOUT << "\n";
-    Indent -= 2;
-    #endif
+    DEBUG(errs() << "== "; Node->dump(CurDAG); errs() << "\n");
     return NULL; // Already selected.
   }
 
@@ -651,84 +617,73 @@ SDNode *SystemZDAGToDAGISel::Select(SDValue Op) {
     EVT ResVT;
     bool is32Bit = false;
     switch (NVT.getSimpleVT().SimpleTy) {
-      default: assert(0 && "Unsupported VT!");
-      case MVT::i32:
-        Opc = SystemZ::SDIVREM32r; MOpc = SystemZ::SDIVREM32m;
-        ResVT = MVT::v2i64;
-        is32Bit = true;
-        break;
-      case MVT::i64:
-        Opc = SystemZ::SDIVREM64r; MOpc = SystemZ::SDIVREM64m;
-        ResVT = MVT::v2i64;
-        break;
+    default: assert(0 && "Unsupported VT!");
+    case MVT::i32:
+      Opc = SystemZ::SDIVREM32r; MOpc = SystemZ::SDIVREM32m;
+      ResVT = MVT::v2i64;
+      is32Bit = true;
+      break;
+    case MVT::i64:
+      Opc = SystemZ::SDIVREM64r; MOpc = SystemZ::SDIVREM64m;
+      ResVT = MVT::v2i64;
+      break;
     }
 
     SDValue Tmp0, Tmp1, Tmp2;
-    bool foldedLoad = TryFoldLoad(Op, N1, Tmp0, Tmp1, Tmp2);
+    bool foldedLoad = TryFoldLoad(Node, N1, Tmp0, Tmp1, Tmp2);
 
     // Prepare the dividend
     SDNode *Dividend;
     if (is32Bit)
-      Dividend = CurDAG->getTargetNode(SystemZ::MOVSX64rr32, dl, MVT::i64, N0);
+      Dividend = CurDAG->getMachineNode(SystemZ::MOVSX64rr32, dl, MVT::i64, N0);
     else
       Dividend = N0.getNode();
 
     // Insert prepared dividend into suitable 'subreg'
-    SDNode *Tmp = CurDAG->getTargetNode(TargetInstrInfo::IMPLICIT_DEF,
-                                        dl, ResVT);
+    SDNode *Tmp = CurDAG->getMachineNode(TargetOpcode::IMPLICIT_DEF,
+                                         dl, ResVT);
     Dividend =
-      CurDAG->getTargetNode(TargetInstrInfo::INSERT_SUBREG, dl, ResVT,
-                            SDValue(Tmp, 0), SDValue(Dividend, 0),
-                            CurDAG->getTargetConstant(subreg_odd, MVT::i32));
+      CurDAG->getMachineNode(TargetOpcode::INSERT_SUBREG, dl, ResVT,
+                             SDValue(Tmp, 0), SDValue(Dividend, 0),
+                             CurDAG->getTargetConstant(subreg_odd, MVT::i32));
 
     SDNode *Result;
     SDValue DivVal = SDValue(Dividend, 0);
     if (foldedLoad) {
       SDValue Ops[] = { DivVal, Tmp0, Tmp1, Tmp2, N1.getOperand(0) };
-      Result = CurDAG->getTargetNode(MOpc, dl, ResVT, Ops, array_lengthof(Ops));
+      Result = CurDAG->getMachineNode(MOpc, dl, ResVT, MVT::Other,
+                                      Ops, array_lengthof(Ops));
       // Update the chain.
-      ReplaceUses(N1.getValue(1), SDValue(Result, 0));
+      ReplaceUses(N1.getValue(1), SDValue(Result, 1));
     } else {
-      Result = CurDAG->getTargetNode(Opc, dl, ResVT, SDValue(Dividend, 0), N1);
+      Result = CurDAG->getMachineNode(Opc, dl, ResVT, SDValue(Dividend, 0), N1);
     }
 
     // Copy the division (odd subreg) result, if it is needed.
-    if (!Op.getValue(0).use_empty()) {
+    if (!SDValue(Node, 0).use_empty()) {
       unsigned SubRegIdx = (is32Bit ? subreg_odd32 : subreg_odd);
-      SDNode *Div = CurDAG->getTargetNode(TargetInstrInfo::EXTRACT_SUBREG,
-                                          dl, NVT,
-                                          SDValue(Result, 0),
-                                          CurDAG->getTargetConstant(SubRegIdx,
-                                                                    MVT::i32));
+      SDNode *Div = CurDAG->getMachineNode(TargetOpcode::EXTRACT_SUBREG,
+                                           dl, NVT,
+                                           SDValue(Result, 0),
+                                           CurDAG->getTargetConstant(SubRegIdx,
+                                                                     MVT::i32));
 
-      ReplaceUses(Op.getValue(0), SDValue(Div, 0));
-      #ifndef NDEBUG
-      DOUT << std::string(Indent-2, ' ') << "=> ";
-      DEBUG(Result->dump(CurDAG));
-      DOUT << "\n";
-      #endif
+      ReplaceUses(SDValue(Node, 0), SDValue(Div, 0));
+      DEBUG(errs() << "=> "; Result->dump(CurDAG); errs() << "\n");
     }
 
     // Copy the remainder (even subreg) result, if it is needed.
-    if (!Op.getValue(1).use_empty()) {
+    if (!SDValue(Node, 1).use_empty()) {
       unsigned SubRegIdx = (is32Bit ? subreg_even32 : subreg_even);
-      SDNode *Rem = CurDAG->getTargetNode(TargetInstrInfo::EXTRACT_SUBREG,
-                                          dl, NVT,
-                                          SDValue(Result, 0),
-                                          CurDAG->getTargetConstant(SubRegIdx,
-                                                                    MVT::i32));
+      SDNode *Rem = CurDAG->getMachineNode(TargetOpcode::EXTRACT_SUBREG,
+                                           dl, NVT,
+                                           SDValue(Result, 0),
+                                           CurDAG->getTargetConstant(SubRegIdx,
+                                                                     MVT::i32));
 
-      ReplaceUses(Op.getValue(1), SDValue(Rem, 0));
-      #ifndef NDEBUG
-      DOUT << std::string(Indent-2, ' ') << "=> ";
-      DEBUG(Result->dump(CurDAG));
-      DOUT << "\n";
-      #endif
+      ReplaceUses(SDValue(Node, 1), SDValue(Rem, 0));
+      DEBUG(errs() << "=> "; Result->dump(CurDAG); errs() << "\n");
     }
-
-#ifndef NDEBUG
-    Indent -= 2;
-#endif
 
     return NULL;
   }
@@ -740,104 +695,89 @@ SDNode *SystemZDAGToDAGISel::Select(SDValue Op) {
 
     bool is32Bit = false;
     switch (NVT.getSimpleVT().SimpleTy) {
-      default: assert(0 && "Unsupported VT!");
-      case MVT::i32:
-        Opc = SystemZ::UDIVREM32r; MOpc = SystemZ::UDIVREM32m;
-        ClrOpc = SystemZ::MOV64Pr0_even;
-        ResVT = MVT::v2i32;
-        is32Bit = true;
-        break;
-      case MVT::i64:
-        Opc = SystemZ::UDIVREM64r; MOpc = SystemZ::UDIVREM64m;
-        ClrOpc = SystemZ::MOV128r0_even;
-        ResVT = MVT::v2i64;
-        break;
+    default: assert(0 && "Unsupported VT!");
+    case MVT::i32:
+      Opc = SystemZ::UDIVREM32r; MOpc = SystemZ::UDIVREM32m;
+      ClrOpc = SystemZ::MOV64Pr0_even;
+      ResVT = MVT::v2i32;
+      is32Bit = true;
+      break;
+    case MVT::i64:
+      Opc = SystemZ::UDIVREM64r; MOpc = SystemZ::UDIVREM64m;
+      ClrOpc = SystemZ::MOV128r0_even;
+      ResVT = MVT::v2i64;
+      break;
     }
 
     SDValue Tmp0, Tmp1, Tmp2;
-    bool foldedLoad = TryFoldLoad(Op, N1, Tmp0, Tmp1, Tmp2);
+    bool foldedLoad = TryFoldLoad(Node, N1, Tmp0, Tmp1, Tmp2);
 
     // Prepare the dividend
     SDNode *Dividend = N0.getNode();
 
     // Insert prepared dividend into suitable 'subreg'
-    SDNode *Tmp = CurDAG->getTargetNode(TargetInstrInfo::IMPLICIT_DEF,
-                                        dl, ResVT);
+    SDNode *Tmp = CurDAG->getMachineNode(TargetOpcode::IMPLICIT_DEF,
+                                         dl, ResVT);
     {
       unsigned SubRegIdx = (is32Bit ? subreg_odd32 : subreg_odd);
       Dividend =
-        CurDAG->getTargetNode(TargetInstrInfo::INSERT_SUBREG, dl, ResVT,
-                              SDValue(Tmp, 0), SDValue(Dividend, 0),
-                              CurDAG->getTargetConstant(SubRegIdx, MVT::i32));
+        CurDAG->getMachineNode(TargetOpcode::INSERT_SUBREG, dl, ResVT,
+                               SDValue(Tmp, 0), SDValue(Dividend, 0),
+                               CurDAG->getTargetConstant(SubRegIdx, MVT::i32));
     }
 
     // Zero out even subreg
-    Dividend = CurDAG->getTargetNode(ClrOpc, dl, ResVT, SDValue(Dividend, 0));
+    Dividend = CurDAG->getMachineNode(ClrOpc, dl, ResVT, SDValue(Dividend, 0));
 
     SDValue DivVal = SDValue(Dividend, 0);
     SDNode *Result;
     if (foldedLoad) {
       SDValue Ops[] = { DivVal, Tmp0, Tmp1, Tmp2, N1.getOperand(0) };
-      Result = CurDAG->getTargetNode(MOpc, dl,ResVT,
-                                     Ops, array_lengthof(Ops));
+      Result = CurDAG->getMachineNode(MOpc, dl, ResVT, MVT::Other,
+                                      Ops, array_lengthof(Ops));
       // Update the chain.
-      ReplaceUses(N1.getValue(1), SDValue(Result, 0));
+      ReplaceUses(N1.getValue(1), SDValue(Result, 1));
     } else {
-      Result = CurDAG->getTargetNode(Opc, dl, ResVT, DivVal, N1);
+      Result = CurDAG->getMachineNode(Opc, dl, ResVT, DivVal, N1);
     }
 
     // Copy the division (odd subreg) result, if it is needed.
-    if (!Op.getValue(0).use_empty()) {
+    if (!SDValue(Node, 0).use_empty()) {
       unsigned SubRegIdx = (is32Bit ? subreg_odd32 : subreg_odd);
-      SDNode *Div = CurDAG->getTargetNode(TargetInstrInfo::EXTRACT_SUBREG,
-                                          dl, NVT,
-                                          SDValue(Result, 0),
-                                          CurDAG->getTargetConstant(SubRegIdx,
-                                                                    MVT::i32));
-      ReplaceUses(Op.getValue(0), SDValue(Div, 0));
-      #ifndef NDEBUG
-      DOUT << std::string(Indent-2, ' ') << "=> ";
-      DEBUG(Result->dump(CurDAG));
-      DOUT << "\n";
-      #endif
+      SDNode *Div = CurDAG->getMachineNode(TargetOpcode::EXTRACT_SUBREG,
+                                           dl, NVT,
+                                           SDValue(Result, 0),
+                                           CurDAG->getTargetConstant(SubRegIdx,
+                                                                     MVT::i32));
+      ReplaceUses(SDValue(Node, 0), SDValue(Div, 0));
+      DEBUG(errs() << "=> "; Result->dump(CurDAG); errs() << "\n");
     }
 
     // Copy the remainder (even subreg) result, if it is needed.
-    if (!Op.getValue(1).use_empty()) {
+    if (!SDValue(Node, 1).use_empty()) {
       unsigned SubRegIdx = (is32Bit ? subreg_even32 : subreg_even);
-      SDNode *Rem = CurDAG->getTargetNode(TargetInstrInfo::EXTRACT_SUBREG,
-                                          dl, NVT,
-                                          SDValue(Result, 0),
-                                          CurDAG->getTargetConstant(SubRegIdx,
-                                                                    MVT::i32));
-      ReplaceUses(Op.getValue(1), SDValue(Rem, 0));
-      #ifndef NDEBUG
-      DOUT << std::string(Indent-2, ' ') << "=> ";
-      DEBUG(Result->dump(CurDAG));
-      DOUT << "\n";
-      #endif
+      SDNode *Rem = CurDAG->getMachineNode(TargetOpcode::EXTRACT_SUBREG,
+                                           dl, NVT,
+                                           SDValue(Result, 0),
+                                           CurDAG->getTargetConstant(SubRegIdx,
+                                                                     MVT::i32));
+      ReplaceUses(SDValue(Node, 1), SDValue(Rem, 0));
+      DEBUG(errs() << "=> "; Result->dump(CurDAG); errs() << "\n");
     }
-
-#ifndef NDEBUG
-    Indent -= 2;
-#endif
 
     return NULL;
   }
   }
 
   // Select the default instruction
-  SDNode *ResNode = SelectCode(Op);
+  SDNode *ResNode = SelectCode(Node);
 
-  #ifndef NDEBUG
-  DOUT << std::string(Indent-2, ' ') << "=> ";
-  if (ResNode == NULL || ResNode == Op.getNode())
-    DEBUG(Op.getNode()->dump(CurDAG));
-  else
-    DEBUG(ResNode->dump(CurDAG));
-  DOUT << "\n";
-  Indent -= 2;
-  #endif
-
+  DEBUG(errs() << "=> ";
+        if (ResNode == NULL || ResNode == Node)
+          Node->dump(CurDAG);
+        else
+          ResNode->dump(CurDAG);
+        errs() << "\n";
+        );
   return ResNode;
 }

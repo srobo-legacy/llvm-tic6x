@@ -17,6 +17,7 @@
 #include "MSP430MachineFunctionInfo.h"
 #include "MSP430RegisterInfo.h"
 #include "MSP430TargetMachine.h"
+#include "llvm/Function.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
@@ -37,17 +38,42 @@ MSP430RegisterInfo::MSP430RegisterInfo(MSP430TargetMachine &tm,
 
 const unsigned*
 MSP430RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
+  const Function* F = MF->getFunction();
   static const unsigned CalleeSavedRegs[] = {
     MSP430::FPW, MSP430::R5W, MSP430::R6W, MSP430::R7W,
     MSP430::R8W, MSP430::R9W, MSP430::R10W, MSP430::R11W,
     0
   };
+  static const unsigned CalleeSavedRegsFP[] = {
+    MSP430::R5W, MSP430::R6W, MSP430::R7W,
+    MSP430::R8W, MSP430::R9W, MSP430::R10W, MSP430::R11W,
+    0
+  };
+  static const unsigned CalleeSavedRegsIntr[] = {
+    MSP430::FPW,  MSP430::R5W,  MSP430::R6W,  MSP430::R7W,
+    MSP430::R8W,  MSP430::R9W,  MSP430::R10W, MSP430::R11W,
+    MSP430::R12W, MSP430::R13W, MSP430::R14W, MSP430::R15W,
+    0
+  };
+  static const unsigned CalleeSavedRegsIntrFP[] = {
+    MSP430::R5W,  MSP430::R6W,  MSP430::R7W,
+    MSP430::R8W,  MSP430::R9W,  MSP430::R10W, MSP430::R11W,
+    MSP430::R12W, MSP430::R13W, MSP430::R14W, MSP430::R15W,
+    0
+  };
 
-  return CalleeSavedRegs;
+  if (hasFP(*MF))
+    return (F->getCallingConv() == CallingConv::MSP430_INTR ?
+            CalleeSavedRegsIntrFP : CalleeSavedRegsFP);
+  else
+    return (F->getCallingConv() == CallingConv::MSP430_INTR ?
+            CalleeSavedRegsIntr : CalleeSavedRegs);
+
 }
 
 const TargetRegisterClass *const *
 MSP430RegisterInfo::getCalleeSavedRegClasses(const MachineFunction *MF) const {
+  const Function* F = MF->getFunction();
   static const TargetRegisterClass * const CalleeSavedRegClasses[] = {
     &MSP430::GR16RegClass, &MSP430::GR16RegClass,
     &MSP430::GR16RegClass, &MSP430::GR16RegClass,
@@ -55,8 +81,36 @@ MSP430RegisterInfo::getCalleeSavedRegClasses(const MachineFunction *MF) const {
     &MSP430::GR16RegClass, &MSP430::GR16RegClass,
     0
   };
+  static const TargetRegisterClass * const CalleeSavedRegClassesFP[] = {
+    &MSP430::GR16RegClass, &MSP430::GR16RegClass,
+    &MSP430::GR16RegClass, &MSP430::GR16RegClass,
+    &MSP430::GR16RegClass, &MSP430::GR16RegClass,
+    &MSP430::GR16RegClass, 0
+  };
+  static const TargetRegisterClass * const CalleeSavedRegClassesIntr[] = {
+    &MSP430::GR16RegClass, &MSP430::GR16RegClass,
+    &MSP430::GR16RegClass, &MSP430::GR16RegClass,
+    &MSP430::GR16RegClass, &MSP430::GR16RegClass,
+    &MSP430::GR16RegClass, &MSP430::GR16RegClass,
+    &MSP430::GR16RegClass, &MSP430::GR16RegClass,
+    &MSP430::GR16RegClass, &MSP430::GR16RegClass,
+    0
+  };
+  static const TargetRegisterClass * const CalleeSavedRegClassesIntrFP[] = {
+    &MSP430::GR16RegClass, &MSP430::GR16RegClass,
+    &MSP430::GR16RegClass, &MSP430::GR16RegClass,
+    &MSP430::GR16RegClass, &MSP430::GR16RegClass,
+    &MSP430::GR16RegClass, &MSP430::GR16RegClass,
+    &MSP430::GR16RegClass, &MSP430::GR16RegClass,
+    &MSP430::GR16RegClass, 0
+  };
 
-  return CalleeSavedRegClasses;
+  if (hasFP(*MF))
+    return (F->getCallingConv() == CallingConv::MSP430_INTR ?
+            CalleeSavedRegClassesIntrFP : CalleeSavedRegClassesFP);
+  else
+    return (F->getCallingConv() == CallingConv::MSP430_INTR ?
+            CalleeSavedRegClassesIntr : CalleeSavedRegClasses);
 }
 
 BitVector MSP430RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
@@ -82,7 +136,11 @@ MSP430RegisterInfo::getPointerRegClass(unsigned Kind) const {
 
 
 bool MSP430RegisterInfo::hasFP(const MachineFunction &MF) const {
-  return NoFramePointerElim || MF.getFrameInfo()->hasVarSizedObjects();
+  const MachineFrameInfo *MFI = MF.getFrameInfo();
+
+  return (NoFramePointerElim ||
+          MF.getFrameInfo()->hasVarSizedObjects() ||
+          MFI->isFrameAddressTaken());
 }
 
 bool MSP430RegisterInfo::hasReservedCallFrame(MachineFunction &MF) const {
@@ -147,9 +205,10 @@ eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
   MBB.erase(I);
 }
 
-void
+unsigned
 MSP430RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
-                                        int SPAdj, RegScavenger *RS) const {
+                                        int SPAdj, int *Value,
+                                        RegScavenger *RS) const {
   assert(SPAdj == 0 && "Unexpected");
 
   unsigned i = 0;
@@ -187,22 +246,23 @@ MSP430RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
     MI.getOperand(i).ChangeToRegister(BasePtr, false);
 
     if (Offset == 0)
-      return;
+      return 0;
 
     // We need to materialize the offset via add instruction.
     unsigned DstReg = MI.getOperand(0).getReg();
     if (Offset < 0)
-      BuildMI(MBB, next(II), dl, TII.get(MSP430::SUB16ri), DstReg)
+      BuildMI(MBB, llvm::next(II), dl, TII.get(MSP430::SUB16ri), DstReg)
         .addReg(DstReg).addImm(-Offset);
     else
-      BuildMI(MBB, next(II), dl, TII.get(MSP430::ADD16ri), DstReg)
+      BuildMI(MBB, llvm::next(II), dl, TII.get(MSP430::ADD16ri), DstReg)
         .addReg(DstReg).addImm(Offset);
 
-    return;
+    return 0;
   }
 
   MI.getOperand(i).ChangeToRegister(BasePtr, false);
   MI.getOperand(i+1).ChangeToImmediate(Offset);
+  return 0;
 }
 
 void
@@ -210,10 +270,10 @@ MSP430RegisterInfo::processFunctionBeforeFrameFinalized(MachineFunction &MF)
                                                                          const {
   // Create a frame entry for the FPW register that must be saved.
   if (hasFP(MF)) {
-    int FrameIdx = MF.getFrameInfo()->CreateFixedObject(2, -4);
+    int ATTRIBUTE_UNUSED FrameIdx =
+      MF.getFrameInfo()->CreateFixedObject(2, -4, true, false);
     assert(FrameIdx == MF.getFrameInfo()->getObjectIndexBegin() &&
            "Slot for FPW register must be last in order to be found!");
-    FrameIdx = 0;
   }
 }
 
@@ -249,7 +309,7 @@ void MSP430RegisterInfo::emitPrologue(MachineFunction &MF) const {
       .addReg(MSP430::SPW);
 
     // Mark the FramePtr as live-in in every block except the entry.
-    for (MachineFunction::iterator I = next(MF.begin()), E = MF.end();
+    for (MachineFunction::iterator I = llvm::next(MF.begin()), E = MF.end();
          I != E; ++I)
       I->addLiveIn(MSP430::FPW);
 
@@ -290,7 +350,8 @@ void MSP430RegisterInfo::emitEpilogue(MachineFunction &MF,
   DebugLoc DL = MBBI->getDebugLoc();
 
   switch (RetOpcode) {
-  case MSP430::RET: break;  // These are ok
+  case MSP430::RET:
+  case MSP430::RETI: break;  // These are ok
   default:
     llvm_unreachable("Can only insert epilog into returning blocks");
   }
@@ -311,7 +372,6 @@ void MSP430RegisterInfo::emitEpilogue(MachineFunction &MF,
     NumBytes = StackSize - CSSize;
 
   // Skip the callee-saved pop instructions.
-  MachineBasicBlock::iterator LastCSPop = MBBI;
   while (MBBI != MBB.begin()) {
     MachineBasicBlock::iterator PI = prior(MBBI);
     unsigned Opc = PI->getOpcode();
@@ -328,7 +388,16 @@ void MSP430RegisterInfo::emitEpilogue(MachineFunction &MF,
   //  mergeSPUpdatesUp(MBB, MBBI, StackPtr, &NumBytes);
 
   if (MFI->hasVarSizedObjects()) {
-    llvm_unreachable("Not implemented yet!");
+    BuildMI(MBB, MBBI, DL,
+            TII.get(MSP430::MOV16rr), MSP430::SPW).addReg(MSP430::FPW);
+    if (CSSize) {
+      MachineInstr *MI =
+        BuildMI(MBB, MBBI, DL,
+                TII.get(MSP430::SUB16ri), MSP430::SPW)
+        .addReg(MSP430::SPW).addImm(CSSize);
+      // The SRW implicit def is dead.
+      MI->getOperand(3).setIsDead();
+    }
   } else {
     // adjust stack pointer back: SPW += numbytes
     if (NumBytes) {
@@ -345,7 +414,7 @@ unsigned MSP430RegisterInfo::getRARegister() const {
   return MSP430::PCW;
 }
 
-unsigned MSP430RegisterInfo::getFrameRegister(MachineFunction &MF) const {
+unsigned MSP430RegisterInfo::getFrameRegister(const MachineFunction &MF) const {
   return hasFP(MF) ? MSP430::FPW : MSP430::SPW;
 }
 

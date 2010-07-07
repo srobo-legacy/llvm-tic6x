@@ -18,6 +18,7 @@
 #include "llvm/CodeGen/ScheduleDAG.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/raw_ostream.h"
 using namespace llvm;
 
 //===----------------------------------------------------------------------===//
@@ -52,7 +53,7 @@ PPCHazardRecognizer970::PPCHazardRecognizer970(const TargetInstrInfo &tii)
 }
 
 void PPCHazardRecognizer970::EndDispatchGroup() {
-  DOUT << "=== Start of dispatch group\n";
+  DEBUG(errs() << "=== Start of dispatch group\n");
   NumIssued = 0;
   
   // Structural hazard info.
@@ -117,7 +118,7 @@ isLoadOfStoredAddress(unsigned LoadSize, SDValue Ptr1, SDValue Ptr2) const {
 }
 
 /// getHazardType - We return hazard for any non-branch instruction that would
-/// terminate terminate the dispatch group.  We turn NoopHazard for any
+/// terminate the dispatch group.  We turn NoopHazard for any
 /// instructions that wouldn't terminate the dispatch group that would cause a
 /// pipeline flush.
 ScheduleHazardRecognizer::HazardType PPCHazardRecognizer970::
@@ -256,7 +257,7 @@ void PPCHazardRecognizer970::EmitInstruction(SUnit *SU) {
     case PPC::STWX:   case PPC::STWX8:
     case PPC::STWUX:
     case PPC::STW:    case PPC::STW8:
-    case PPC::STWU:   case PPC::STWU8:
+    case PPC::STWU:
     case PPC::STVEWX:
     case PPC::STFIWX:
     case PPC::STWBRX:

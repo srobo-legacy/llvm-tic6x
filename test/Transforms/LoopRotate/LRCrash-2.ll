@@ -1,4 +1,4 @@
-; RUN: llvm-as < %s | opt -loop-rotate -disable-output
+; RUN: opt < %s -loop-rotate -verify-dom-info -verify-loop-info -disable-output
 
 define void @findAllPairs() {
 entry:

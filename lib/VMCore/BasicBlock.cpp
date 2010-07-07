@@ -35,7 +35,7 @@ LLVMContext &BasicBlock::getContext() const {
 
 // Explicit instantiation of SymbolTableListTraits since some of the methods
 // are not in the public header file...
-template class SymbolTableListTraits<Instruction, BasicBlock>;
+template class llvm::SymbolTableListTraits<Instruction, BasicBlock>;
 
 
 BasicBlock::BasicBlock(LLVMContext &C, const Twine &Name, Function *NewParent,
@@ -58,6 +58,24 @@ BasicBlock::BasicBlock(LLVMContext &C, const Twine &Name, Function *NewParent,
 
 
 BasicBlock::~BasicBlock() {
+  // If the address of the block is taken and it is being deleted (e.g. because
+  // it is dead), this means that there is either a dangling constant expr
+  // hanging off the block, or an undefined use of the block (source code
+  // expecting the address of a label to keep the block alive even though there
+  // is no indirect branch).  Handle these cases by zapping the BlockAddress
+  // nodes.  There are no other possible uses at this point.
+  if (hasAddressTaken()) {
+    assert(!use_empty() && "There should be at least one blockaddress!");
+    Constant *Replacement =
+      ConstantInt::get(llvm::Type::getInt32Ty(getContext()), 1);
+    while (!use_empty()) {
+      BlockAddress *BA = cast<BlockAddress>(use_back());
+      BA->replaceAllUsesWith(ConstantExpr::getIntToPtr(Replacement,
+                                                       BA->getType()));
+      BA->destroyConstant();
+    }
+  }
+  
   assert(getParent() == 0 && "BasicBlock still linked into the program!");
   dropAllReferences();
   InstList.clear();
@@ -244,7 +262,7 @@ BasicBlock *BasicBlock::splitBasicBlock(iterator I, const Twine &BBName) {
   assert(I != InstList.end() &&
          "Trying to get me to create degenerate basic block!");
 
-  BasicBlock *InsertBefore = next(Function::iterator(this))
+  BasicBlock *InsertBefore = llvm::next(Function::iterator(this))
                                .getNodePtrUnchecked();
   BasicBlock *New = BasicBlock::Create(getContext(), BBName,
                                        getParent(), InsertBefore);
@@ -277,3 +295,4 @@ BasicBlock *BasicBlock::splitBasicBlock(iterator I, const Twine &BBName) {
   }
   return New;
 }
+

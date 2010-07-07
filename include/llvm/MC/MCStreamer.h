@@ -14,53 +14,33 @@
 #ifndef LLVM_MC_MCSTREAMER_H
 #define LLVM_MC_MCSTREAMER_H
 
-#include "llvm/Support/DataTypes.h"
+#include "llvm/System/DataTypes.h"
+#include "llvm/MC/MCDirectives.h"
 
 namespace llvm {
-  class AsmPrinter;
+  class MCAsmInfo;
+  class MCCodeEmitter;
   class MCContext;
-  class MCValue;
+  class MCExpr;
   class MCInst;
+  class MCInstPrinter;
   class MCSection;
   class MCSymbol;
   class StringRef;
+  class Twine;
   class raw_ostream;
-  class TargetAsmInfo;
+  class formatted_raw_ostream;
 
   /// MCStreamer - Streaming machine code generation interface.  This interface
   /// is intended to provide a programatic interface that is very similar to the
   /// level that an assembler .s file provides.  It has callbacks to emit bytes,
-  /// "emit directives", etc.  The implementation of this interface retains
+  /// handle directives, etc.  The implementation of this interface retains
   /// state to know what the current section is etc.
   ///
   /// There are multiple implementations of this interface: one for writing out
   /// a .s file, and implementations that write out .o files of various formats.
   ///
   class MCStreamer {
-  public:
-    enum SymbolAttr {
-      Global,         /// .globl
-      Hidden,         /// .hidden (ELF)
-      IndirectSymbol, /// .indirect_symbol (Apple)
-      Internal,       /// .internal (ELF)
-      LazyReference,  /// .lazy_reference (Apple)
-      NoDeadStrip,    /// .no_dead_strip (Apple)
-      PrivateExtern,  /// .private_extern (Apple)
-      Protected,      /// .protected (ELF)
-      Reference,      /// .reference (Apple)
-      Weak,           /// .weak
-      WeakDefinition, /// .weak_definition (Apple)
-      WeakReference,  /// .weak_reference (Apple)
-
-      SymbolAttrFirst = Global,
-      SymbolAttrLast = WeakReference
-    };
-
-    enum AssemblerFlag {
-      SubsectionsViaSymbols  /// .subsections_via_symbols (Apple)
-    };
-
-  private:
     MCContext &Context;
 
     MCStreamer(const MCStreamer&); // DO NOT IMPLEMENT
@@ -72,26 +52,52 @@ namespace llvm {
     /// CurSection - This is the current section code is being emitted to, it is
     /// kept up to date by SwitchSection.
     const MCSection *CurSection;
+
   public:
     virtual ~MCStreamer();
 
     MCContext &getContext() const { return Context; }
 
+    /// @name Assembly File Formatting.
+    /// @{
+    
+    /// isVerboseAsm - Return true if this streamer supports verbose assembly at
+    /// all.
+    virtual bool isVerboseAsm() const { return false; }
+
+    /// AddComment - Add a comment that can be emitted to the generated .s
+    /// file if applicable as a QoI issue to make the output of the compiler
+    /// more readable.  This only affects the MCAsmStreamer, and only when
+    /// verbose assembly output is enabled.
+    ///
+    /// If the comment includes embedded \n's, they will each get the comment
+    /// prefix as appropriate.  The added comment should not end with a \n.
+    virtual void AddComment(const Twine &T) {}
+    
+    /// GetCommentOS - Return a raw_ostream that comments can be written to.
+    /// Unlike AddComment, you are required to terminate comments with \n if you
+    /// use this method.
+    virtual raw_ostream &GetCommentOS();
+    
+    /// AddBlankLine - Emit a blank line to a .s file to pretty it up.
+    virtual void AddBlankLine() {}
+    
+    /// @}
+    
     /// @name Symbol & Section Management
     /// @{
-
-    /// SwitchSection - Set the current section where code is being emitted to
-    /// @param Section.  This is required to update CurSection.
-    ///
-    /// This corresponds to assembler directives like .section, .text, etc.
-    virtual void SwitchSection(const MCSection *Section) = 0;
-
     
     /// getCurrentSection - Return the current seciton that the streamer is
     /// emitting code to.
     const MCSection *getCurrentSection() const { return CurSection; }
+
+    /// SwitchSection - Set the current section where code is being emitted to
+    /// @p Section.  This is required to update CurSection.
+    ///
+    /// This corresponds to assembler directives like .section, .text, etc.
+    virtual void SwitchSection(const MCSection *Section) = 0;
     
-    /// EmitLabel - Emit a label for @param Symbol into the current section.
+    /// EmitLabel - Emit a label for @p Symbol into the current section.
     ///
     /// This corresponds to an assembler statement such as:
     ///   foo:
@@ -99,15 +105,12 @@ namespace llvm {
     /// @param Symbol - The symbol to emit. A given symbol should only be
     /// emitted as a label once, and symbols emitted as a label should never be
     /// used in an assignment.
-    //
-    // FIXME: What to do about the current section? Should we get rid of the
-    // symbol section in the constructor and initialize it here?
     virtual void EmitLabel(MCSymbol *Symbol) = 0;
 
-    /// EmitAssemblerFlag - Note in the output the specified @param Flag
-    virtual void EmitAssemblerFlag(AssemblerFlag Flag) = 0;
+    /// EmitAssemblerFlag - Note in the output the specified @p Flag
+    virtual void EmitAssemblerFlag(MCAssemblerFlag Flag) = 0;
 
-    /// EmitAssignment - Emit an assignment of @param Value to @param Symbol.
+    /// EmitAssignment - Emit an assignment of @p Value to @p Symbol.
     ///
     /// This corresponds to an assembler statement such as:
     ///  symbol = value
@@ -118,66 +121,63 @@ namespace llvm {
     ///
     /// @param Symbol - The symbol being assigned to.
     /// @param Value - The value for the symbol.
-    /// @param MakeAbsolute - If true, then the symbol should be given the
-    /// absolute value of @param Value, even if @param Value would be
-    /// relocatable expression. This corresponds to the ".set" directive.
-    virtual void EmitAssignment(MCSymbol *Symbol, const MCValue &Value,
-                                bool MakeAbsolute = false) = 0;
+    virtual void EmitAssignment(MCSymbol *Symbol, const MCExpr *Value) = 0;
 
-    /// EmitSymbolAttribute - Add the given @param Attribute to @param Symbol.
-    //
-    // FIXME: This doesn't make much sense, could we just have attributes be on
-    // the symbol and make the printer smart enough to add the right symbols?
-    // This should work as long as the order of attributes in the file doesn't
-    // matter.
+    /// EmitSymbolAttribute - Add the given @p Attribute to @p Symbol.
     virtual void EmitSymbolAttribute(MCSymbol *Symbol,
-                                     SymbolAttr Attribute) = 0;
+                                     MCSymbolAttr Attribute) = 0;
 
-    /// EmitSymbolDesc - Set the @param DescValue for the @param Symbol.
+    /// EmitSymbolDesc - Set the @p DescValue for the @p Symbol.
     ///
     /// @param Symbol - The symbol to have its n_desc field set.
     /// @param DescValue - The value to set into the n_desc field.
     virtual void EmitSymbolDesc(MCSymbol *Symbol, unsigned DescValue) = 0;
 
-    /// EmitLocalSymbol - Emit a local symbol of @param Value to @param Symbol.
+    
+    /// EmitELFSize - Emit an ELF .size directive.
     ///
-    /// @param Symbol - The local symbol being created.
-    /// @param Value - The value for the symbol.
-    virtual void EmitLocalSymbol(MCSymbol *Symbol, const MCValue &Value) = 0;
-
-    /// EmitCommonSymbol - Emit a common or local common symbol of @param Size
-    /// with the @param Pow2Alignment if non-zero.
+    /// This corresponds to an assembler statement such as:
+    ///  .size symbol, expression
+    ///
+    virtual void EmitELFSize(MCSymbol *Symbol, const MCExpr *Value) = 0;
+    
+    /// EmitCommonSymbol - Emit a common symbol.
     ///
     /// @param Symbol - The common symbol to emit.
     /// @param Size - The size of the common symbol.
-    /// @param Pow2Alignment - The alignment of the common symbol if non-zero.
-    /// @param IsLocal - If true, then the symbol is to be a local common
-    virtual void EmitCommonSymbol(MCSymbol *Symbol, unsigned Size,
-                                  unsigned Pow2Alignment, bool IsLocal) = 0;
+    /// @param ByteAlignment - The alignment of the symbol if
+    /// non-zero. This must be a power of 2.
+    virtual void EmitCommonSymbol(MCSymbol *Symbol, uint64_t Size,
+                                  unsigned ByteAlignment) = 0;
 
-    /// EmitZerofill - Emit a the zerofill section and possiblity a symbol, if
-    /// @param Symbol is non-NULL, for @param Size and with the @param
-    /// Pow2Alignment if non-zero.
+    /// EmitLocalCommonSymbol - Emit a local common (.lcomm) symbol.
+    ///
+    /// @param Symbol - The common symbol to emit.
+    /// @param Size - The size of the common symbol.
+    virtual void EmitLocalCommonSymbol(MCSymbol *Symbol, uint64_t Size) = 0;
+    
+    /// EmitZerofill - Emit a the zerofill section and an option symbol.
     ///
     /// @param Section - The zerofill section to create and or to put the symbol
     /// @param Symbol - The zerofill symbol to emit, if non-NULL.
     /// @param Size - The size of the zerofill symbol.
-    /// @param Pow2Alignment - The alignment of the zerofill symbol if non-zero.
-    virtual void EmitZerofill(MCSection *Section, MCSymbol *Symbol = 0,
-                              unsigned Size = 0,unsigned Pow2Alignment = 0) = 0;
+    /// @param ByteAlignment - The alignment of the zerofill symbol if
+    /// non-zero. This must be a power of 2 on some targets.
+    virtual void EmitZerofill(const MCSection *Section, MCSymbol *Symbol = 0,
+                              unsigned Size = 0,unsigned ByteAlignment = 0) = 0;
 
     /// @}
     /// @name Generating Data
     /// @{
 
-    /// EmitBytes - Emit the bytes in @param Data into the output.
+    /// EmitBytes - Emit the bytes in \arg Data into the output.
     ///
     /// This is used to implement assembler directives such as .byte, .ascii,
     /// etc.
-    virtual void EmitBytes(const StringRef &Data) = 0;
+    virtual void EmitBytes(StringRef Data, unsigned AddrSpace) = 0;
 
-    /// EmitValue - Emit the expression @param Value into the output as a native
-    /// integer of the given @param Size bytes.
+    /// EmitValue - Emit the expression @p Value into the output as a native
+    /// integer of the given @p Size bytes.
     ///
     /// This is used to implement assembler directives such as .word, .quad,
     /// etc.
@@ -185,13 +185,37 @@ namespace llvm {
     /// @param Value - The value to emit.
     /// @param Size - The size of the integer (in bytes) to emit. This must
     /// match a native machine width.
-    virtual void EmitValue(const MCValue &Value, unsigned Size) = 0;
+    virtual void EmitValue(const MCExpr *Value, unsigned Size,
+                           unsigned AddrSpace) = 0;
 
-    /// EmitValueToAlignment - Emit some number of copies of @param Value until
-    /// the byte alignment @param ByteAlignment is reached.
+    /// EmitIntValue - Special case of EmitValue that avoids the client having
+    /// to pass in a MCExpr for constant integers.
+    virtual void EmitIntValue(uint64_t Value, unsigned Size,unsigned AddrSpace);
+    
+    /// EmitGPRel32Value - Emit the expression @p Value into the output as a
+    /// gprel32 (32-bit GP relative) value.
+    ///
+    /// This is used to implement assembler directives such as .gprel32 on
+    /// targets that support them.
+    virtual void EmitGPRel32Value(const MCExpr *Value) = 0;
+    
+    /// EmitFill - Emit NumBytes bytes worth of the value specified by
+    /// FillValue.  This implements directives such as '.space'.
+    virtual void EmitFill(uint64_t NumBytes, uint8_t FillValue,
+                          unsigned AddrSpace);
+    
+    /// EmitZeros - Emit NumBytes worth of zeros.  This is a convenience
+    /// function that just wraps EmitFill.
+    void EmitZeros(uint64_t NumBytes, unsigned AddrSpace) {
+      EmitFill(NumBytes, 0, AddrSpace);
+    }
+
+    
+    /// EmitValueToAlignment - Emit some number of copies of @p Value until
+    /// the byte alignment @p ByteAlignment is reached.
     ///
     /// If the number of bytes need to emit for the alignment is not a multiple
-    /// of @param ValueSize, then the contents of the emitted fill bytes is
+    /// of @p ValueSize, then the contents of the emitted fill bytes is
     /// undefined.
     ///
     /// This used to implement the .align assembler directive.
@@ -199,8 +223,8 @@ namespace llvm {
     /// @param ByteAlignment - The alignment to reach. This must be a power of
     /// two on some targets.
     /// @param Value - The value to use when filling bytes.
-    /// @param Size - The size of the integer (in bytes) to emit for @param
-    /// Value. This must match a native machine width.
+    /// @param ValueSize - The size of the integer (in bytes) to emit for
+    /// @p Value. This must match a native machine width.
     /// @param MaxBytesToEmit - The maximum numbers of bytes to emit, or 0. If
     /// the alignment cannot be reached in this many bytes, no bytes are
     /// emitted.
@@ -208,22 +232,43 @@ namespace llvm {
                                       unsigned ValueSize = 1,
                                       unsigned MaxBytesToEmit = 0) = 0;
 
-    /// EmitValueToOffset - Emit some number of copies of @param Value until the
-    /// byte offset @param Offset is reached.
+    /// EmitCodeAlignment - Emit nops until the byte alignment @p ByteAlignment
+    /// is reached.
+    ///
+    /// This used to align code where the alignment bytes may be executed.  This
+    /// can emit different bytes for different sizes to optimize execution.
+    ///
+    /// @param ByteAlignment - The alignment to reach. This must be a power of
+    /// two on some targets.
+    /// @param MaxBytesToEmit - The maximum numbers of bytes to emit, or 0. If
+    /// the alignment cannot be reached in this many bytes, no bytes are
+    /// emitted.
+    virtual void EmitCodeAlignment(unsigned ByteAlignment,
+                                   unsigned MaxBytesToEmit = 0) = 0;
+
+    /// EmitValueToOffset - Emit some number of copies of @p Value until the
+    /// byte offset @p Offset is reached.
     ///
     /// This is used to implement assembler directives such as .org.
     ///
-    /// @param Offset - The offset to reach.This may be an expression, but the
+    /// @param Offset - The offset to reach. This may be an expression, but the
     /// expression must be associated with the current section.
     /// @param Value - The value to use when filling bytes.
-    // 
-    // FIXME: How are we going to signal failures out of this?
-    virtual void EmitValueToOffset(const MCValue &Offset, 
+    virtual void EmitValueToOffset(const MCExpr *Offset,
                                    unsigned char Value = 0) = 0;
     
     /// @}
+    
+    /// EmitFileDirective - Switch to a new logical file.  This is used to
+    /// implement the '.file "foo.c"' assembler directive.
+    virtual void EmitFileDirective(StringRef Filename) = 0;
+    
+    /// EmitDwarfFileDirective - Associate a filename with a specified logical
+    /// file number.  This implements the DWARF2 '.file 4 "foo.c"' assembler
+    /// directive.
+    virtual void EmitDwarfFileDirective(unsigned FileNo,StringRef Filename) = 0;
 
-    /// EmitInstruction - Emit the given @param Instruction into the current
+    /// EmitInstruction - Emit the given @p Instruction into the current
     /// section.
     virtual void EmitInstruction(const MCInst &Inst) = 0;
 
@@ -239,9 +284,20 @@ namespace llvm {
   /// assembly for the native target, suitable for compiling with a native
   /// assembler.
   ///
-  /// \arg AP - If given, an AsmPrinter to use for printing instructions.
-  MCStreamer *createAsmStreamer(MCContext &Ctx, raw_ostream &OS,
-                                const TargetAsmInfo &TAI, AsmPrinter *AP = 0);
+  /// \param InstPrint - If given, the instruction printer to use. If not given
+  /// the MCInst representation will be printed.
+  ///
+  /// \param CE - If given, a code emitter to use to show the instruction
+  /// encoding inline with the assembly.
+  ///
+  /// \param ShowInst - Whether to show the MCInst representation inline with
+  /// the assembly.
+  MCStreamer *createAsmStreamer(MCContext &Ctx, formatted_raw_ostream &OS,
+                                const MCAsmInfo &MAI, bool isLittleEndian,
+                                bool isVerboseAsm,
+                                MCInstPrinter *InstPrint = 0,
+                                MCCodeEmitter *CE = 0,
+                                bool ShowInst = false);
 
   // FIXME: These two may end up getting rolled into a single
   // createObjectStreamer interface, which implements the assembler backend, and
@@ -249,7 +305,8 @@ namespace llvm {
 
   /// createMachOStream - Create a machine code streamer which will generative
   /// Mach-O format object files.
-  MCStreamer *createMachOStreamer(MCContext &Ctx, raw_ostream &OS);
+  MCStreamer *createMachOStreamer(MCContext &Ctx, raw_ostream &OS,
+                                  MCCodeEmitter *CE);
 
   /// createELFStreamer - Create a machine code streamer which will generative
   /// ELF format object files.

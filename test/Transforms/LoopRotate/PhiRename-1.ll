@@ -1,4 +1,4 @@
-; RUN: llvm-as < %s | opt -loop-rotate | llvm-dis | not grep {\\\[ .tmp224} 
+; RUN: opt < %s -loop-rotate -verify-dom-info -verify-loop-info -S | not grep {\\\[ .tmp224} 
 ; END.
 target datalayout = "e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:32:64-f32:32:32-f64:32:64-v64:64:64-v128:128:128-a0:0:64"
 
@@ -73,7 +73,7 @@ cond_next:		; preds = %cond_true, %bb
 	br label %bb21
 
 bb21:		; preds = %cond_next, %entry
-        %l.in = phi %struct.list** [ @operators, %entry ], [ %tmp19, %cond_next ]  ;
+        %l.in = phi %struct.list** [ @operators, %entry ], [ %tmp19, %cond_next ]
 	%tmp22 = load %struct.list** %l.in		; <%struct.list*> [#uses=1]
 	icmp ne %struct.list* %tmp22, null		; <i1>:3 [#uses=1]
 	zext i1 %3 to i8		; <i8>:4 [#uses=1]

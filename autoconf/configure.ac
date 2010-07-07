@@ -31,12 +31,12 @@ dnl===
 dnl===-----------------------------------------------------------------------===
 dnl Initialize autoconf and define the package name, version number and
 dnl email address for reporting bugs.
-AC_INIT([[llvm]],[[2.6]],[llvmbugs@cs.uiuc.edu])
+AC_INIT([[llvm]],[[2.7]],[llvmbugs@cs.uiuc.edu])
 
 dnl Provide a copyright substitution and ensure the copyright notice is included
 dnl in the output of --version option of the generated configure script.
-AC_SUBST(LLVM_COPYRIGHT,["Copyright (c) 2003-2009 University of Illinois at Urbana-Champaign."])
-AC_COPYRIGHT([Copyright (c) 2003-2009 University of Illinois at Urbana-Champaign.])
+AC_SUBST(LLVM_COPYRIGHT,["Copyright (c) 2003-2010 University of Illinois at Urbana-Champaign."])
+AC_COPYRIGHT([Copyright (c) 2003-2010 University of Illinois at Urbana-Champaign.])
 
 dnl Indicate that we require autoconf 2.59 or later. Ths is needed because we
 dnl use some autoconf macros only available in 2.59.
@@ -80,6 +80,7 @@ do
       llvm-tv)      AC_CONFIG_SUBDIRS([projects/llvm-tv])   ;;
       llvm-poolalloc) AC_CONFIG_SUBDIRS([projects/llvm-poolalloc]) ;;
       poolalloc)    AC_CONFIG_SUBDIRS([projects/poolalloc]) ;;
+      safecode)     AC_CONFIG_SUBDIRS([projects/safecode]) ;;
       llvm-kernel)  AC_CONFIG_SUBDIRS([projects/llvm-kernel]) ;;
       *)
         AC_MSG_WARN([Unknown project (${i}) won't be configured automatically])
@@ -165,6 +166,11 @@ AC_CACHE_CHECK([type of operating system we're going to host on],
     llvm_cv_no_link_all_option="-Wl,-z,defaultextract"
     llvm_cv_os_type="SunOS"
     llvm_cv_platform_type="Unix" ;;
+  *-*-auroraux*)
+    llvm_cv_link_all_option="-Wl,-z,allextract"
+    llvm_cv_link_all_option="-Wl,-z,defaultextract"
+    llvm_cv_os_type="AuroraUX"
+    llvm_cv_platform_type="Unix" ;;
   *-*-win32*)
     llvm_cv_link_all_option="-Wl,--whole-archive"
     llvm_cv_no_link_all_option="-Wl,--no-whole-archive"
@@ -175,6 +181,11 @@ AC_CACHE_CHECK([type of operating system we're going to host on],
     llvm_cv_no_link_all_option="-Wl,--no-whole-archive"
     llvm_cv_os_type="MingW"
     llvm_cv_platform_type="Win32" ;;
+  *-*-haiku*)
+    llvm_cv_link_all_option="-Wl,--whole-archive"
+    llvm_cv_no_link_all_option="-Wl,--no-whole-archive"
+    llvm_cv_os_type="Haiku"
+    llvm_cv_platform_type="Unix" ;;
   *-unknown-eabi*)
     llvm_cv_link_all_option="-Wl,--whole-archive"
     llvm_cv_no_link_all_option="-Wl,--no-whole-archive"
@@ -219,10 +230,14 @@ AC_CACHE_CHECK([type of operating system we're going to target],
     llvm_cv_target_os_type="Linux" ;;
   *-*-solaris*)
     llvm_cv_target_os_type="SunOS" ;;
+  *-*-auroraux*)
+    llvm_cv_target_os_type="AuroraUX" ;;
   *-*-win32*)
     llvm_cv_target_os_type="Win32" ;;
   *-*-mingw*)
     llvm_cv_target_os_type="MingW" ;;
+  *-*-haiku*)
+    llvm_cv_target_os_type="Haiku" ;;
   *-unknown-eabi*)
     llvm_cv_target_os_type="Freestanding" ;;
   *)
@@ -277,6 +292,7 @@ AC_CACHE_CHECK([target architecture],[llvm_cv_target_arch],
   msp430-*)               llvm_cv_target_arch="MSP430" ;;
   s390x-*)                llvm_cv_target_arch="SystemZ" ;;
   bfin-*)                 llvm_cv_target_arch="Blackfin" ;;
+  mblaze-*)               llvm_cv_target_arch="MBlaze" ;;
   tic64x-*)               llvm_cv_target_arch="TMS320C64X" ;;
   *)                      llvm_cv_target_arch="Unknown" ;;
 esac])
@@ -362,17 +378,6 @@ else
   AC_SUBST(DISABLE_ASSERTIONS,[[DISABLE_ASSERTIONS=1]])
 fi
 
-dnl LLVM_COMPACT_SENTINELS : can be used to shrink ilist's end iterators and disable certain checks on them:
-if test ${ENABLE_OPTIMIZED},${DISABLE_ASSERTIONS} = "ENABLE_OPTIMIZED=1,DISABLE_ASSERTIONS=1" ; then
-  AC_SUBST(LLVM_COMPACT_SENTINELS,[1])
-else
-  AC_SUBST(LLVM_COMPACT_SENTINELS,[0])
-fi
-
-AC_DEFINE_UNQUOTED([LLVM_COMPACT_SENTINELS],$LLVM_COMPACT_SENTINELS,
-                   [Define to 1 for ilist sentinel compaction])
-
-
 dnl --enable-expensive-checks : check whether they want to turn on expensive debug checks:
 AC_ARG_ENABLE(expensive-checks,AS_HELP_STRING(
   --enable-expensive-checks,[Compile with expensive debug checks enabled (default is NO)]),, enableval="no")
@@ -391,6 +396,16 @@ if test ${enableval} = "no" ; then
   AC_SUBST(DEBUG_RUNTIME,[[]])
 else
   AC_SUBST(DEBUG_RUNTIME,[[DEBUG_RUNTIME=1]])
+fi
+
+dnl --enable-debug-symbols : should even optimized compiler libraries
+dnl have debug symbols?
+AC_ARG_ENABLE(debug-symbols,
+   AS_HELP_STRING(--enable-debug-symbols,[Build compiler with debug symbols (default is NO if optimization is on and YES if it's off)]),,enableval=no)
+if test ${enableval} = "no" ; then
+  AC_SUBST(DEBUG_SYMBOLS,[[]])
+else
+  AC_SUBST(DEBUG_SYMBOLS,[[DEBUG_SYMBOLS=1]])
 fi
 
 dnl --enable-jit: check whether they want to enable the jit
@@ -415,6 +430,7 @@ else
     MSP430)      AC_SUBST(TARGET_HAS_JIT,0) ;;
     SystemZ)     AC_SUBST(TARGET_HAS_JIT,0) ;;
     Blackfin)    AC_SUBST(TARGET_HAS_JIT,0) ;;
+    MBlaze)      AC_SUBST(TARGET_HAS_JIT,0) ;;
     *)           AC_SUBST(TARGET_HAS_JIT,0) ;;
   esac
 fi
@@ -458,32 +474,30 @@ esac
 AC_DEFINE_UNQUOTED([ENABLE_PIC],$ENABLE_PIC,
                    [Define if position independent code is enabled])
 
+dnl Allow building a shared library and linking tools against it.
+AC_ARG_ENABLE(shared,
+  AS_HELP_STRING([--enable-shared],
+                 [Build a shared library and link tools against it (default is NO)]),,
+                 enableval=default)
+case "$enableval" in
+  yes) AC_SUBST(ENABLE_SHARED,[1]) ;;
+  no)  AC_SUBST(ENABLE_SHARED,[0]) ;;
+  default) AC_SUBST(ENABLE_SHARED,[0]) ;;
+  *) AC_MSG_ERROR([Invalid setting for --enable-shared. Use "yes" or "no"]) ;;
+esac
+
 dnl Allow specific targets to be specified for building (or not)
 TARGETS_TO_BUILD=""
 AC_ARG_ENABLE([targets],AS_HELP_STRING([--enable-targets],
-    [Build specific host targets: all,host-only,{target-name} (default=all)]),,
+    [Build specific host targets: all or target1,target2,... Valid targets are:
+     host, x86, x86_64, sparc, powerpc, alpha, arm, mips, spu, pic16,
+     xcore, msp430, systemz, blackfin, cbe, msil, and cpp (default=all)]),,
     enableval=all)
+if test "$enableval" = host-only ; then
+  enableval=host
+fi
 case "$enableval" in
-  all) TARGETS_TO_BUILD="X86 Sparc PowerPC Alpha ARM Mips CellSPU PIC16 XCore MSP430 SystemZ Blackfin TMS320C64X CBackend MSIL CppBackend" ;;
-  host-only)
-    case "$llvm_cv_target_arch" in
-      x86)         TARGETS_TO_BUILD="X86" ;;
-      x86_64)      TARGETS_TO_BUILD="X86" ;;
-      Sparc)       TARGETS_TO_BUILD="Sparc" ;;
-      PowerPC)     TARGETS_TO_BUILD="PowerPC" ;;
-      Alpha)       TARGETS_TO_BUILD="Alpha" ;;
-      ARM)         TARGETS_TO_BUILD="ARM" ;;
-      Mips)        TARGETS_TO_BUILD="Mips" ;;
-      CellSPU|SPU) TARGETS_TO_BUILD="CellSPU" ;;
-      PIC16)       TARGETS_TO_BUILD="PIC16" ;;
-      XCore)       TARGETS_TO_BUILD="XCore" ;;
-      MSP430)      TARGETS_TO_BUILD="MSP430" ;;
-      SystemZ)     TARGETS_TO_BUILD="SystemZ" ;;
-      Blackfin)    TARGETS_TO_BUILD="Blackfin" ;;
-      TMS320C64X)  TARGETS_TO_BUILD="TMS320C64X" ;;
-      *)       AC_MSG_ERROR([Can not set target to build]) ;;
-    esac
-    ;;
+  all) TARGETS_TO_BUILD="X86 Sparc PowerPC Alpha ARM Mips CellSPU PIC16 XCore MSP430 SystemZ Blackfin CBackend MSIL CppBackend MBlaze TMS320C64X" ;;
   *)for a_target in `echo $enableval|sed -e 's/,/ /g' ` ; do
       case "$a_target" in
         x86)      TARGETS_TO_BUILD="X86 $TARGETS_TO_BUILD" ;;
@@ -502,7 +516,25 @@ case "$enableval" in
         cbe)      TARGETS_TO_BUILD="CBackend $TARGETS_TO_BUILD" ;;
         msil)     TARGETS_TO_BUILD="MSIL $TARGETS_TO_BUILD" ;;
         cpp)      TARGETS_TO_BUILD="CppBackend $TARGETS_TO_BUILD" ;;
+        mblaze)   TARGETS_TO_BUILD="MBlaze $TARGETS_TO_BUILD" ;;
         tms320c64x) TARGETS_TO_BUILD="TMS320C64X $TARGETS_TO_BUILD" ;;
+        host) case "$llvm_cv_target_arch" in
+            x86)         TARGETS_TO_BUILD="X86 $TARGETS_TO_BUILD" ;;
+            x86_64)      TARGETS_TO_BUILD="X86 $TARGETS_TO_BUILD" ;;
+            Sparc)       TARGETS_TO_BUILD="Sparc $TARGETS_TO_BUILD" ;;
+            PowerPC)     TARGETS_TO_BUILD="PowerPC $TARGETS_TO_BUILD" ;;
+            Alpha)       TARGETS_TO_BUILD="Alpha $TARGETS_TO_BUILD" ;;
+            ARM)         TARGETS_TO_BUILD="ARM $TARGETS_TO_BUILD" ;;
+            Mips)        TARGETS_TO_BUILD="Mips $TARGETS_TO_BUILD" ;;
+            MBlaze)      TARGETS_TO_BUILD="MBlaze $TARGETS_TO_BUILD" ;;
+            CellSPU|SPU) TARGETS_TO_BUILD="CellSPU $TARGETS_TO_BUILD" ;;
+            PIC16)       TARGETS_TO_BUILD="PIC16 $TARGETS_TO_BUILD" ;;
+            XCore)       TARGETS_TO_BUILD="XCore $TARGETS_TO_BUILD" ;;
+            MSP430)      TARGETS_TO_BUILD="MSP430 $TARGETS_TO_BUILD" ;;
+            s390x)       TARGETS_TO_BUILD="SystemZ $TARGETS_TO_BUILD" ;;
+            Blackfin)    TARGETS_TO_BUILD="Blackfin $TARGETS_TO_BUILD" ;;
+            *)       AC_MSG_ERROR([Can not set target to build]) ;;
+          esac ;;
         *) AC_MSG_ERROR([Unrecognized target $a_target]) ;;
       esac
   done
@@ -520,11 +552,12 @@ for a_target in $TARGETS_TO_BUILD; do
   fi
 done
 
-# Build the LLVM_TARGET and LLVM_ASM_PRINTER macro uses for
-# Targets.def, AsmPrinters.def, and AsmParsers.def.
+# Build the LLVM_TARGET and LLVM_... macros for Targets.def and the individual
+# target feature def files.
 LLVM_ENUM_TARGETS=""
 LLVM_ENUM_ASM_PRINTERS=""
 LLVM_ENUM_ASM_PARSERS=""
+LLVM_ENUM_DISASSEMBLERS=""
 for target_to_build in $TARGETS_TO_BUILD; do
   LLVM_ENUM_TARGETS="LLVM_TARGET($target_to_build) $LLVM_ENUM_TARGETS"
   if test -f ${srcdir}/lib/Target/${target_to_build}/AsmPrinter/Makefile ; then
@@ -533,10 +566,14 @@ for target_to_build in $TARGETS_TO_BUILD; do
   if test -f ${srcdir}/lib/Target/${target_to_build}/AsmParser/Makefile ; then
     LLVM_ENUM_ASM_PARSERS="LLVM_ASM_PARSER($target_to_build) $LLVM_ENUM_ASM_PARSERS";
   fi
+  if test -f ${srcdir}/lib/Target/${target_to_build}/Disassembler/Makefile ; then
+    LLVM_ENUM_DISASSEMBLERS="LLVM_DISASSEMBLER($target_to_build) $LLVM_ENUM_DISASSEMBLERS";
+  fi
 done
 AC_SUBST(LLVM_ENUM_TARGETS)
 AC_SUBST(LLVM_ENUM_ASM_PRINTERS)
 AC_SUBST(LLVM_ENUM_ASM_PARSERS)
+AC_SUBST(LLVM_ENUM_DISASSEMBLERS)
 
 dnl Prevent the CBackend from using printf("%a") for floating point so older
 dnl C compilers that cannot deal with the 0x0p+0 hex floating point format
@@ -594,6 +631,73 @@ if test -n "$LLVMGXX" && test -z "$LLVMGCC"; then
    AC_MSG_ERROR([Invalid llvm-gcc. Use --with-llvmgcc when --with-llvmgxx is used]);
 fi
 
+dnl Allow a specific Clang compiler to be used with this LLVM config.
+AC_ARG_WITH(clang,
+  AS_HELP_STRING([--with-clang],
+    [Specify location of clang compiler (default is --with-built-clang)]),
+    [],[with_clang=default])
+
+dnl Enable use of the built Clang.
+AC_ARG_WITH(built-clang,
+  AS_HELP_STRING([--with-built-clang],
+    [Use the compiled Clang as the LLVM compiler (default=check)]),
+    [],[with_built_clang=check])
+
+dnl Select the Clang compiler option.
+dnl
+dnl If --with-clang is given, always honor that; otherwise honor
+dnl --with-built-clang, or check if we have the clang sources.
+AC_MSG_CHECKING([clang compiler])
+WITH_CLANGPATH=""
+WITH_BUILT_CLANG=0
+if test "$with_clang" != "default"; then
+   WITH_CLANGPATH="$with_clang"
+   if ! test -x "$WITH_CLANGPATH"; then
+     AC_MSG_ERROR([invalid --with-clang, path does not specify an executable])
+   fi
+elif test "$with_built_clang" = "yes"; then
+   WITH_BUILT_CLANG=1
+elif test "$with_built_clang" = "no"; then
+   WITH_BUILT_CLANG=0
+else
+   if test "$with_built_clang" != "check"; then
+      AC_MSG_ERROR([invalid value for --with-built-clang.])
+   fi
+
+   if test -f ${srcdir}/tools/clang/README.txt; then
+     WITH_BUILT_CLANG=1
+   fi
+fi
+
+if ! test -z "$WITH_CLANGPATH"; then
+   AC_MSG_RESULT([$WITH_CLANGPATH])
+   WITH_CLANGXXPATH=`"$WITH_CLANGPATH" --print-prog-name=clang++`
+elif test "$WITH_BUILT_CLANG" = "1"; then
+   AC_MSG_RESULT([built])
+else
+   AC_MSG_RESULT([none])
+fi
+AC_SUBST(CLANGPATH,$WITH_CLANGPATH)
+AC_SUBST(CLANGXXPATH,$WITH_CLANGXXPATH)
+AC_SUBST(ENABLE_BUILT_CLANG,$WITH_BUILT_CLANG)
+
+dnl Override the option to use for optimized builds.
+AC_ARG_WITH(optimize-option,
+  AS_HELP_STRING([--with-optimize-option],
+                 [Select the compiler options to use for optimized builds]),,
+                 withval=default)
+AC_MSG_CHECKING([optimization flags])
+case "$withval" in
+  default)
+    case "$llvm_cv_os_type" in
+    MingW) optimize_option=-O3 ;;
+    *)     optimize_option=-O2 ;;
+    esac ;;
+  *) optimize_option="$withval" ;;
+esac
+AC_SUBST(OPTIMIZE_OPTION,$optimize_option)
+AC_MSG_RESULT([$optimize_option])
+
 dnl Specify extra build options
 AC_ARG_WITH(extra-options,
   AS_HELP_STRING([--with-extra-options],
@@ -637,6 +741,41 @@ case "$withval" in
   *) AC_MSG_ERROR([Invalid path for --with-ocaml-libdir. Provide full path]) ;;
 esac
 
+AC_ARG_WITH(c-include-dirs,
+  AS_HELP_STRING([--with-c-include-dirs],
+    [Colon separated list of directories clang will search for headers]),,
+    withval="")
+AC_DEFINE_UNQUOTED(C_INCLUDE_DIRS,"$withval",
+                   [Directories clang will search for headers])
+
+AC_ARG_WITH(cxx-include-root,
+  AS_HELP_STRING([--with-cxx-include-root],
+    [Directory with the libstdc++ headers.]),,
+    withval="")
+AC_DEFINE_UNQUOTED(CXX_INCLUDE_ROOT,"$withval",
+                   [Directory with the libstdc++ headers.])
+
+AC_ARG_WITH(cxx-include-arch,
+  AS_HELP_STRING([--with-cxx-include-arch],
+    [Architecture of the libstdc++ headers.]),,
+    withval="")
+AC_DEFINE_UNQUOTED(CXX_INCLUDE_ARCH,"$withval",
+                   [Arch the libstdc++ headers.])
+
+AC_ARG_WITH(cxx-include-32bit-dir,
+  AS_HELP_STRING([--with-cxx-include-32bit-dir],
+    [32 bit multilib dir.]),,
+    withval="")
+AC_DEFINE_UNQUOTED(CXX_INCLUDE_32BIT_DIR,"$withval",
+                   [32 bit multilib directory.])
+
+AC_ARG_WITH(cxx-include-64bit-dir,
+  AS_HELP_STRING([--with-cxx-include-64bit-dir],
+    [64 bit multilib directory.]),,
+    withval="")
+AC_DEFINE_UNQUOTED(CXX_INCLUDE_64BIT_DIR,"$withval",
+                   [64 bit multilib directory.])
+
 dnl Allow linking of LLVM with GPLv3 binutils code.
 AC_ARG_WITH(binutils-include,
   AS_HELP_STRING([--with-binutils-include],
@@ -657,13 +796,13 @@ fi
 
 dnl --enable-libffi : check whether the user wants to turn off libffi:
 AC_ARG_ENABLE(libffi,AS_HELP_STRING(
-  --enable-libffi,[Check for the presence of libffi (default is YES)]),,
-  enableval=yes)
-case "$enableval" in
-  yes) llvm_cv_enable_libffi="yes" ;;
-  no)  llvm_cv_enable_libffi="no"  ;;
-  *) AC_MSG_ERROR([Invalid setting for --enable-libffi. Use "yes" or "no"]) ;;
-esac
+  --enable-libffi,[Check for the presence of libffi (default is NO)]),
+  [case "$enableval" in
+    yes) llvm_cv_enable_libffi="yes" ;;
+    no)  llvm_cv_enable_libffi="no"  ;;
+    *) AC_MSG_ERROR([Invalid setting for --enable-libffi. Use "yes" or "no"]) ;;
+  esac],
+  llvm_cv_enable_libffi=no)
 
 dnl Only Windows needs dynamic libCompilerDriver to support plugins.
 if test "$llvm_cv_os_type" = "Win32" ; then
@@ -719,6 +858,7 @@ AC_PATH_PROG(GREP, [grep], [grep])
 AC_PATH_PROG(MKDIR,[mkdir],[mkdir])
 AC_PATH_PROG(MV,   [mv],   [mv])
 AC_PROG_RANLIB
+AC_CHECK_TOOL(AR, ar, false)
 AC_PATH_PROG(RM,   [rm],   [rm])
 AC_PATH_PROG(SED,  [sed],  [sed])
 AC_PATH_PROG(TAR,  [tar],  [gtar])
@@ -849,13 +989,6 @@ dnl before the AC_PROG_LIBTOOL check in order to enable dlopening libraries with
 dnl libtool).
 AC_LIBTOOL_DLOPEN
 AC_LIB_LTDL
-AC_PROG_LIBTOOL
-
-if test "$lt_cv_dlopen_self" = "yes" ; then
-  AC_DEFINE([CAN_DLOPEN_SELF],[1],
-              [Define if dlopen(0) will open the symbols of the program])
-fi
-
 
 if test "$WITH_LLVMGCCDIR" = "default" ; then
   LLVMGCC="llvm-gcc${EXEEXT}"
@@ -882,6 +1015,29 @@ else
   AC_SUBST(LLVMGXXCOMMAND,$LLVMGXXCOMMAND)
 fi
 
+dnl Select the LLVM capable compiler to use, we default to using llvm-gcc if
+dnl found, otherwise clang if available.
+AC_ARG_WITH(llvmcc,
+  AS_HELP_STRING([--with-llvmcc=<name>],
+    [Choose the LLVM capable compiler to use (llvm-gcc, clang, or none; default=check)]),
+    [],[with_llvmcc=check])
+AC_MSG_CHECKING([LLVM capable compiler])
+if test "$with_llvmcc" != "check"; then
+   if (test "$with_llvmcc" != "llvm-gcc" &&
+       test "$with_llvmcc" != "clang" &&
+       test "$with_llvmcc" != "none"); then
+      AC_MSG_ERROR([invalid value for --with-llvmcc, expected 'llvm-gcc', 'clang', or 'none'.])
+   fi
+   WITH_LLVMCC="$with_llvmcc"
+elif test -n "$LLVMGCC"; then
+   WITH_LLVMCC=llvm-gcc
+elif test -n "$WITH_CLANGPATH" || test "$WITH_BUILT_CLANG" -ne "0"; then
+   WITH_LLVMCC=clang
+else
+   WITH_LLVMCC=none
+fi
+AC_MSG_RESULT([$WITH_LLVMCC])
+AC_SUBST(LLVMCC_OPTION,$WITH_LLVMCC)
 
 AC_MSG_CHECKING([tool compatibility])
 
@@ -930,6 +1086,12 @@ fi
 dnl Tool compatibility is okay if we make it here.
 AC_MSG_RESULT([ok])
 
+dnl Check optional compiler flags.
+AC_MSG_CHECKING([optional compiler flags])
+CXX_FLAG_CHECK(NO_VARIADIC_MACROS, [-Wno-variadic-macros])
+CXX_FLAG_CHECK(NO_MISSING_FIELD_INITIALIZERS, [-Wno-missing-field-initializers])
+AC_MSG_RESULT([$NO_VARIADIC_MACROS $NO_MISSING_FIELD_INITIALIZERS])
+
 dnl===-----------------------------------------------------------------------===
 dnl===
 dnl=== SECTION 5: Check for libraries
@@ -951,7 +1113,7 @@ dnl libffi is optional; used to call external functions from the interpreter
 if test "$llvm_cv_enable_libffi" = "yes" ; then
   AC_SEARCH_LIBS(ffi_call,ffi,AC_DEFINE([HAVE_FFI_CALL],[1],
                  [Define if libffi is available on this platform.]),
-                 AC_MSG_WARN([libffi not found - disabling external calls from interpreter]))
+                 AC_MSG_ERROR([libffi not found - configure without --enable-libffi to compile without it]))
 fi
 
 dnl mallinfo is optional; the code can compile (minus features) without it
@@ -961,7 +1123,7 @@ AC_SEARCH_LIBS(mallinfo,malloc,AC_DEFINE([HAVE_MALLINFO],[1],
 dnl pthread locking functions are optional - but llvm will not be thread-safe
 dnl without locks.
 if test "$ENABLE_THREADS" -eq 1 ; then
-  AC_CHECK_LIB(pthread,pthread_mutex_init)
+  AC_CHECK_LIB(pthread, pthread_mutex_init)
   AC_SEARCH_LIBS(pthread_mutex_lock,pthread,
                  AC_DEFINE([HAVE_PTHREAD_MUTEX_LOCK],[1],
                            [Have pthread_mutex_lock]))
@@ -1000,31 +1162,30 @@ AC_ARG_WITH(oprofile,
       AC_SUBST(USE_OPROFILE, [1])
       case "$withval" in
         /usr|yes) llvm_cv_oppath=/usr/lib/oprofile ;;
+        no) llvm_cv_oppath=
+            AC_SUBST(USE_OPROFILE, [0]) ;;
         *) llvm_cv_oppath="${withval}/lib/oprofile"
            CPPFLAGS="-I${withval}/include";;
       esac
-      LIBS="$LIBS -L${llvm_cv_oppath} -Wl,-rpath,${llvm_cv_oppath}"
-      AC_SEARCH_LIBS(op_open_agent, opagent, [], [
-        echo "Error! You need to have libopagent around."
-        exit -1
-      ])
-      AC_CHECK_HEADER([opagent.h], [], [
-        echo "Error! You need to have opagent.h around."
-        exit -1
-      ])
+      if test -n "$llvm_cv_oppath" ; then
+        LIBS="$LIBS -L${llvm_cv_oppath} -Wl,-rpath,${llvm_cv_oppath}"
+        dnl Work around http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=537744:
+        dnl libbfd is not included properly in libopagent in some Debian
+        dnl versions.  If libbfd isn't found at all, we assume opagent works
+        dnl anyway.
+        AC_SEARCH_LIBS(bfd_init, bfd, [], [])
+        AC_SEARCH_LIBS(op_open_agent, opagent, [], [
+          echo "Error! You need to have libopagent around."
+          exit -1
+        ])
+        AC_CHECK_HEADER([opagent.h], [], [
+          echo "Error! You need to have opagent.h around."
+          exit -1
+          ])
+      fi
     ],
     [
-      llvm_cv_old_LIBS="$LIBS"
-      LIBS="$LIBS -L/usr/lib/oprofile -Wl,-rpath,/usr/lib/oprofile"
-      dnl If either the library or header aren't present, omit oprofile support.
-      AC_SEARCH_LIBS(op_open_agent, opagent,
-                     [AC_SUBST(USE_OPROFILE, [1])],
-                     [LIBS="$llvm_cv_old_LIBS"
-                      AC_SUBST(USE_OPROFILE, [0])])
-      AC_CHECK_HEADER([opagent.h], [], [
-        LIBS="$llvm_cv_old_LIBS"
-        AC_SUBST(USE_OPROFILE, [0])
-      ])
+      AC_SUBST(USE_OPROFILE, [0])
     ])
 AC_DEFINE_UNQUOTED([USE_OPROFILE],$USE_OPROFILE,
                    [Define if we have the oprofile JIT-support library])
@@ -1073,7 +1234,7 @@ dnl===-----------------------------------------------------------------------===
 AC_HUGE_VAL_CHECK
 AC_TYPE_PID_T
 AC_TYPE_SIZE_T
-AC_TYPE_SIGNAL
+AC_DEFINE_UNQUOTED([RETSIGTYPE],[void],[Define as the return type of signal handlers (`int' or `void').])
 AC_STRUCT_TM
 AC_CHECK_TYPES([int64_t],,AC_MSG_ERROR([Type int64_t required but not found]))
 AC_CHECK_TYPES([uint64_t],,
@@ -1091,18 +1252,14 @@ AC_CHECK_FUNCS([powf fmodf strtof round ])
 AC_CHECK_FUNCS([getpagesize getrusage getrlimit setrlimit gettimeofday ])
 AC_CHECK_FUNCS([isatty mkdtemp mkstemp ])
 AC_CHECK_FUNCS([mktemp realpath sbrk setrlimit strdup ])
-AC_CHECK_FUNCS([strerror strerror_r strerror_s ])
+AC_CHECK_FUNCS([strerror strerror_r strerror_s setenv ])
 AC_CHECK_FUNCS([strtoll strtoq sysconf malloc_zone_statistics ])
 AC_CHECK_FUNCS([setjmp longjmp sigsetjmp siglongjmp])
 AC_C_PRINTF_A
-AC_FUNC_ALLOCA
 AC_FUNC_RAND48
 
 dnl Check for variations in the Standard C++ library and STL. These macros are
 dnl provided by LLVM in the autoconf/m4 directory.
-AC_CXX_HAVE_STD_ITERATOR
-AC_CXX_HAVE_BI_ITERATOR
-AC_CXX_HAVE_FWD_ITERATOR
 AC_FUNC_ISNAN
 AC_FUNC_ISINF
 
@@ -1150,6 +1307,16 @@ dnl=== SECTION 9: Additional checks, variables, etc.
 dnl===
 dnl===-----------------------------------------------------------------------===
 
+dnl Handle 32-bit linux systems running a 64-bit kernel.
+dnl This has to come after section 4 because it invokes the compiler.
+if test "$llvm_cv_os_type" = "Linux" -a "$llvm_cv_target_arch" = "x86_64" ; then
+  AC_IS_LINUX_MIXED
+  if test "$llvm_cv_linux_mixed" = "yes"; then
+    llvm_cv_target_arch="x86"
+    ARCH="x86"
+  fi
+fi
+
 dnl Check, whether __dso_handle is present
 AC_CHECK_FUNCS([__dso_handle])
 
@@ -1175,12 +1342,6 @@ if test "$llvm_cv_llvmgcc_sanity" = "yes" ; then
   AC_SUBST(LLVMCC1PLUS,$llvmcc1pluspath)
   llvmgccdir=`echo "$llvmcc1path" | sed 's,/libexec/.*,,'`
   AC_SUBST(LLVMGCCDIR,$llvmgccdir)
-  llvmgcclibexec=`echo "$llvmcc1path" | sed 's,/cc1,,'`
-  AC_SUBST(LLVMGCCLIBEXEC,$llvmgcclibexec)
-  llvmgccversion=[`"$LLVMGCC" -dumpversion 2>&1 | sed 's/^\([0-9.]*\).*/\1/'`]
-  llvmgccmajvers=[`echo $llvmgccversion | sed 's/^\([0-9]\).*/\1/'`]
-  AC_SUBST(LLVMGCC_VERSION,$llvmgccversion)
-  AC_SUBST(LLVMGCC_MAJVERS,$llvmgccmajvers)
   llvmgcclangs=[`"$LLVMGCC" -v --help 2>&1 | grep '^Configured with:' | sed 's/^.*--enable-languages=\([^ ]*\).*/\1/'`]
   AC_SUBST(LLVMGCC_LANGS,$llvmgcclangs)
   AC_MSG_RESULT([ok])
@@ -1189,6 +1350,10 @@ fi
 dnl Propagate the shared library extension that the libltdl checks did to
 dnl the Makefiles so we can use it there too
 AC_SUBST(SHLIBEXT,$libltdl_cv_shlibext)
+
+dnl Propagate the run-time library path variable that the libltdl
+dnl checks found to the Makefiles so we can use it there too
+AC_SUBST(SHLIBPATH_VAR,$libltdl_cv_shlibpath_var)
 
 # Translate the various configuration directories and other basic
 # information into substitutions that will end up in Makefile.config.in
@@ -1200,7 +1365,7 @@ eval LLVM_PREFIX="${prefix}";
 eval LLVM_BINDIR="${prefix}/bin";
 eval LLVM_LIBDIR="${prefix}/lib";
 eval LLVM_DATADIR="${prefix}/share/llvm";
-eval LLVM_DOCSDIR="${prefix}/docs/llvm";
+eval LLVM_DOCSDIR="${prefix}/share/doc/llvm";
 eval LLVM_ETCDIR="${prefix}/etc/llvm";
 eval LLVM_INCLUDEDIR="${prefix}/include";
 eval LLVM_INFODIR="${prefix}/info";
@@ -1326,8 +1491,8 @@ AC_CONFIG_HEADERS([include/llvm/Config/config.h])
 AC_CONFIG_FILES([include/llvm/Config/Targets.def])
 AC_CONFIG_FILES([include/llvm/Config/AsmPrinters.def])
 AC_CONFIG_FILES([include/llvm/Config/AsmParsers.def])
-AC_CONFIG_HEADERS([include/llvm/Support/DataTypes.h])
-AC_CONFIG_HEADERS([include/llvm/ADT/iterator.h])
+AC_CONFIG_FILES([include/llvm/Config/Disassemblers.def])
+AC_CONFIG_HEADERS([include/llvm/System/DataTypes.h])
 
 dnl Configure the makefile's configuration data
 AC_CONFIG_FILES([Makefile.config])

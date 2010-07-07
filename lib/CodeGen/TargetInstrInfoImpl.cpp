@@ -13,10 +13,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Target/TargetInstrInfo.h"
+#include "llvm/Target/TargetMachine.h"
+#include "llvm/Target/TargetRegisterInfo.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
+#include "llvm/CodeGen/MachineMemOperand.h"
+#include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/PseudoSourceValue.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
@@ -131,33 +135,31 @@ void TargetInstrInfoImpl::reMaterialize(MachineBasicBlock &MBB,
                                         MachineBasicBlock::iterator I,
                                         unsigned DestReg,
                                         unsigned SubIdx,
-                                        const MachineInstr *Orig) const {
+                                        const MachineInstr *Orig,
+                                        const TargetRegisterInfo *TRI) const {
   MachineInstr *MI = MBB.getParent()->CloneMachineInstr(Orig);
   MachineOperand &MO = MI->getOperand(0);
-  MO.setReg(DestReg);
-  MO.setSubReg(SubIdx);
+  if (TargetRegisterInfo::isVirtualRegister(DestReg)) {
+    MO.setReg(DestReg);
+    MO.setSubReg(SubIdx);
+  } else if (SubIdx) {
+    MO.setReg(TRI->getSubReg(DestReg, SubIdx));
+  } else {
+    MO.setReg(DestReg);
+  }
   MBB.insert(I, MI);
 }
 
-bool TargetInstrInfoImpl::isDeadInstruction(const MachineInstr *MI) const {
-  const TargetInstrDesc &TID = MI->getDesc();
-  if (TID.mayLoad() || TID.mayStore() || TID.isCall() || TID.isTerminator() ||
-      TID.isCall() || TID.isBarrier() || TID.isReturn() ||
-      TID.hasUnmodeledSideEffects())
-    return false;
-  for (unsigned i = 0, e = MI->getNumOperands(); i != e; ++i) {
-    const MachineOperand &MO = MI->getOperand(i);
-    if (!MO.isReg() || !MO.getReg())
-      continue;
-    if (MO.isDef() && !MO.isDead())
-      return false;
-    if (MO.isUse() && MO.isKill())
-      // FIXME: We can't remove kill markers or else the scavenger will assert.
-      // An alternative is to add a ADD pseudo instruction to replace kill
-      // markers.
-      return false;
-  }
-  return true;
+bool TargetInstrInfoImpl::produceSameValue(const MachineInstr *MI0,
+                                           const MachineInstr *MI1) const {
+  return MI0->isIdenticalTo(MI1, MachineInstr::IgnoreVRegDefs);
+}
+
+MachineInstr *TargetInstrInfoImpl::duplicate(MachineInstr *Orig,
+                                             MachineFunction &MF) const {
+  assert(!Orig->getDesc().isNotDuplicable() &&
+         "Instruction cannot be duplicated");
+  return MF.CloneMachineInstr(Orig);
 }
 
 unsigned
@@ -203,11 +205,11 @@ TargetInstrInfo::foldMemoryOperand(MachineFunction &MF,
          "Folded a use to a non-load!");
   const MachineFrameInfo &MFI = *MF.getFrameInfo();
   assert(MFI.getObjectOffset(FrameIndex) != -1);
-  MachineMemOperand MMO(PseudoSourceValue::getFixedStack(FrameIndex),
-                        Flags,
-                        MFI.getObjectOffset(FrameIndex),
-                        MFI.getObjectSize(FrameIndex),
-                        MFI.getObjectAlignment(FrameIndex));
+  MachineMemOperand *MMO =
+    MF.getMachineMemOperand(PseudoSourceValue::getFixedStack(FrameIndex),
+                            Flags, /*Offset=*/0,
+                            MFI.getObjectSize(FrameIndex),
+                            MFI.getObjectAlignment(FrameIndex));
   NewMI->addMemOperand(MF, MMO);
 
   return NewMI;
@@ -232,9 +234,93 @@ TargetInstrInfo::foldMemoryOperand(MachineFunction &MF,
   if (!NewMI) return 0;
 
   // Copy the memoperands from the load to the folded instruction.
-  for (std::list<MachineMemOperand>::iterator I = LoadMI->memoperands_begin(),
-       E = LoadMI->memoperands_end(); I != E; ++I)
-    NewMI->addMemOperand(MF, *I);
+  NewMI->setMemRefs(LoadMI->memoperands_begin(),
+                    LoadMI->memoperands_end());
 
   return NewMI;
+}
+
+bool
+TargetInstrInfo::isReallyTriviallyReMaterializableGeneric(const MachineInstr *
+                                                            MI,
+                                                          AliasAnalysis *
+                                                            AA) const {
+  const MachineFunction &MF = *MI->getParent()->getParent();
+  const MachineRegisterInfo &MRI = MF.getRegInfo();
+  const TargetMachine &TM = MF.getTarget();
+  const TargetInstrInfo &TII = *TM.getInstrInfo();
+  const TargetRegisterInfo &TRI = *TM.getRegisterInfo();
+
+  // A load from a fixed stack slot can be rematerialized. This may be
+  // redundant with subsequent checks, but it's target-independent,
+  // simple, and a common case.
+  int FrameIdx = 0;
+  if (TII.isLoadFromStackSlot(MI, FrameIdx) &&
+      MF.getFrameInfo()->isImmutableObjectIndex(FrameIdx))
+    return true;
+
+  const TargetInstrDesc &TID = MI->getDesc();
+
+  // Avoid instructions obviously unsafe for remat.
+  if (TID.hasUnmodeledSideEffects() || TID.isNotDuplicable() ||
+      TID.mayStore())
+    return false;
+
+  // Avoid instructions which load from potentially varying memory.
+  if (TID.mayLoad() && !MI->isInvariantLoad(AA))
+    return false;
+
+  // If any of the registers accessed are non-constant, conservatively assume
+  // the instruction is not rematerializable.
+  for (unsigned i = 0, e = MI->getNumOperands(); i != e; ++i) {
+    const MachineOperand &MO = MI->getOperand(i);
+    if (!MO.isReg()) continue;
+    unsigned Reg = MO.getReg();
+    if (Reg == 0)
+      continue;
+
+    // Check for a well-behaved physical register.
+    if (TargetRegisterInfo::isPhysicalRegister(Reg)) {
+      if (MO.isUse()) {
+        // If the physreg has no defs anywhere, it's just an ambient register
+        // and we can freely move its uses. Alternatively, if it's allocatable,
+        // it could get allocated to something with a def during allocation.
+        if (!MRI.def_empty(Reg))
+          return false;
+        BitVector AllocatableRegs = TRI.getAllocatableSet(MF, 0);
+        if (AllocatableRegs.test(Reg))
+          return false;
+        // Check for a def among the register's aliases too.
+        for (const unsigned *Alias = TRI.getAliasSet(Reg); *Alias; ++Alias) {
+          unsigned AliasReg = *Alias;
+          if (!MRI.def_empty(AliasReg))
+            return false;
+          if (AllocatableRegs.test(AliasReg))
+            return false;
+        }
+      } else {
+        // A physreg def. We can't remat it.
+        return false;
+      }
+      continue;
+    }
+
+    // Only allow one virtual-register def, and that in the first operand.
+    if (MO.isDef() != (i == 0))
+      return false;
+
+    // For the def, it should be the only def of that register.
+    if (MO.isDef() && (llvm::next(MRI.def_begin(Reg)) != MRI.def_end() ||
+                       MRI.isLiveIn(Reg)))
+      return false;
+
+    // Don't allow any virtual-register uses. Rematting an instruction with
+    // virtual register uses would length the live ranges of the uses, which
+    // is not necessarily a good idea, certainly not "trivial".
+    if (MO.isUse())
+      return false;
+  }
+
+  // Everything checked out.
+  return true;
 }
