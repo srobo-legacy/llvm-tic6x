@@ -416,10 +416,10 @@ TMS320C64XLowering::LowerCall(SDValue Chain, SDValue Callee, CallingConv::ID
 	// into; apparently we can put the memory location ones into one big
 	// chain, because they can happen independantly
 
+	SDValue in_flag;
 	if (!stack_args.empty()) {
 		Chain = DAG.getNode(ISD::TokenFactor, dl, MVT::Other,
 					&stack_args[0], stack_args.size());
-		in_flag = Chain.getValue(1);
 	}
 
 	// This chains loading to specified registers sequentially
