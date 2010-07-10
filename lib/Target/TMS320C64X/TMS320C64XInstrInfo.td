@@ -330,7 +330,7 @@ def brcond_p : nopred_inst<(outs), (ins brtarget:$block), "b\t.S1\t$block",
 	let Pattern = sched_pattern;
 }
 
-def bindirect_2 : inst<(outs), (ins GPRegs:$reg), "b\t.S2X\t$reg",
+def bindirect_2 : inst<(outs), (ins GPRegs:$reg), "bnop\t.S2X\t$reg,\t5",
 				[(brind GPRegs:$reg)], 1, unit_s> {
 	let Pattern = sched_pattern;
 }
@@ -362,7 +362,8 @@ def callp_e_p : inst<(outs), (ins calltarget:$dst, variable_ops),
 }
 
 def call_indirect_2 : inst<(outs), (ins GPRegs:$reg, variable_ops),
-				"b\t.S2X\t$reg", [(TMS320C64Xcall GPRegs:$reg)],
+				"bnop\t.S2X\t$reg,\t5",
+				[(TMS320C64Xcall GPRegs:$reg)],
 				1, unit_s> {
 	let Pattern = sched_pattern;
 	let Uses = [B3];
