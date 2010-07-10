@@ -728,6 +728,10 @@ TMS320C64XLowering::LowerVASTART(SDValue op, SelectionDAG &DAG)
 		stackgap = (num_normal_params - 10) * 4;
 	}
 
+	// That gives us the offset of the last fixed stack argument; now
+	// increment that to point at the first var argument
+	stackgap += 4;
+
 	SDValue Chain = DAG.getNode(ISD::ADD, op.getDebugLoc(), MVT::i32,
 				DAG.getRegister(TMS320C64X::A15, MVT::i32),
 				DAG.getConstant(stackgap, MVT::i32));
