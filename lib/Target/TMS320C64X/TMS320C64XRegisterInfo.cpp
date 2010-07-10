@@ -226,46 +226,11 @@ TMS320C64XRegisterInfo::emitPrologue(MachineFunction &MF) const
 	frame_size += 7;
 	frame_size &= ~7;
 
-	// Emit setup instructions
-	// Store return pointer - we could use the correct addressing mode
-	// to decrement SP for us, but I don't know the infrastructure well
-	// enough to do that yet
-	addDefaultPred(BuildMI(MBB, MBBI, dl,
-		TII.get(TMS320C64X::word_store_p_addr))
-		.addReg(TMS320C64X::B15).addImm(0)
-		.addReg(TMS320C64X::B3, RegState::Kill));
-
-	// Store FP
-	addDefaultPred(BuildMI(MBB, MBBI, dl,
-		TII.get(TMS320C64X::word_store_p_addr))
-		.addReg(TMS320C64X::B15).addImm(-4).addReg(TMS320C64X::A15));
-
-	// Setup our own FP using the current SP
-	addDefaultPred(BuildMI(MBB, MBBI, dl,
-		TII.get(TMS320C64X::mv1))
-		.addReg(TMS320C64X::A15).addReg(TMS320C64X::B15));
-
-	// On the assumption the stack size will be sizeable, load
-	// constant into volatile register.  XXX - doesn't appear to be a way
-	// of generating a constant node from this position
-	if (frame_size < 0x8000) {
-		addDefaultPred(BuildMI(MBB, MBBI, dl,TII.get(TMS320C64X::mvk_p))
-			.addReg(TMS320C64X::A0, RegState::Define)
-			.addImm(frame_size));
-	} else {
-		addDefaultPred(BuildMI(MBB, MBBI, dl,
-			TII.get(TMS320C64X::mvkl_p))
-			.addReg(TMS320C64X::A0, RegState::Define)
-			.addImm(frame_size));
-		addDefaultPred(BuildMI(MBB, MBBI, dl,
-			TII.get(TMS320C64X::mvkh_p))
-			.addReg(TMS320C64X::A0)
-			.addImm(frame_size).addReg(TMS320C64X::A0));
-	}
-
-	addDefaultPred(BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::sub_l2x),
-		TMS320C64X::B15).addReg(TMS320C64X::B15)
-		.addReg(TMS320C64X::A0, RegState::Kill));
+	// Emit setup instructions - unfortunately because they have to be
+	// done in parallel now, this can't currently be modeled through llvm,
+	// so instead we hack this in at the assembly printing stage.
+	addDefaultPred(BuildMI(MBB, MBBI, dl, TII.get(TMS320C64X::prolog))
+		.addImm(frame_size));
 }
 
 void
@@ -282,24 +247,9 @@ TMS320C64XRegisterInfo::emitEpilogue(MachineFunction &MF,
 	if (MBBI->getOpcode() != TMS320C64X::ret)
 		llvm_unreachable("Can't insert epilogue before non-ret insn");
 
-	// To finish, nuke stack frame, restore FP, ret addr
-
-	addDefaultPred(BuildMI(MBB, MBBI, DL,
-		TII.get(TMS320C64X::mv2))
-		.addReg(TMS320C64X::B15).addReg(TMS320C64X::A15));
-	addDefaultPred(BuildMI(MBB, MBBI, DL,
-		TII.get(TMS320C64X::word_load_p_addr))
-		.addReg(TMS320C64X::A15, RegState::Define)
-		.addReg(TMS320C64X::B15)
-		.addImm(-4));
-	addDefaultPred(BuildMI(MBB, MBBI, DL,
-		TII.get(TMS320C64X::word_load_p_addr))
-		.addReg(TMS320C64X::B3, RegState::Define)
-		.addReg(TMS320C64X::B15).addImm(0));
-
-	// Add no-op to give B3 time to load
-	addDefaultPred(BuildMI(MBB, MBBI, DL, TII.get(TMS320C64X::noop))
-		.addImm(4));
+	// For current situation, epilog has to be hard coded to allow
+	// parallel instructions to work, hence this unpleasent hack.
+	addDefaultPred(BuildMI(MBB, MBBI, DL, TII.get(TMS320C64X::epilog)));
 }
 
 int
