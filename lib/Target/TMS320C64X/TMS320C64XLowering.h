@@ -50,7 +50,6 @@ namespace TMSISD {
 		CMPLTU,
 		RET_FLAG,
 		SELECT,
-		VASTART,
 		WRAPPER
 	};
 }

@@ -58,7 +58,6 @@ def cmpgt_node : SDNode<"TMSISD::CMPGT", SDTIntBinOp, [SDNPOutFlag]>;
 def cmpgtu_node : SDNode<"TMSISD::CMPGTU", SDTIntBinOp, [SDNPOutFlag]>;
 def cmplt_node : SDNode<"TMSISD::CMPLT", SDTIntBinOp, [SDNPOutFlag]>;
 def cmpltu_node : SDNode<"TMSISD::CMPLTU", SDTIntBinOp, [SDNPOutFlag]>;
-def tms_vastart: SDNode<"TMSISD::VASTART", SDTIntBinOp, [SDNPOutFlag]>;
 def tmsselect : SDNode<"TMSISD::SELECT", SDT_tmsselect>;
 def Wrapper : SDNode<"TMSISD::WRAPPER", SDT_Wrapper>;
 
@@ -146,12 +145,6 @@ def sub_p_rr : pseudo_rr<"sub", ".L1", unit_l, sub, 0>;
 def sub_p_ri : pseudo_ri<"sub", ".D1", (i32 uconst5:$imm), unit_d, sub, 0>;
 
 // Prolog asm requires some special cases:
-
-// For varargs, we have to calculate a pointer onto the stack argument area
-// using the stack pointer; thats best achieved with just "add 4, B15, dst",
-// however that requires the use of the Xpath, hence this special case insn
-def vastart_add : pseudo_ri<"add", ".D1X", (i32 uconst5:$imm), unit_l,
-							tms_vastart, 1>;
 
 // The actual prolog itself now requires some insns to occur in parallel,
 // which I haven't yet modelled for tablegen. So instead we have this fake
