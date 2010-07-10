@@ -198,7 +198,7 @@ TMS320C64XLowering::LowerFormalArguments(SDValue Chain,
 	MachineRegisterInfo &RegInfo = MF.getRegInfo();
 
 	arg_idx = 0;
-	stack_offset = 0;
+	stack_offset = 4; // Arguments start 4 bytes before the FP
 
 	CCState CCInfo(CallConv, isVarArg, getTargetMachine(), ArgLocs,
 			*DAG.getContext());
