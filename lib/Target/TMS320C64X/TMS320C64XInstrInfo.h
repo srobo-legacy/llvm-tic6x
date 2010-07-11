@@ -98,6 +98,12 @@ public:
 	virtual bool isMoveInstr(const MachineInstr& MI,
 				unsigned& SrcReg, unsigned& DstReg,
 				unsigned& SrcSubIdx, unsigned& DstSubIdx) const;
+	virtual unsigned isLoadFromStackSlot(const MachineInstr *MI,
+						int &FrameIndex) const;
+	virtual unsigned isStoreToStackSlot(const MachineInstr *MI,
+						int &FrameIndex) const;
+	virtual bool isPredicated(const MachineInstr *MI) const;
+
 };
 
 inline const MachineInstrBuilder &addDefaultPred(const MachineInstrBuilder &MIB)

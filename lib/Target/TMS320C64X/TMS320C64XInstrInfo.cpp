@@ -320,3 +320,77 @@ TMS320C64XInstrInfo::isMoveInstr(const MachineInstr &MI, unsigned &src_reg,
 
 	return false;
 }
+
+unsigned
+TMS320C64XInstrInfo::isLoadFromStackSlot(const MachineInstr *MI,
+						int &FrameIndex) const
+{
+	unsigned opcode;
+
+	opcode = MI->getDesc().getOpcode();
+
+	if (opcode == TMS320C64X::word_load_p_idx ||
+			opcode == TMS320C64X::hword_load_p_idx ||
+			opcode == TMS320C64X::uhword_load_p_idx ||
+			opcode == TMS320C64X::byte_load_p_idx ||
+			opcode == TMS320C64X::ubyte_load_p_idx) {
+		if (MI->getOperand(0).getReg() == TMS320C64X::B15) {
+			MachineOperand op = MI->getOperand(1);
+			if (op.isFI()) {
+				FrameIndex = op.getIndex();
+				return true;
+			} else {
+				// XXX - are there any circumstances where
+				// we'll be handed an insn after frame index
+				// elimination? I find this unlikely, but just
+				// in case
+				llvm_unreachable("Found load-from-stack sans "
+						"frame index operand");
+			}
+		}
+	}
+
+	return false;
+}
+
+unsigned
+TMS320C64XInstrInfo::isStoreToStackSlot(const MachineInstr *MI,
+						int &FrameIndex) const
+{
+	unsigned opcode;
+
+	opcode = MI->getDesc().getOpcode();
+
+	if (opcode == TMS320C64X::word_store_p_idxaddr ||
+			opcode == TMS320C64X::hword_store_p_idxaddr ||
+			opcode == TMS320C64X::byte_store_p_idxaddr) {
+		if (MI->getOperand(1).getReg() == TMS320C64X::B15) {
+			MachineOperand op = MI->getOperand(2);
+			if (op.isFI()) {
+				FrameIndex = op.getIndex();
+				return true;
+			} else {
+				llvm_unreachable("Found store-to-stack sans "
+						"frame index operand");
+			}
+		}
+	}
+
+	return false;
+}
+
+bool
+TMS320C64XInstrInfo::isPredicated(const MachineInstr *MI) const
+{
+	int pred_idx, pred_val;
+
+	pred_idx = MI->findFirstPredOperandIdx();
+	if (pred_idx == -1)
+		return false;
+
+	pred_val = MI->getOperand(pred_idx).getImm();
+	if (pred_val == -1)
+		return false;
+
+	return true;
+}
