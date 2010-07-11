@@ -237,6 +237,9 @@ TMS320C64XInstrInfo::InsertBranch(MachineBasicBlock &MBB,
 		// analyze branch
 		BuildMI(&MBB, dl, get(TMS320C64X::brcond_p)).addMBB(TBB)
 			.addImm(Cond[0].getImm()).addReg(Cond[1].getReg());
+		if (FBB)
+			addDefaultPred(BuildMI(&MBB, dl,
+					get(TMS320C64X::brcond_p)).addMBB(FBB));
 	}
 
 	return 1;
