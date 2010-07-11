@@ -92,6 +92,8 @@ public:
 				const SmallVectorImpl<MachineOperand> &Cond)
 				const;
 	virtual unsigned RemoveBranch(MachineBasicBlock &MBB) const;
+	virtual bool ReverseBranchCondition(SmallVectorImpl<MachineOperand>
+							&Cond) const;
 
 	virtual bool isMoveInstr(const MachineInstr& MI,
 				unsigned& SrcReg, unsigned& DstReg,

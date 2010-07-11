@@ -272,6 +272,18 @@ TMS320C64XInstrInfo::RemoveBranch(MachineBasicBlock &MBB) const
 }
 
 bool
+TMS320C64XInstrInfo::ReverseBranchCondition(
+				SmallVectorImpl<MachineOperand> &Cond) const
+{
+	int val;
+
+	val = Cond[0].getImm();
+	val = (val) ? 0 : 1;
+	Cond[0] = MachineOperand::CreateImm(val);
+	return false;
+}
+
+bool
 TMS320C64XInstrInfo::isMoveInstr(const MachineInstr &MI, unsigned &src_reg,
 				unsigned &dst_reg, unsigned &src_sub_idx,
 				unsigned &dst_sub_idx) const
