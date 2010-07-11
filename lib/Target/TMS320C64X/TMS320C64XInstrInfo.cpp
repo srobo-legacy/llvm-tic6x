@@ -184,18 +184,18 @@ TMS320C64XInstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
 			// next, or it's a conditional before unconditional.
 
 			if (TBB != NULL) {
-				// True condition branches to operand of
-				// this conditional branch; false condition is
-				// where the following unconditional goes.
+				// False: the trailing unconditional branch
+				// True: the conditional branch if taken
 				FBB = TBB;
 				TBB = I->getOperand(0).getMBB();
 			} else {
 				TBB = I->getOperand(0).getMBB();
 			}
 
-			// Grab the condition
+			// Store the conditions of the conditional jump
 			Cond.push_back(I->getOperand(1)); // Zero/NZ
 			Cond.push_back(I->getOperand(2)); // Reg
+
 			return false;
 		}
 
@@ -213,7 +213,7 @@ TMS320C64XInstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
 		return true; // Something we don't understand at all
 	}
 
-	return false;
+	return true;
 }
 
 unsigned
