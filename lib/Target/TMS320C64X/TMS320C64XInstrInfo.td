@@ -58,7 +58,6 @@ def cmpgt_node : SDNode<"TMSISD::CMPGT", SDTIntBinOp, [SDNPOutFlag]>;
 def cmpgtu_node : SDNode<"TMSISD::CMPGTU", SDTIntBinOp, [SDNPOutFlag]>;
 def cmplt_node : SDNode<"TMSISD::CMPLT", SDTIntBinOp, [SDNPOutFlag]>;
 def cmpltu_node : SDNode<"TMSISD::CMPLTU", SDTIntBinOp, [SDNPOutFlag]>;
-def tms_vastart: SDNode<"TMSISD::VASTART", SDTIntBinOp, [SDNPOutFlag]>;
 def tmsselect : SDNode<"TMSISD::SELECT", SDT_tmsselect>;
 def Wrapper : SDNode<"TMSISD::WRAPPER", SDT_Wrapper>;
 
@@ -147,19 +146,18 @@ def sub_p_ri : pseudo_ri<"sub", ".D1", (i32 uconst5:$imm), unit_d, sub, 0>;
 
 // Prolog asm requires some special cases:
 
-// This specific one is used for subtracting the size of the stack from the
-// stack pointer, when it's contained in a register, which will have been
-// allocated from side A; hence a need for the cross path and executing on side
-// two.
-def sub_l2x : inst<(outs GPRegs:$dst), (ins GPRegs:$src1, GPRegs:$src2),
-			"sub\t.L2X\t$src1,\t$src2,\t$dst", [], 1, unit_l>;
+// The actual prolog itself now requires some insns to occur in parallel,
+// which I haven't yet modelled for tablegen. So instead we have this fake
+// instruction that the assembly printer will see and emit the parallel code
+// for. Unpleasent, but saves a whole load of pain immediately.
+def prolog : inst<(outs), (ins i32imm:$stacksz), "", [], 0, unit_s> {
+	let hasSideEffects = 1;
+}
 
-// For varargs, we have to calculate a pointer onto the stack argument area
-// using the stack pointer; thats best achieved with just "add 4, B15, dst",
-// however that requires the use of the Xpath, hence this special case insn
-def vastart_add : pseudo_ri<"add", ".D1X", (i32 uconst5:$imm), unit_l,
-							tms_vastart, 1>;
-
+// Similar story for epilog
+def epilog : inst<(outs), (ins), "", [], 0, unit_s> {
+	let hasSideEffects = 1;
+}
 
 // Multiplies - there are a million and one of them, so we'll just be using
 // mpy32. It might be possible to apply various constraints to the size of
@@ -332,7 +330,7 @@ def brcond_p : nopred_inst<(outs), (ins brtarget:$block), "b\t.S1\t$block",
 	let Pattern = sched_pattern;
 }
 
-def bindirect_2 : inst<(outs), (ins GPRegs:$reg), "b\t.S2X\t$reg",
+def bindirect_2 : inst<(outs), (ins GPRegs:$reg), "bnop\t.S2X\t$reg,\t5",
 				[(brind GPRegs:$reg)], 1, unit_s> {
 	let Pattern = sched_pattern;
 }
@@ -364,7 +362,8 @@ def callp_e_p : inst<(outs), (ins calltarget:$dst, variable_ops),
 }
 
 def call_indirect_2 : inst<(outs), (ins GPRegs:$reg, variable_ops),
-				"b\t.S2X\t$reg", [(TMS320C64Xcall GPRegs:$reg)],
+				"bnop\t.S2X\t$reg,\t5",
+				[(TMS320C64Xcall GPRegs:$reg)],
 				1, unit_s> {
 	let Pattern = sched_pattern;
 	let Uses = [B3];

@@ -184,18 +184,18 @@ TMS320C64XInstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
 			// next, or it's a conditional before unconditional.
 
 			if (TBB != NULL) {
-				// True condition branches to operand of
-				// this conditional branch; false condition is
-				// where the following unconditional goes.
+				// False: the trailing unconditional branch
+				// True: the conditional branch if taken
 				FBB = TBB;
 				TBB = I->getOperand(0).getMBB();
 			} else {
 				TBB = I->getOperand(0).getMBB();
 			}
 
-			// Grab the condition
+			// Store the conditions of the conditional jump
 			Cond.push_back(I->getOperand(1)); // Zero/NZ
 			Cond.push_back(I->getOperand(2)); // Reg
+
 			return false;
 		}
 
@@ -213,7 +213,7 @@ TMS320C64XInstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
 		return true; // Something we don't understand at all
 	}
 
-	return false;
+	return true;
 }
 
 unsigned
@@ -237,6 +237,9 @@ TMS320C64XInstrInfo::InsertBranch(MachineBasicBlock &MBB,
 		// analyze branch
 		BuildMI(&MBB, dl, get(TMS320C64X::brcond_p)).addMBB(TBB)
 			.addImm(Cond[0].getImm()).addReg(Cond[1].getReg());
+		if (FBB)
+			addDefaultPred(BuildMI(&MBB, dl,
+					get(TMS320C64X::brcond_p)).addMBB(FBB));
 	}
 
 	return 1;
@@ -266,6 +269,18 @@ TMS320C64XInstrInfo::RemoveBranch(MachineBasicBlock &MBB) const
 	}
 
 	return count;
+}
+
+bool
+TMS320C64XInstrInfo::ReverseBranchCondition(
+				SmallVectorImpl<MachineOperand> &Cond) const
+{
+	int val;
+
+	val = Cond[0].getImm();
+	val = (val) ? 0 : 1;
+	Cond[0] = MachineOperand::CreateImm(val);
+	return false;
 }
 
 bool
@@ -304,4 +319,78 @@ TMS320C64XInstrInfo::isMoveInstr(const MachineInstr &MI, unsigned &src_reg,
 	}
 
 	return false;
+}
+
+unsigned
+TMS320C64XInstrInfo::isLoadFromStackSlot(const MachineInstr *MI,
+						int &FrameIndex) const
+{
+	unsigned opcode;
+
+	opcode = MI->getDesc().getOpcode();
+
+	if (opcode == TMS320C64X::word_load_p_idx ||
+			opcode == TMS320C64X::hword_load_p_idx ||
+			opcode == TMS320C64X::uhword_load_p_idx ||
+			opcode == TMS320C64X::byte_load_p_idx ||
+			opcode == TMS320C64X::ubyte_load_p_idx) {
+		if (MI->getOperand(0).getReg() == TMS320C64X::B15) {
+			MachineOperand op = MI->getOperand(1);
+			if (op.isFI()) {
+				FrameIndex = op.getIndex();
+				return true;
+			} else {
+				// XXX - are there any circumstances where
+				// we'll be handed an insn after frame index
+				// elimination? I find this unlikely, but just
+				// in case
+				llvm_unreachable("Found load-from-stack sans "
+						"frame index operand");
+			}
+		}
+	}
+
+	return false;
+}
+
+unsigned
+TMS320C64XInstrInfo::isStoreToStackSlot(const MachineInstr *MI,
+						int &FrameIndex) const
+{
+	unsigned opcode;
+
+	opcode = MI->getDesc().getOpcode();
+
+	if (opcode == TMS320C64X::word_store_p_idxaddr ||
+			opcode == TMS320C64X::hword_store_p_idxaddr ||
+			opcode == TMS320C64X::byte_store_p_idxaddr) {
+		if (MI->getOperand(1).getReg() == TMS320C64X::B15) {
+			MachineOperand op = MI->getOperand(2);
+			if (op.isFI()) {
+				FrameIndex = op.getIndex();
+				return true;
+			} else {
+				llvm_unreachable("Found store-to-stack sans "
+						"frame index operand");
+			}
+		}
+	}
+
+	return false;
+}
+
+bool
+TMS320C64XInstrInfo::isPredicated(const MachineInstr *MI) const
+{
+	int pred_idx, pred_val;
+
+	pred_idx = MI->findFirstPredOperandIdx();
+	if (pred_idx == -1)
+		return false;
+
+	pred_val = MI->getOperand(pred_idx).getImm();
+	if (pred_val == -1)
+		return false;
+
+	return true;
 }

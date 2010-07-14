@@ -198,7 +198,7 @@ TMS320C64XLowering::LowerFormalArguments(SDValue Chain,
 	MachineRegisterInfo &RegInfo = MF.getRegInfo();
 
 	arg_idx = 0;
-	stack_offset = 0;
+	stack_offset = 4; // Arguments start 4 bytes before the FP
 
 	CCState CCInfo(CallConv, isVarArg, getTargetMachine(), ArgLocs,
 			*DAG.getContext());
@@ -728,8 +728,12 @@ TMS320C64XLowering::LowerVASTART(SDValue op, SelectionDAG &DAG)
 		stackgap = (num_normal_params - 10) * 4;
 	}
 
-	SDValue Chain = DAG.getNode(TMSISD::VASTART, op.getDebugLoc(), MVT::i32,
-				DAG.getRegister(TMS320C64X::B15, MVT::i32),
+	// That gives us the offset of the last fixed stack argument; now
+	// increment that to point at the first var argument
+	stackgap += 4;
+
+	SDValue Chain = DAG.getNode(ISD::ADD, op.getDebugLoc(), MVT::i32,
+				DAG.getRegister(TMS320C64X::A15, MVT::i32),
 				DAG.getConstant(stackgap, MVT::i32));
 	const Value *SV = cast<SrcValueSDNode>(op.getOperand(2))->getValue();
 	return DAG.getStore(op.getOperand(0), op.getDebugLoc(), Chain,

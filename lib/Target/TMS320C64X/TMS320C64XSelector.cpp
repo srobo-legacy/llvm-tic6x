@@ -228,17 +228,17 @@ TMS320C64XInstSelectorPass::select_addr(SDNode *&op, SDValue &N,
 				return false;
 			}
 
-			// scale offset by amount hardware will
-			offset >>= (int)log2(want_align);
-			DebugLoc dl = DebugLoc::getUnknownLoc();
-			MachineFunction &MF = CurDAG->getMachineFunction();
-			MachineRegisterInfo &MR = MF.getRegInfo();
-			unsigned reg = MR.createVirtualRegister(
-					&TMS320C64X::GPRegsRegClass);
-
-			offs = CurDAG->getCopyToReg(N.getOperand(1), dl, reg,
-					CurDAG->getTargetConstant(offset,
-					MVT::i32));
+			// XXX - there was some code here that attempted to load
+			// the offs operand into a register and then pump it out
+			// however this wasn't valid - LLVM doesn't expect new
+			// SDNodes to occur as a result of selection. Removing
+			// this should have caused some offset-too-large
+			// complaints from the assembler.. but didn't. So I can
+			// only assume that this is munging offsets into a
+			// register or otherwise doing something unexpected. In
+			// either case, memory access beating needs to be
+			// rewritten, again.
+			offs = N.getOperand(1);
 			return true;
 		}
 	} else if (N.getOpcode() == ISD::ADD) {

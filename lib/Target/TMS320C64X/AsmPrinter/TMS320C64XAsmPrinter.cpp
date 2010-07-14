@@ -63,6 +63,8 @@ public:
 
 	bool print_predicate(const MachineInstr *MI);
 	void printInstruction(const MachineInstr *MI);
+	void emit_prolog(const MachineInstr *MI);
+	void emit_epilog(const MachineInstr *MI);
 	bool runOnMachineFunction(MachineFunction &F);
 	void PrintGlobalVariable(const GlobalVariable *GVar);
 	void printOperand(const MachineInstr *MI, int opNum);
@@ -112,8 +114,17 @@ TMS320C64XAsmPrinter::runOnMachineFunction(MachineFunction &MF)
 
 		for (MachineBasicBlock::const_iterator II = I->begin(),
 				E = I->end(); II != E; ++II) {
-			print_predicate(II);
-			printInstruction(II);
+			unsigned opcode;
+
+			opcode = II->getDesc().getOpcode();
+			if (opcode == TMS320C64X::prolog) {
+				emit_prolog(II);
+			} else if (opcode == TMS320C64X::epilog) {
+				emit_epilog(II);
+			} else {
+				print_predicate(II);
+				printInstruction(II);
+			}
 			O << "\n";
 		}
 	}
@@ -121,6 +132,34 @@ TMS320C64XAsmPrinter::runOnMachineFunction(MachineFunction &MF)
 	return false;
 }
 
+void
+TMS320C64XAsmPrinter::emit_prolog(const MachineInstr *MI)
+{
+	// See instr info td file for why we do this here
+
+	O << "mvk\t\t";
+	printOperand(MI, 0);
+	O << ",\tA0\n";
+	O << "\t||\tmv\t\tB15,\tA1\n";
+	O << "\t\tstw\t\tA15,\t*B15\n";
+	O << "\t||\tstw\t\tB3,\t*-A1(4)\n";
+	O << "\t||\tmv\t\tB15,\tA15\n";
+	O << "\t||\tsub\t\tB15,\tA0\t,B15\n";
+
+	return;
+}
+void
+TMS320C64XAsmPrinter::emit_epilog(const MachineInstr *MI)
+{
+	// See instr info td file for why we do this here
+
+	O << "ldw\t\t*-A15(4),\tB3\n";
+	O << "\t\tmv\t\tA15,\tB15\n";
+	O << "\t||\tldw\t\t*A15,\tA15\n";
+	O << "\t\tnop\t\t4\n";
+
+	return;
+}
 bool
 TMS320C64XAsmPrinter::print_predicate(const MachineInstr *MI)
 {
