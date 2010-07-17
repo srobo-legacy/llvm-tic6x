@@ -41,25 +41,6 @@ class MemImmIndex<int val> : MemIndex {
 	let imm = val;
 }
 
-class AddrMode<int kind> {
-	int mode = kind;
-}
-
-def PreInc	: AddrMode<0>;
-def PostInc	: AddrMode<1>;
-def PreDec	: AddrMode<2>;
-def PostDec	: AddrMode<3>;
-def PreIncReg	: AddrMode<4>;
-def PostIncReg	: AddrMode<5>;
-def PreDecReg	: AddrMode<6>;
-def PostDecReg	: AddrMode<7>;
-def PreIncImm	: AddrMode<8>;
-def PostIncImm	: AddrMode<9>;
-def PreDecImm	: AddrMode<10>;
-def PostDecImm	: AddrMode<11>;
-def PlainReg	: AddrMode<12>;
-def PlainImm	: AddrMode<13>;
-
 class InstUnit<bits<2> u> {
 	bits<2> unit = u;
 }
