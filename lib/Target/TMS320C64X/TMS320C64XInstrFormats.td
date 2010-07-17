@@ -44,20 +44,6 @@ def call_ret_label_operand_operand : Operand<i32> {
 	let PrintMethod = "printRetLabel";
 }
 
-def i8index : PatLeaf<(imm), [{
-	return ((int)N->getSExtValue() >= 0 && (int)N->getSExtValue() < 32);
-}]>;
-
-def i16index : PatLeaf<(imm), [{
-	return ((int)N->getSExtValue() >= 0 && (int)N->getSExtValue() < 64 &&
-			((int)N->getSExtValue() & 1) == 0);
-}]>;
-
-def i32index : PatLeaf<(imm), [{
-	return ((int)N->getSExtValue() >= 0 && (int)N->getSExtValue() < 32 &&
-			((int)N->getSExtValue() & 3) == 0);
-}]>;
-
 def addr : ComplexPattern<i32, 2, "select_addr", [], []>;
 def idxaddr : ComplexPattern<i32, 2, "select_idxaddr", [frameindex], []>;
 
