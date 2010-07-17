@@ -24,23 +24,6 @@
 // THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //===----------------------------------------------------------------------===//
 
-// Memory index, ie register, immediate. Note no restriction on imm size here
-class MemIndex {
-	bit is_imm = 0;
-	int imm = -1;
-	MainReg reg;
-}
-
-class MemRegIndex<MainReg r> : MemIndex {
-	let is_imm = 0;
-	let reg = r;
-}
-
-class MemImmIndex<int val> : MemIndex {
-	let is_imm = 1;
-	let imm = val;
-}
-
 class InstUnit<bits<2> u> {
 	bits<2> unit = u;
 }
