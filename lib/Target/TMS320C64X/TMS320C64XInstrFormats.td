@@ -24,42 +24,6 @@
 // THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //===----------------------------------------------------------------------===//
 
-// Memory index, ie register, immediate. Note no restriction on imm size here
-class MemIndex {
-	bit is_imm = 0;
-	int imm = -1;
-	MainReg reg;
-}
-
-class MemRegIndex<MainReg r> : MemIndex {
-	let is_imm = 0;
-	let reg = r;
-}
-
-class MemImmIndex<int val> : MemIndex {
-	let is_imm = 1;
-	let imm = val;
-}
-
-class AddrMode<int kind> {
-	int mode = kind;
-}
-
-def PreInc	: AddrMode<0>;
-def PostInc	: AddrMode<1>;
-def PreDec	: AddrMode<2>;
-def PostDec	: AddrMode<3>;
-def PreIncReg	: AddrMode<4>;
-def PostIncReg	: AddrMode<5>;
-def PreDecReg	: AddrMode<6>;
-def PostDecReg	: AddrMode<7>;
-def PreIncImm	: AddrMode<8>;
-def PostIncImm	: AddrMode<9>;
-def PreDecImm	: AddrMode<10>;
-def PostDecImm	: AddrMode<11>;
-def PlainReg	: AddrMode<12>;
-def PlainImm	: AddrMode<13>;
-
 class InstUnit<bits<2> u> {
 	bits<2> unit = u;
 }
@@ -79,20 +43,6 @@ def brtarget : Operand<OtherVT>;
 def call_ret_label_operand_operand : Operand<i32> {
 	let PrintMethod = "printRetLabel";
 }
-
-def i8index : PatLeaf<(imm), [{
-	return ((int)N->getSExtValue() >= 0 && (int)N->getSExtValue() < 32);
-}]>;
-
-def i16index : PatLeaf<(imm), [{
-	return ((int)N->getSExtValue() >= 0 && (int)N->getSExtValue() < 64 &&
-			((int)N->getSExtValue() & 1) == 0);
-}]>;
-
-def i32index : PatLeaf<(imm), [{
-	return ((int)N->getSExtValue() >= 0 && (int)N->getSExtValue() < 32 &&
-			((int)N->getSExtValue() & 3) == 0);
-}]>;
 
 def addr : ComplexPattern<i32, 2, "select_addr", [], []>;
 def idxaddr : ComplexPattern<i32, 2, "select_idxaddr", [frameindex], []>;
@@ -173,64 +123,6 @@ def nodefault_zflag : PredicateOperand<i32, (ops timm), (ops)>;
 def nodefault_reg : PredicateOperand<i32, (ops PredRegs), (ops)>;
 
 def predwrapper1 : ComplexPattern<i32, 1, "bounce_predicate", [], []>;
-
-// A note on how we're formatting instruction representation.
-//
-// All instructions we care about right now have at _least_ a destination
-// register operand, almost always one source register operand, generally two,
-// sometimes an immediate instead. In general, instructions can only access
-// registers on one side of the processor. Which side they're on is defined by
-// where the destination register is (you can only write back to your own side).
-//
-// So for many instructions, all registers used will have to be on one side,
-// hence a lot of the templating below orientates about all registers being in
-// either ARegs or BRegs, but not both.
-//
-// Some instructions can use the "crosspath" (xpath), and access both banks of
-// registers - but, only one insn on each side of the processor in any cycle.
-// So to cater for those some insns have one operand as GPRegs rather than
-// ARegs or BRes
-//
-// UPDATE: I'm covered in bees
-//
-// Some significant suckage has been averted at the expense of my eyes. Add to
-// the above the fact that, to allow immediates we need to inject a dag
-// specifying the predicate into the pattern. We also need to move the pattern
-// into the multiclass, to allow side-specific register classes to be used.
-//
-// Also throw into this control over what order the operands match the operator
-// node, and that this might have to be flipped to support what the assembler
-// expects.
-//
-// So what we have, is death in a cake. Solution: pass in a dag for imms,
-// the SDNode of the operator (neat trick from sparcs instrformats.td),
-// and a "swap" integer operand, which selects whether the operand order is
-// reversed when emmitted. Will it work, who can say.
-//
-// UPDATE: Tactical clarinet eye-strike
-//
-// Tablegen won't permit multiple instructions to match the same pattern, which
-// torpedoes trying to generate VLIW parallelism at the instruction selection
-// level. New tactic: we have a high-level pseudo-instruction, that represents
-// all the different forms the insn can take. This only executes on one side of
-// the processor, and only in one slot.
-//
-// We then have a set of "real" instructions, that represent the different forms
-// and sides and units the instruction can have. We then have the option of
-// using the singled-sided, non-parallel implementation. Or setting the
-// usesCustomDAGSchedInserter flag on the psuedo-insts, and morphing them
-// into parallel {unit,side} specific insns. Only the former will be implemented
-// for now, the latter is an area of expansion that can be targetted when I'm
-// not actually on fire.
-//
-// Implementing the latter will require two things - making a tablegen backend
-// that spits out code to find what insns are valid to map the pseudo onto. In
-// its current form tablegen output isn't sufficient to do this. After that, a
-// register pass is needed to ensure correct legalisation of register
-// allocation. AKA, making sure that the xpath is only used once per execution
-// packet.
-
-
 
 class inst<dag outs, dag ins, string asm_str, list<dag> pattern, bit side,
 			InstUnit u> : Instruction {
