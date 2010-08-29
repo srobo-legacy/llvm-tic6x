@@ -151,14 +151,10 @@ def sub_p_ri : pseudo_ri<"sub", ".D1", (i32 uconst5:$imm), unit_d, sub, 0>;
 // which I haven't yet modelled for tablegen. So instead we have this fake
 // instruction that the assembly printer will see and emit the parallel code
 // for. Unpleasent, but saves a whole load of pain immediately.
-def prolog : inst<(outs), (ins i32imm:$stacksz), "", [], 0, unit_s> {
-	let hasSideEffects = 1;
-}
+def prolog : inst<(outs), (ins i32imm:$stacksz), "", [], 0, unit_s>;
 
 // Similar story for epilog
-def epilog : inst<(outs), (ins), "", [], 0, unit_s> {
-	let hasSideEffects = 1;
-}
+def epilog : inst<(outs), (ins), "", [], 0, unit_s>;
 
 // Multiplies - there are a million and one of them, so we'll just be using
 // mpy32. It might be possible to apply various constraints to the size of
