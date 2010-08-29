@@ -123,6 +123,7 @@ TMS320C64XLowering::TMS320C64XLowering(TMS320C64XTargetMachine &tm) :
 	setOperationAction(ISD::SHL_PARTS, MVT::i32, Expand);
 	setOperationAction(ISD::SRA_PARTS, MVT::i32, Expand);
 	setOperationAction(ISD::SRL_PARTS, MVT::i32, Expand);
+	setOperationAction(ISD::ROTR, MVT::i32, Expand);
 
 	// There's no carry support, we're supposed to use 40 bit integers
 	// instead. Let llvm generate workarounds instead.
