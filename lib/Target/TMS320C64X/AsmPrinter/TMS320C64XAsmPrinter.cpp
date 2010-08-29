@@ -137,7 +137,7 @@ TMS320C64XAsmPrinter::emit_prolog(const MachineInstr *MI)
 {
 	// See instr info td file for why we do this here
 
-	O << "mvk\t\t";
+	O << "\t\tmvk\t\t";
 	printOperand(MI, 0);
 	O << ",\tA0\n";
 	O << "\t||\tmv\t\tB15,\tA1\n";
