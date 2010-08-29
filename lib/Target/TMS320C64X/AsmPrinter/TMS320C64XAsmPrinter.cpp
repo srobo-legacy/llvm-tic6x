@@ -153,7 +153,7 @@ TMS320C64XAsmPrinter::emit_epilog(const MachineInstr *MI)
 {
 	// See instr info td file for why we do this here
 
-	O << "ldw\t\t*-A15(4),\tB3\n";
+	O << "\t\tldw\t\t*-A15(4),\tB3\n";
 	O << "\t\tmv\t\tA15,\tB15\n";
 	O << "\t||\tldw\t\t*A15,\tA15\n";
 	O << "\t\tnop\t\t4\n";
