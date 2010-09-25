@@ -312,7 +312,7 @@ def : Pat<(i32 mvk_all_pred:$val),
 
 // Branch / call instructions
 
-let isTerminator = 1, isBranch = 1, delay_slots = 4, hasDelaySlot = 1 in {
+let isTerminator = 1, isBranch = 1, delay_slots = 5, hasDelaySlot = 1 in {
 def branch_p : inst<(outs), (ins brtarget:$block), "b\t.S1\t$block",
 				[(br bb:$block)], 0, unit_s> {
 	let Pattern = sched_pattern;
